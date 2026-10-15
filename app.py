@@ -280,16 +280,23 @@ def wynn_button():
     return {'wynn_login': wynn_config() is not None}
 
 def wynn_api(url, data = None, token = None):
-    req = urllib.request.Request(url, data = urlencode(data).encode() if data else None,
-                                 headers = {'Authorization': 'Bearer ' + token} if token else {})
+    # Cloudflare in front of the API refuses Python's default User-Agent (error 1010)
+    headers = {'User-Agent': 'WynnGuessr (+https://wynndle.com)'}
+    if token:
+        headers['Authorization'] = 'Bearer ' + token
+    req = urllib.request.Request(url, data = urlencode(data).encode() if data else None, headers = headers)
     with urllib.request.urlopen(req, timeout = 10) as r:
         return json.load(r)
+
+def wynn_fail(message):
+    # these routes sit two folders deep: show the error on the normal page
+    return redirect('../../apology?' + urlencode({'message': message}))
 
 @app.route("/auth/wynncraft")
 def wynn_start():
     cfg = wynn_config()
     if not cfg:
-        return render_template('apology.html', message = "Wynncraft login is not set up yet")
+        return wynn_fail("Wynncraft login is not set up yet")
     session['wynn_state'] = secrets.token_urlsafe(16)
     session['wynn_next'] = next_page()
     url = cfg['authorize_url']
@@ -300,9 +307,9 @@ def wynn_back():
     cfg = wynn_config()
     state = session.pop('wynn_state', None)
     if not cfg or not state or request.args.get('state') != state:
-        return render_template('apology.html', message = "Wynncraft login failed, please try again")
+        return wynn_fail("Wynncraft login failed, please try again")
     if not request.args.get('code'):
-        return render_template('apology.html', message = "Wynncraft login was cancelled")
+        return wynn_fail("Wynncraft login was cancelled")
     try:
         token = wynn_api('https://api.wynncraft.com/v3/oauth/token', {
             'grant_type': 'authorization_code', 'code': request.args['code'], 'redirect_uri': cfg['redirect_uri'],
@@ -310,21 +317,23 @@ def wynn_back():
         profiles = wynn_api('https://api.wynncraft.com/v3/oauth/me', token = token)['profiles']
         uuid, profile = sorted(profiles.items(), key = lambda p: not p[1].get('primary'))[0]
         name = profile['username']
-    except Exception:
-        return render_template('apology.html', message = "Wynncraft did not answer, please try again")
+    except Exception as e:
+        detail = e.read()[:300] if hasattr(e, 'read') else ''
+        app.logger.error("Wynncraft login: %r %s", e, detail)
+        return wynn_fail("Wynncraft did not answer, please try again")
     with connect() as c:
         owner = c.execute("SELECT id FROM users WHERE mc_uuid = ?", (uuid,)).fetchone()
         if session.get('loggedin'):
             # linking an existing account, from the profile page
             if owner and owner[0] != session['user_id']:
-                return render_template('apology.html', message = "This Minecraft account is already linked to another account")
+                return wynn_fail("This Minecraft account is already linked to another account")
             c.execute("UPDATE users SET mc_uuid = ?, mc_name = ? WHERE id = ?", (uuid, name, session['user_id']))
             return redirect('../../profile')
         if owner:
             c.execute("UPDATE users SET mc_name = ? WHERE id = ?", (name, owner[0]))  # Minecraft names can change
             uid = owner[0]
         elif c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
-            return render_template('apology.html', message = "An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
+            return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
     session.permanent = True
