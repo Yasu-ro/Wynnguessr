@@ -582,15 +582,14 @@ function clocks() {
     }
     if (view.indexOf('guess') == 0) {
         if (deadline === null) {
-            $('#hud-time').empty();
             $('#room-countdown').prop('hidden', true);
         } else {
+            // the time left, in its own box under the banner, red for the last ten seconds;
+            // out loud too, for whoever still has to guess
             var left = Math.max(0, (deadline - Date.now()) / 1000);
-            $('#hud-time').html("<i class='material-icons'>timer</i>" + clock(left)).toggleClass('urgent', left <= 10);
-            // the last ten seconds, big in the middle of the screen and out loud, for whoever still has to guess
             var second = Math.ceil(left), guessing = !submitted && (!s.live || s.playing);
-            $('#room-countdown').prop('hidden', !(guessing && left > 0 && left <= 10)).text(second)
-                .toggleClass('final', second <= 3);
+            $('#room-countdown').prop('hidden', false).html("<i class='material-icons'>timer</i>" + clock(left))
+                .toggleClass('urgent', left <= 10);
             if (guessing && second != lastSecond && left > 0) {
                 if (second == 10 || second == 5) {
                     sound('warn');

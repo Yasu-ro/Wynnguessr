@@ -1311,25 +1311,23 @@ a.play-card:hover{
 
 /* ---------- Countdown ---------- */
 .room-countdown{
-    min-width: 90px;
-    padding: 0 18px;
-    background-color: rgba(20, 19, 35, .85);
-    border: 3px solid black;
+    display: flex;
+    align-items: center;
+    padding: 2px 18px;
+    background-color: #baaa80;
+    border: 3px solid #857361;
     border-radius: 12px;
-    color: #ffd54a;
-    font-size: 52px;
+    color: black;
+    font-size: 30px;
     font-weight: bold;
-    line-height: 1.2;
-    text-align: center;
-    animation: room-pulse 1s infinite;
 }
-.room-countdown.final{
-    color: #ff4d4d;
-    border-color: #ff4d4d;
+.room-countdown .material-icons{
+    margin-right: 6px;
+    font-size: 30px;
 }
-@keyframes room-pulse{
-    0%{ transform: scale(1.12); }
-    100%{ transform: scale(1); }
+.room-countdown.urgent{
+    color: #b3261e;
+    border-color: #b3261e;
 }
 @media (max-width: 800px){
     .room-chat-game{
@@ -1352,4 +1350,70 @@ a.play-card:hover{
 .play-card p a{
     color: #402523;
     font-weight: bold;
+}
+
+/* ---------- Game panels in the site's colours ---------- */
+.room-hud{
+    background-color: #baaa80;
+    border: 3px solid #857361;
+    color: black;
+}
+.room-hud-call{
+    color: #b3261e;
+}
+.room-panel{
+    background-color: #baaa80;
+    border-left: 4px solid #857361;
+    color: black;
+}
+.room-panel h2{
+    color: black;
+}
+.room-mine{
+    color: #2f6b2f;
+}
+.room-mine.none{
+    color: #5a4a3a;
+}
+.room-mine.room-bullseye{
+    color: #8a6100;
+}
+.room-table th{
+    color: #402523;
+    font-weight: bold;
+}
+.room-table td{
+    border-top: 2px solid #857361;
+}
+.room-loss{
+    color: #b3261e;
+}
+.room-gain{
+    color: #2f6b2f;
+}
+.room-hp{
+    background-color: #857361;
+}
+.material-icons.room-heart.empty{
+    color: #857361;
+}
+.next-button:disabled, .guess-button:disabled{
+    background-color: #a3b48f;
+    color: #4b4b4b;
+}
+#score-container{
+    background-color: #baaa80;
+    border-top: 4px solid #857361;
+}
+#score-container .score-info{
+    color: black;
+}
+.progress-bar{
+    background-color: #857361;
+}
+@media (max-width: 800px){
+    .room-panel{
+        border-left: 0;
+        border-top: 4px solid #857361;
+    }
 }
