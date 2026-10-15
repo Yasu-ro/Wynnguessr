@@ -205,7 +205,7 @@ function chat(messages) {
             return;
         }
         chatId = m.id;
-        log.append("<p><b style='color:" + COLORS[m.color % COLORS.length] + "'>" + esc(m.name) + "</b> " + esc(m.text) + "</p>");
+        log.append("<p>" + dot(m) + "<b>" + esc(m.name) + "</b><span>" + esc(m.text) + "</span></p>");
         if ($('#room-chat').hasClass('folded') && m.name != me().name) {
             unread++;
         }

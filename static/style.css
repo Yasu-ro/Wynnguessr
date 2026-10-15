@@ -1183,10 +1183,10 @@ a.play-card:hover{
     display: flex;
     flex-direction: column;
     margin: 5px;
-    background-color: rgba(20, 19, 35, .9);
-    border: 3px solid black;
+    background-color: #baaa80;
+    border: 4px solid #857361;
     border-radius: 12px;
-    color: white;
+    color: black;
     text-align: left;
     overflow: hidden;
 }
@@ -1201,11 +1201,11 @@ a.play-card:hover{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 4px 10px;
+    padding: 3px 10px;
     background-color: #857361;
+    border-bottom: 3px solid #402523;
     color: black;
-    font-size: 17px;
-    font-weight: bold;
+    font-size: 18px;
     cursor: pointer;
 }
 .room-sound{
@@ -1216,27 +1216,43 @@ a.play-card:hover{
     color: black;
     cursor: pointer;
 }
+.room-sound:hover{
+    color: white;
+}
 .room-chat-log{
     height: 160px;
     padding: 6px 10px;
     overflow-y: auto;
-    font-size: 16px;
+    font-size: 17px;
 }
 .room-chat-log p{
-    margin: 0 0 3px;
+    display: flex;
+    align-items: baseline;
+    margin: 0 0 4px;
     overflow-wrap: anywhere;
+}
+.room-chat-log .room-dot{
+    width: 11px;
+    height: 11px;
+    margin-right: 6px;
+}
+.room-chat-log b{
+    margin-right: 6px;
+    white-space: nowrap;
 }
 .room-chat-form{
     display: flex;
-    border-top: 2px solid #3a3950;
+    gap: 6px;
+    padding: 6px;
 }
 .room-chat-form input{
     flex: 1;
     min-width: 0;
-    padding: 5px 10px;
-    background: none;
-    border: 0;
-    color: white;
+    padding: 3px 8px;
+    background-color: white;
+    border: 3px solid black;
+    border-radius: 8px;
+    color: black;
     font-size: 16px;
     outline: none;
 }
@@ -1244,20 +1260,27 @@ a.play-card:hover{
     display: flex;
     align-items: center;
     padding: 0 10px;
-    background: none;
-    border: 0;
-    color: #83C73C;
+    background-color: #83C73C;
+    border: 3px solid black;
+    border-radius: 8px;
+    color: black;
     cursor: pointer;
+}
+.room-chat-form button:hover{
+    background-color: #6FAE2D;
 }
 .room-chat.folded .room-chat-log, .room-chat.folded .room-chat-form{
     display: none;
+}
+.room-chat.folded .room-chat-head{
+    border-bottom: 0;
 }
 .room-chat-game{
     position: fixed;
     top: calc(var(--nav) + 10px);
     left: 50px;
     z-index: 600;
-    width: 280px;
+    width: 290px;
 }
 .room-chat-game .room-chat{
     margin: 0;
