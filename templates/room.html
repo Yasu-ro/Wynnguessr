@@ -8,7 +8,7 @@
 <div id="room" data-code="{{ code }}">
 
     <section id="lobby" class="room-page" hidden>
-        <h1>Room {{ code }}</h1>
+        <h1 class="sign">Room {{ code }}</h1>
         <div class="room-columns">
             <div class="room-column">
                 <fieldset class="mode-select-box">
@@ -80,7 +80,7 @@
     </section>
 
     <section id="results" class="room-page" hidden>
-        <h1 id="results-title">Results</h1>
+        <h1 class="sign" id="results-title">Results</h1>
         <table class="leaderboard-table room-results">
             <thead><tr class="leaderboard-row"><th>Rank</th><th>Player</th><th id="results-score">Score</th></tr></thead>
             <tbody id="results-rows"></tbody>

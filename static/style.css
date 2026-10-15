@@ -1175,7 +1175,9 @@ a.play-card:hover{
     padding: 6px 40px;
 }
 .play-back{
-    display: inline-block;
+    display: table;
+    margin-left: auto;
+    margin-right: auto;
     margin-bottom: 5px;
     color: white;
     font-size: 18px;
@@ -1564,4 +1566,73 @@ a.play-card:hover{
     .match-result{
         flex-basis: 100%;
     }
+}
+
+/* ---------- Wynncraft touch ----------
+   Ubuntu and Architects Daughter (free Google fonts, the ones wynncraft.com
+   uses), raised buttons, page titles on hanging wooden signs, the current
+   page lit in the menu. Inspired by their site, nothing taken from it. */
+*{
+    font-family: Ubuntu, Georgia, sans-serif;
+}
+.material-icons{
+    font-family: 'Material Icons';
+}
+.nav-link-left, .nav-link-right{
+    font-family: 'Architects Daughter', Ubuntu, cursive;
+    font-weight: bold;
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), inset 0 -3px 0 rgba(0, 0, 0, .25);
+}
+.nav-link-left[data-here]{
+    background-color: #f5d76e;
+}
+h1.sign{
+    position: relative;
+    display: inline-block;
+    margin: 28px 0 15px;
+    padding: 4px 26px;
+    background-color: #9a7b55;
+    border: 4px solid #402523;
+    border-radius: 8px;
+    box-shadow: inset 0 3px 0 rgba(255, 255, 255, .25), inset 0 -4px 0 rgba(0, 0, 0, .3), 0 4px 8px rgba(0, 0, 0, .35);
+    color: white;
+    font-style: italic;
+    font-weight: bold;
+    text-shadow: 0 2px 0 #402523;
+}
+/* the two ropes it hangs from */
+h1.sign::before, h1.sign::after{
+    content: "";
+    position: absolute;
+    top: -26px;
+    width: 4px;
+    height: 22px;
+    background-color: #402523;
+}
+h1.sign::before{
+    left: 22%;
+}
+h1.sign::after{
+    right: 22%;
+}
+.form-submit, .play-button, .next-button, .guess-button, .wynn-button{
+    box-shadow: inset 0 3px 0 rgba(255, 255, 255, .4), inset 0 -4px 0 rgba(0, 0, 0, .25);
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.form-submit:disabled, .next-button:disabled, .guess-button:disabled{
+    box-shadow: none;
+}
+.mode-select-option, .filter-option, .board-mode, .room-player, .room-code{
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .5), inset 0 -3px 0 rgba(0, 0, 0, .15);
+}
+:checked + label{
+    box-shadow: inset 0 2px 0 rgba(255, 255, 255, .25), inset 0 -3px 0 rgba(0, 0, 0, .3);
+}
+.play-card, .profile-stat, .match, .room-chat, .room-hud, .room-countdown, .profile-wynn{
+    box-shadow: inset 0 3px 0 rgba(255, 255, 255, .25), 0 4px 8px rgba(0, 0, 0, .3);
+}
+.welcome-header, .play-card h2, .room-panel h2{
+    font-style: italic;
+    font-weight: bold;
 }

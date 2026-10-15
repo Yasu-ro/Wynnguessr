@@ -3,7 +3,7 @@
 {% block title %}: Leaderboard{% endblock %}
 
 {% block content %}
-<h1>Leaderboard</h1>
+<h1 class="sign">Leaderboard</h1>
 <div class="board" data-api="api/updaterank">
 {% include "board.html" %}
     {% if not session['loggedin'] %}

@@ -6,7 +6,7 @@
 {% set names = {'classic': 'Classic', 'survival': 'Survival', 'duel': 'Duel', 'royale': 'Battle Royale'} %}
 <div class="profile">
     <div class="profile-head">
-        <h1>{{ username }}</h1>
+        <h1 class="sign">{{ username }}</h1>
         {% if mc_name %}
             <a class="profile-wynn" href="https://wynncraft.com/stats/player/{{ mc_name | urlencode }}" target="_blank" rel="noopener">
                 <i class="material-icons wynn-check">verified</i> Wynncraft: {{ mc_name }} <i class="material-icons">open_in_new</i></a>

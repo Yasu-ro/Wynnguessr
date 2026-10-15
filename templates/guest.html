@@ -3,7 +3,7 @@
 {% block title %}: Join{% endblock %}
 
 {% block content %}
-    <h1>Join the Game</h1>
+    <h1 class="sign">Join the Game</h1>
     <div class="play-choices">
 {% with next = request.args.get('next', 'mode?play=friends') %}{% include "guest_card.html" %}{% endwith %}
     </div>

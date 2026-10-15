@@ -4,7 +4,7 @@
 
 {% block content %}
     {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
-    <h1>Register</h1>
+    <h1 class="sign">Register</h1>
     {% if 'room' in request.args.get('next', '') %}
         <p class="friends-hint">Create an account to join your friends' room.</p>
     {% endif %}

@@ -5,7 +5,7 @@
 {% block content %}
 {% set play = request.args.get('play') %}
 {% if play == 'solo' %}
-    <h1>Play Solo</h1>
+    <h1 class="sign">Play Solo</h1>
     <a class="play-back" href="mode">← Back</a>
     <div>
         <form action="game" class="mode-select-form" method="get">
@@ -16,7 +16,7 @@
     </div>
     <script>showRules();</script>
 {% elif play == 'friends' %}
-    <h1>Play With Friends</h1>
+    <h1 class="sign">Play With Friends</h1>
     <a class="play-back" href="mode">← Back</a>
     {% if session['user_id'] %}
     <div class="play-choices">
@@ -50,7 +50,7 @@
     </div>
     {% endif %}
 {% else %}
-    <h1>How Do You Want to Play?</h1>
+    <h1 class="sign">How Do You Want to Play?</h1>
     <div class="play-choices">
         <a class="play-card" href="mode?play=solo">
             <i class="material-icons">person</i>
