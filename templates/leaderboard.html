@@ -6,7 +6,7 @@
 <h1>Leaderboard</h1>
 <div class="board" data-api="api/updaterank">
 {% include "board.html" %}
-    {% if not session['user_id'] %}
+    {% if not session['loggedin'] %}
         <p class="friends-hint"><a href="login?next=leaderboard">Log in</a> to get your games on the leaderboard.</p>
     {% endif %}
 </div>

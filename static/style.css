@@ -765,13 +765,21 @@ body.room-playing{
     width: 100%;
     height: 100%;
 }
-.room-hud{
+.room-top{
     position: absolute;
     top: 10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     max-width: calc(100% - 140px);
+    pointer-events: none;
+}
+.room-hud{
+    max-width: 100%;
     padding: 6px 18px;
     background-color: rgba(20, 19, 35, .85);
     border: 3px solid black;
@@ -967,8 +975,10 @@ body.room-playing{
         border-left: 0;
         border-top: 3px solid #857361;
     }
-    .room-hud{
+    .room-top{
         max-width: calc(100% - 90px);
+    }
+    .room-hud{
         padding: 4px 10px;
         font-size: 15px;
     }
@@ -1191,6 +1201,7 @@ a.play-card:hover{
     overflow: hidden;
 }
 .room-chat-slot{
+    max-width: 640px;
     margin: 5px 20px;
 }
 .room-chat-results{
@@ -1300,24 +1311,25 @@ a.play-card:hover{
 
 /* ---------- Countdown ---------- */
 .room-countdown{
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    z-index: 550;
-    transform: translate(-50%, -50%);
+    min-width: 90px;
+    padding: 0 18px;
+    background-color: rgba(20, 19, 35, .85);
+    border: 3px solid black;
+    border-radius: 12px;
     color: #ffd54a;
-    font-size: 140px;
+    font-size: 52px;
     font-weight: bold;
-    text-shadow: 0 0 12px black, 0 4px 8px black;
-    pointer-events: none;
+    line-height: 1.2;
+    text-align: center;
     animation: room-pulse 1s infinite;
 }
 .room-countdown.final{
     color: #ff4d4d;
+    border-color: #ff4d4d;
 }
 @keyframes room-pulse{
-    0%{ transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
-    100%{ transform: translate(-50%, -50%) scale(1); opacity: .75; }
+    0%{ transform: scale(1.12); }
+    100%{ transform: scale(1); }
 }
 @media (max-width: 800px){
     .room-chat-game{
@@ -1331,6 +1343,13 @@ a.play-card:hover{
         font-size: 14px;
     }
     .room-countdown{
-        font-size: 90px;
+        font-size: 36px;
     }
+}
+.guest-name{
+    width: 240px;
+}
+.play-card p a{
+    color: #402523;
+    font-weight: bold;
 }

@@ -184,9 +184,10 @@ def login():
         if username == "" or password == "":
             return render_template('apology.html', message = "Please fill in all fields")
         with connect() as c:
-            user = c.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+            user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
         if user and bcrypt.check_password_hash(user[2], password):
             session.permanent = True
+            session['guest'] = False
             session['loggedin'] = True
             session['user_id'] = user[0]
             return redirect(next_page())
@@ -208,15 +209,16 @@ def register():
                 return render_template('apology.html', message = "Password must be 64 characters or less")
             if password != confirmation:
                 return render_template('apology.html', message = "Passwords do not match")
-            elif c.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchall():
+            elif c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchall():
                 return render_template('apology.html', message = "Username is already taken")
             elif username == "" or password == "" or confirmation == "":
                 return render_template('apology.html', message = "Please fill in all fields")
             else:
                 hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
                 c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-                user = c.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+                user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
                 session.permanent = True
+                session['guest'] = False
                 session['loggedin'] = True
                 session['user_id'] = user[0]
                 return redirect(next_page())
@@ -226,8 +228,28 @@ def register():
 @app.route("/logout")
 def logout():
     session['loggedin'] = False
+    session['guest'] = False
     session['user_id'] = None
     return redirect('./')
+
+@app.route("/guest", methods=['POST', 'GET'])
+def guest():
+    # multiplayer without an account: just a nickname. A guest is a user row
+    # marked guest: no password, and never on the leaderboard
+    if request.method == 'GET':
+        return render_template('guest.html')
+    name = ' '.join(request.form.get('username', '').split())
+    if not name or len(name) > 20:
+        return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
+    with connect() as c:
+        if c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
+            return render_template('apology.html', message = "This name belongs to a registered player: pick another one, or log in")
+        uid = c.execute("INSERT INTO users (username, password, guest) VALUES (?, '', 1)", (name,)).lastrowid
+    session.permanent = True
+    session['loggedin'] = False
+    session['guest'] = True
+    session['user_id'] = uid
+    return redirect(next_page())
 
 @app.route("/profile")
 def profile():
@@ -286,6 +308,9 @@ with connect() as c:
     # the scores table comes with the original game, which had no modes
     if 'mode' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN mode TEXT DEFAULT 'classic'")
+    # guests: players with a nickname and no account
+    if 'guest' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN guest INTEGER DEFAULT 0")
 
 def room_tx():
     # room requests read then write: taking the write lock first means two
@@ -390,8 +415,10 @@ def guessers(c, r):
     return {u for u, p in standings(c, r, r['round'] - 1).items() if p['out'] is None}
 
 def record(c, r, uid):
-    # a finished classic room game also counts for the leaderboard and the profile
+    # a finished classic room game also counts for the leaderboard and the profile (not for guests)
     if c.execute("SELECT recorded FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()[0]:
+        return
+    if c.execute("SELECT COALESCE(guest, 0) FROM users WHERE id = ?", (uid,)).fetchone()[0]:
         return
     c.execute("UPDATE room_players SET recorded = 1 WHERE code = ? AND user_id = ?", (r['code'], uid))
     total, spent, guessed = c.execute('''SELECT COALESCE(SUM(score), 0), COALESCE(SUM(time), 0), COUNT(x)
@@ -446,8 +473,8 @@ def member(c, code):
 
 @app.route("/room/create", methods=['POST'])
 def room_create():
-    if not session.get('loggedin'):
-        return redirect('../login?next=' + quote('mode?play=friends'))
+    if not session.get('user_id'):
+        return redirect('../guest?next=' + quote('mode?play=friends'))
     s, error = room_settings(request.form)
     if error:
         return render_template('apology.html', message = error)
@@ -460,12 +487,18 @@ def room_create():
 @app.route("/room")
 def room():
     code = request.args.get('code', '').strip()
-    if not session.get('loggedin'):
-        return redirect('login?next=' + quote('room?code=' + code))
+    if not session.get('user_id'):
+        return redirect('guest?next=' + quote('room?code=' + code))
     with room_tx() as c:
         r = find_room(c, code)
         if not r:
             return render_template('apology.html', message = "No room with the code " + code)
+        # names tell players apart on screen: two of the same in a room would mix up
+        clash = c.execute('''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id, users me
+            WHERE p.code = ? AND me.id = ? AND p.user_id != me.id AND u.username = me.username COLLATE NOCASE''',
+            (r['code'], session['user_id'])).fetchone()
+        if clash:
+            return render_template('apology.html', message = "Someone in this room already has your name: pick another nickname")
         # joining before the end means playing live, even mid-game; a finished
         # classic room can still be played alone, the other modes only looked at
         c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, ?, ?)",

@@ -45,7 +45,9 @@
         </form>
     </div>
     {% else %}
-    <p class="friends-hint play-login"><a href="login?next=mode%3Fplay%3Dfriends">Log in</a> or <a href="register?next=mode%3Fplay%3Dfriends">register</a> to play with your friends.</p>
+    <div class="play-choices">
+{% with next = 'mode?play=friends' %}{% include "guest_card.html" %}{% endwith %}
+    </div>
     {% endif %}
 {% else %}
     <h1>How Do You Want to Play?</h1>
