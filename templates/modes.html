@@ -1,0 +1,31 @@
+{% set rules = {
+    'classic': "Everyone gets the same locations: up to 5,000 points a round, the closer the better. Most points wins.",
+    'survival': "Solo. Land within 500 blocks of the spot to keep going. One miss and it's over: how far can you go?",
+    'duel': "With friends. Everyone starts with 6,000 HP. Each round, you lose the gap between your score and the best one, and the damage grows every round (×1.5, ×2, ×2.5...): nobody is safe, comebacks happen. Last one standing wins.",
+    'royale': "With friends. Three lives each. The worst guess of each round loses a life, a bullseye (4,950+ points) wins one back. Last one standing wins."
+} %}
+            <fieldset class="mode-select-box" id="game-mode">
+                <h3 class="mode-select-header">Game Mode</h3>
+                <div class="mode-select-option-box">
+                    {% for mode, name in modes %}
+                    <input class="form-check-input" type="radio" name="mode" id="mode-{{ mode }}" value="{{ mode }}"{% if loop.first %} checked{% endif %}>
+                    <label class="mode-select-option" for="mode-{{ mode }}">{{ name }}</label>
+                    {% endfor %}
+                </div>
+                {% for mode, name in modes %}
+                <p class="friends-hint mode-rules" data-mode="{{ mode }}"{% if not loop.first %} hidden{% endif %}>{{ rules[mode] }}</p>
+                {% endfor %}
+            </fieldset>
+            <script>
+                // the rules of the chosen mode; the number of rounds only matters in classic
+                function showRules() {
+                    var mode = document.querySelector('[name=mode]:checked').value;
+                    document.querySelectorAll('.mode-rules').forEach(function (p) { p.hidden = p.dataset.mode != mode; });
+                    var rounds = document.getElementById('rounds');
+                    if (rounds) {
+                        rounds.hidden = mode != 'classic';
+                    }
+                    document.dispatchEvent(new CustomEvent('modechange', {detail: mode}));
+                }
+                document.querySelectorAll('[name=mode]').forEach(function (r) { r.addEventListener('change', showRules); });
+            </script>

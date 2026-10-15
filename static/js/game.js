@@ -6,9 +6,12 @@ var round = 0;
 var maxRounds = $('#game-variables').attr('rounds');
 var score = 0;
 var totalScore = 0;
-var images = new Array(Number(maxRounds));
-var markers = new Array(Number(maxRounds));
-var polylines = new Array(Number(maxRounds));
+var mode = $('#game-variables').attr('mode');
+var SURVIVAL = 500; // survival: how close a guess must land to keep going, in blocks
+var streak = 0;
+var images = [];
+var markers = [];
+var polylines = [];
 var map;
 var timer = null;
 var scoreMap;
@@ -78,10 +81,13 @@ function showScoreScreen() {
     if(markers[round - 1] == undefined){
         document.getElementById('score').innerHTML = "No location selected!";
         document.getElementById('progress').style.width = "0%";
-        document.getElementById('distance').innerHTML = "Distance: 0 blocks away!";
+        document.getElementById('distance').innerHTML = mode == 'survival' ? "Game over!" : "Distance: 0 blocks away!";
         document.getElementById('next-button').onclick = function(){
-            showNextLocation();
+            nextStep(false);
         };
+        if (mode == 'survival') {
+            document.getElementById('next-button').innerHTML = "See Results";
+        }
         L.marker([-zActual, xActual], { icon: greenIcon }).addTo(scoreMap);
         scoreMap.fitBounds([[[-zActual, xActual], [-zActual, xActual]]]);
         return;
@@ -101,14 +107,21 @@ function showScoreScreen() {
     document.getElementById('totalScore').innerHTML = "Score: " + totalScore;
     document.getElementById('score').innerHTML = score + " points!";
 
+    var survived = distance <= SURVIVAL;
+    if (mode == 'survival') {
+        if (survived) {
+            streak++;
+        }
+        document.getElementById('totalScore').innerHTML = "Streak: " + streak;
+        document.getElementById('score').innerHTML = survived
+            ? "Within " + SURVIVAL + " blocks: streak " + streak + "!"
+            : "More than " + SURVIVAL + " blocks away: game over!";
+        if (!survived) {
+            document.getElementById('next-button').innerHTML = "See Results";
+        }
+    }
     document.getElementById('next-button').onclick = function(){
-        if(round >= maxRounds){
-            post('api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
-            finalScore();
-        }
-        else{
-            showNextLocation();
-        }
+        nextStep(survived);
     };
     L.marker([-zActual, xActual], { icon: greenIcon }).addTo(scoreMap);
     
@@ -203,9 +216,26 @@ function showNextLocation() {
         map.removeLayer(polyline);
     }
     marker = null;
-    document.getElementById('round-number').innerHTML = "Round: " + round + "/" + maxRounds;
+    document.getElementById('round-number').innerHTML = mode == 'survival' ? "Round: " + round : "Round: " + round + "/" + maxRounds;
+    if (mode == 'survival') {
+        document.getElementById('totalScore').innerHTML = "Streak: " + streak;
+    }
     
     
+}
+
+// after a score: the next location, or the end of the game
+function nextStep(survived) {
+    var over = mode == 'survival' ? !survived || LOCATIONS.length == 0 : round >= maxRounds;
+    if (!over) {
+        showNextLocation();
+    } else if (mode == 'survival') {
+        post('api/score', {'score': streak, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'mode': 'survival'});
+        finalScore();
+    } else {
+        post('api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
+        finalScore();
+    }
 }
 
 function showContent(contentId){
@@ -276,6 +306,11 @@ function finalScore() {
     document.getElementById('Finish Message').innerHTML = "Game Finished! Total Time: " + timeString;
     document.getElementById('score').innerHTML = "Final Score: " + totalScore + "/" + maxRounds * 5000;
     document.getElementById('progress').style.width = (totalScore / (maxRounds * 5000)) * 100 + "%";
+    if (mode == 'survival') {
+        document.getElementById('Finish Message').innerHTML = "Game Over! Total Time: " + timeString;
+        document.getElementById('score').innerHTML = "Streak: " + streak + (streak == 1 ? " location" : " locations");
+        document.querySelector('#score-container .progress-bar').style.display = 'none';
+    }
     $('#next-button').click(function(){
         location.reload();
     });

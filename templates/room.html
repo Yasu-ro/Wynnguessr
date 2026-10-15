@@ -26,6 +26,7 @@
             </div>
             <form id="room-settings" class="room-column" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
+{% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('royale', 'Battle Royale')] %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
                 </fieldset>
                 <p id="settings-error" class="room-error"></p>
@@ -37,7 +38,7 @@
     <section id="guess-screen" class="room-screen" hidden>
         <div id="room-panorama"></div>
         <div class="room-hud">
-            <div class="room-hud-line"><span id="hud-round"></span><span id="hud-score"></span><span id="hud-time"></span></div>
+            <div class="room-hud-line"><span id="hud-round"></span><span id="hud-mult"></span><span id="hud-score"></span><span id="hud-time"></span></div>
             <div id="hud-call" class="room-hud-call"></div>
             <div id="hud-players" class="room-hud-players"></div>
         </div>
@@ -53,7 +54,7 @@
             <h2 id="reveal-title"></h2>
             <p id="reveal-mine" class="room-mine"></p>
             <table class="room-table">
-                <thead><tr><th>Player</th><th class="num">Round</th><th class="num">Total</th></tr></thead>
+                <thead><tr><th>Player</th><th class="num">Round</th><th class="num" id="reveal-total">Total</th></tr></thead>
                 <tbody id="reveal-rows"></tbody>
             </table>
             <button type="button" id="next-button" class="next-button room-next"></button>
@@ -63,7 +64,7 @@
     <section id="results" class="room-page" hidden>
         <h1 id="results-title">Results</h1>
         <table class="leaderboard-table room-results">
-            <thead><tr class="leaderboard-row"><th>Rank</th><th>Player</th><th>Score</th></tr></thead>
+            <thead><tr class="leaderboard-row"><th>Rank</th><th>Player</th><th id="results-score">Score</th></tr></thead>
             <tbody id="results-rows"></tbody>
         </table>
         <div class="room-actions">
@@ -71,7 +72,7 @@
             <a href="mode" class="form-submit room-action room-leave">Back to Menu</a>
         </div>
         <p id="results-hint" class="friends-hint"></p>
-        <p class="friends-hint">Anyone can still play these same locations with the code <b>{{ code }}</b> · <a href="#" data-copy>copy the link</a></p>
+        <p class="friends-hint" id="results-replay">Anyone can still play these same locations with the code <b>{{ code }}</b> · <a href="#" data-copy>copy the link</a></p>
     </section>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

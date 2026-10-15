@@ -5,7 +5,8 @@
 {% block content %}
     <h1>Mode Selection</h1>
     <div>
-        <form action="game" class="mode-select-form" method="post">
+        <form action="game" class="mode-select-form" method="get">
+{% with modes = [('classic', 'Classic'), ('survival', 'Survival'), ('duel', 'Duel'), ('royale', 'Battle Royale')] %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
 
             <button type="submit" class="form-submit" id="mode-submit-button">Play Solo</button>
@@ -14,7 +15,7 @@
                 <h3 class="mode-select-header">Play With Friends</h3>
                 {% if session['user_id'] %}
                     <div class="mode-select-option-box friends-box">
-                        <button type="submit" class="form-submit friends-button" formaction="room/create">Create a Room</button>
+                        <button type="submit" class="form-submit friends-button" id="create-button" formaction="room/create" formmethod="post">Create a Room</button>
                         <span class="friends-or">or</span>
                         <input form="join-form" class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
                         <button form="join-form" type="submit" class="form-submit friends-button">Join</button>
@@ -27,4 +28,18 @@
         </form>
         <form id="join-form" action="room" method="get"></form>
     </div>
+    <script>
+        // each mode says where it can be played
+        document.addEventListener('modechange', function (e) {
+            var solo = e.detail == 'classic' || e.detail == 'survival';
+            var play = document.getElementById('mode-submit-button'), create = document.getElementById('create-button');
+            play.disabled = !solo;
+            play.textContent = solo ? 'Play Solo' : 'This mode is played with friends: create a room below';
+            if (create) {
+                create.disabled = e.detail == 'survival';
+                create.textContent = e.detail == 'survival' ? 'Survival is played solo' : 'Create a Room';
+            }
+        });
+        showRules();
+    </script>
 {% endblock %}

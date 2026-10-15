@@ -784,7 +784,7 @@ body.room-playing{
 .room-hud-line span{
     white-space: nowrap;
 }
-.room-hud-line span:not(:empty) + span:not(:empty)::before{
+.room-hud-line span:not(:empty) ~ span:not(:empty)::before{
     content: "·";
     margin: 0 10px;
 }
@@ -845,7 +845,7 @@ body.room-playing{
     display: flex;
     flex-direction: column;
     flex: none;
-    width: 340px;
+    width: 380px;
     padding: 15px;
     background-color: #141323;
     border-left: 3px solid #857361;
@@ -963,7 +963,7 @@ body.room-playing{
     }
     .room-panel{
         width: auto;
-        max-height: 45%;
+        max-height: 55%;
         border-left: 0;
         border-top: 3px solid #857361;
     }
@@ -977,5 +977,133 @@ body.room-playing{
     }
     .room-code{
         font-size: 26px;
+    }
+}
+
+/* ---------- Game modes ---------- */
+.mode-rules{
+    max-width: 820px;
+}
+.room-hp{
+    display: inline-block;
+    width: 60px;
+    height: 8px;
+    margin-right: 8px;
+    overflow: hidden;
+    background-color: #3a3950;
+    border: 1px solid black;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+.room-hp span{
+    display: block;
+    height: 100%;
+    background-color: #83C73C;
+}
+.room-hp.low span{
+    background-color: #e6194b;
+}
+.room-table .room-hp{
+    display: block;
+    width: 100%;
+    margin: 4px 0 0;
+}
+.room-loss{
+    color: #ff6b6b;
+    font-weight: bold;
+}
+.room-gain{
+    color: #83C73C;
+    font-weight: bold;
+}
+.material-icons.room-heart{
+    margin: 0;
+    color: #e6194b;
+    font-size: 18px;
+    vertical-align: -3px;
+}
+.material-icons.room-heart.empty{
+    color: #5a5870;
+}
+.room-out td{
+    opacity: .45;
+}
+.room-mine.room-bullseye{
+    color: #ffd54a;
+}
+
+/* ---------- Leaderboard ---------- */
+.board{
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 15px 30px;
+}
+.board-title{
+    margin: 0 0 5px;
+    font-size: 26px;
+}
+.board-filters input{
+    display: none;
+}
+.board-modes{
+    display: flex;
+    justify-content: center;
+    margin: 5px 0 12px;
+}
+.board-mode{
+    margin: 0 5px;
+    padding: 6px 24px;
+    background-color: white;
+    border: 3px solid black;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+.board-group{
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    margin: 0 10px 6px;
+}
+.board-group[hidden]{
+    display: none;
+}
+.board-label{
+    margin-right: 4px;
+    color: white;
+    font-size: 17px;
+    text-shadow: 0 1px 3px black;
+}
+.board-group .filter-option{
+    margin: 3px;
+}
+.board-table{
+    margin-top: 10px;
+    font-size: 19px;
+}
+.board-table th, .board-table td{
+    padding: 7px 12px;
+    vertical-align: middle;
+}
+.board-table tr.you{
+    background-color: #9a8670;
+    font-weight: bold;
+}
+.board-own .board-player{
+    display: none;
+}
+.leaderboard-table tr.leaderboard-row{
+    font-size: inherit;
+}
+@media (max-width: 600px){
+    .board-date{
+        display: none;
+    }
+    .board-table, .room-results{
+        font-size: 16px;
+    }
+    .board-table th, .board-table td{
+        padding: 6px;
     }
 }

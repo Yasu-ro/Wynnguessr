@@ -182,6 +182,51 @@ $(document).on('click', '[data-copy]', function (e) {
     });
 });
 
+// ---------- modes ----------
+// duel: health points; royale: lives. Both come from the server (left, out,
+// delta) for the contestants (seat) after the last finished round.
+
+var MODE_NAMES = {classic: 'Classic', duel: 'Duel', royale: 'Battle Royale'};
+var DUEL_HP = 6000, LIVES = 3, BULLSEYE = 4950;
+
+function hearts(n) {
+    var html = '';
+    for (var i = 0; i < LIVES; i++) {
+        html += "<i class='material-icons room-heart" + (i < n ? '' : ' empty') + "'>favorite</i>";
+    }
+    return html;
+}
+
+// duel: health bar
+function health(p) {
+    var share = Math.max(0, p.left) / DUEL_HP * 100;
+    return "<span class='room-hp" + (share < 30 ? ' low' : '') + "'><span style='width:" + share + "%'></span></span>";
+}
+
+// what a contestant has left
+function standing(p) {
+    return s.mode == 'duel' ? health(p) + p.left.toLocaleString('en-US') : hearts(p.left);
+}
+
+// what the last round did to them
+function change(p) {
+    if (!p.delta) {
+        return '';
+    }
+    if (s.mode == 'duel') {
+        return " <span class='room-loss'>" + p.delta.toLocaleString('en-US') + "</span>";
+    }
+    return p.delta < 0 ? " <span class='room-loss'>-1</span>" : " <span class='room-gain'>+1</span>";
+}
+
+function contestants() {
+    return s.players.filter(function (p) { return p.seat; });
+}
+
+function standingNow() {
+    return contestants().filter(function (p) { return p.out == null; });
+}
+
 // ---------- lobby ----------
 
 function lobby() {
@@ -199,32 +244,48 @@ function lobby() {
     }
     $('#room-settings-fields').prop('disabled', !s.host);
     var host = s.players.filter(function (p) { return p.host; })[0];
-    $('#start-button').prop('disabled', !s.host)
-        .text(s.host ? 'Start the Game' : 'Waiting for ' + (host ? host.name : 'the host') + ' to start...');
+    var here = s.players.filter(function (p) { return p.here; }).length;
+    var tooFew = s.settings.mode != 'classic' && here < 2;
+    $('#start-button').prop('disabled', !s.host || tooFew).text(
+        !s.host ? 'Waiting for ' + (host ? host.name : 'the host') + ' to start...'
+        : tooFew ? MODE_NAMES[s.settings.mode] + ' needs at least 2 players'
+        : 'Start the Game');
 }
 
 function showSettings(st) {
+    $('#room-settings [name=mode]').each(function () {
+        this.checked = this.value == st.mode;
+    });
     $('#room-settings [name=province]').each(function () {
         this.checked = st.provinces.indexOf(this.value) >= 0;
     });
-    $('#room-settings [name=rounds]').each(function () {
-        this.checked = Number(this.value) == st.rounds;
-    });
+    // duel and royale have no set number of rounds: keep the classic choice
+    if (st.mode == 'classic') {
+        $('#room-settings [name=rounds]').each(function () {
+            this.checked = Number(this.value) == st.rounds;
+        });
+    }
     $('#time-limit-checkbox').prop('checked', st.time_limit > 0);
     if (st.time_limit > 0) {
         $('#time-limit').val(st.time_limit);
     }
     $('#no-look').prop('checked', st.look);
+    showRules();
 }
 
-// the host changes a setting: the server checks it and picks new locations
-$('#room-settings').on('change', function () {
-    if (!s || !s.host) {
+// the host changes a setting: the server checks it and picks new locations.
+// One request at a time, else quick changes could arrive in the wrong order:
+// a change made meanwhile is sent afterwards, with the form as it is then.
+var saving = false, saveAgain = false;
+
+function saveSettings() {
+    if (saving) {
+        saveAgain = true;
         return;
     }
+    saving = true;
     pending++;
-    $('#settings-error').text('');
-    send('settings', $(this).serialize())
+    send('settings', $('#room-settings').serialize())
         .done(function (r) {
             if (!r.success) {
                 $('#settings-error').text(r.error || 'These settings were refused');
@@ -232,20 +293,38 @@ $('#room-settings').on('change', function () {
         })
         .fail(function () { $('#settings-error').text('Connection problem, try again'); })
         .always(function () {
+            saving = false;
             pending--;
-            settingsKey = null;
+            if (saveAgain) {
+                saveAgain = false;
+                saveSettings();
+            } else {
+                settingsKey = null;
+            }
         });
+}
+
+$('#room-settings').on('change', function () {
+    if (s && s.host) {
+        $('#settings-error').text('');
+        saveSettings();
+    }
 });
 
 $('#start-button').on('click', function () {
     $(this).prop('disabled', true);
-    send('start');
+    send('start').done(function (r) {
+        if (!r.success && r.error) {
+            $('#settings-error').text(r.error);
+        }
+    });
 });
 
 // ---------- a round ----------
 
 function guess() {
     var key = 'guess' + s.round;
+    var watching = s.live && !s.playing;
     if (view != key) {
         view = key;
         show('guess-screen');
@@ -259,7 +338,7 @@ function guess() {
         }
         map = makeMap('map', -2);
         map.on('click', function (e) {
-            if (submitted) {
+            if (submitted || (s.live && !s.playing)) {
                 return;
             }
             if (marker) {
@@ -295,15 +374,27 @@ function guess() {
     if (s.answered) {
         submitted = true;
     }
-    if (submitted) {
+    var mine = me();
+    if (watching) {
+        $('#guess-button').prop('disabled', true).text(mine.seat ? "You're out" : 'Spectating');
+    } else if (submitted) {
         $('#guess-button').prop('disabled', true).text(s.live ? 'Waiting for the others...' : 'Guess sent');
     }
 
-    var mine = me();
-    $('#hud-round').text('Round ' + s.round + '/' + s.rounds);
-    $('#hud-score').text(points(mine.total));
-    $('#hud-call').text(s.live && s.first && !submitted ? s.first + ' has guessed, hurry up!' : '');
-    $('#hud-players').html(!s.live ? '' : s.players.filter(function (p) { return p.here || p.guessed; }).map(function (p) {
+    if (s.mode == 'classic') {
+        $('#hud-round').text('Round ' + s.round + '/' + s.rounds);
+        $('#hud-mult').empty();
+        $('#hud-score').text(points(mine.total));
+    } else {
+        $('#hud-round').text('Round ' + s.round);
+        $('#hud-mult').text(s.mode == 'duel' && s.multiplier > 1 ? 'Damage ×' + s.multiplier : '');
+        $('#hud-score').html(watching ? 'Watching' : s.mode == 'duel' ? mine.left.toLocaleString('en-US') + ' HP' : hearts(mine.left));
+    }
+    $('#hud-call').text(s.live && s.first && !submitted && !watching ? s.first + ' has guessed, hurry up!' : '');
+    var inRound = s.players.filter(function (p) {
+        return s.mode == 'classic' ? p.here || p.guessed : p.seat && p.out == null;
+    });
+    $('#hud-players').html(!s.live ? '' : inRound.map(function (p) {
         return "<span class='room-hud-player'>" + dot(p) + esc(p.name) +
             "<i class='material-icons'>" + (p.guessed ? 'check_circle' : 'more_horiz') + "</i></span>";
     }).join(''));
@@ -311,7 +402,7 @@ function guess() {
 
 // auto: the clock ran out, send the marker if there is one
 function submit(auto) {
-    if (submitted) {
+    if (submitted || (s.live && !s.playing)) {
         return;
     }
     if (!marker && (s.live || !auto)) {
@@ -386,22 +477,57 @@ function reveal() {
         revealMap.fitBounds(L.featureGroup(group).getBounds(), {padding: [60, 60], maxZoom: 1});
     }
 
-    var mine = s.reveal.guesses.filter(function (g) { return g.name == me().name; })[0];
-    $('#reveal-title').text('Round ' + s.round + '/' + s.rounds);
-    $('#reveal-mine').text(mine && mine.x !== null ? '+' + points(mine.score) : 'No guess this round')
-        .toggleClass('none', !(mine && mine.x !== null));
+    var you = me();
+    var mine = s.reveal.guesses.filter(function (g) { return g.name == you.name; })[0];
+    var guessed = mine && mine.x !== null;
+    var line = guessed ? '+' + points(mine.score) : 'No guess this round';
+    if (guessed && mine.score >= BULLSEYE) {
+        line = 'Bullseye! ' + line;
+    }
+    var bad = "<span class='room-loss'> · ", good = "<span class='room-gain'> · ";
+    if (s.mode != 'classic' && you.seat && (you.out == null || you.out == s.round)) {
+        if (you.out == s.round) {
+            line += bad + "you're out!</span>";
+        } else if (s.mode == 'duel') {
+            line += you.delta ? bad + you.delta.toLocaleString('en-US') + ' HP</span>' : good + 'no damage</span>';
+        } else if (you.delta) {
+            line += you.delta < 0 ? bad + 'you lose a life</span>' : good + 'a life back!</span>';
+        }
+    }
+    $('#reveal-title').text(s.mode == 'classic' ? 'Round ' + s.round + '/' + s.rounds
+        : 'Round ' + s.round + (s.mode == 'duel' && s.multiplier > 1 ? ' · damage ×' + s.multiplier : ''));
+    $('#reveal-mine').html(line).toggleClass('none', !guessed).toggleClass('room-bullseye', guessed && mine.score >= BULLSEYE);
+    $('#reveal-total').text({classic: 'Total', duel: 'HP', royale: 'Lives'}[s.mode]);
+
     var rows = s.players.map(function (p) {
         var g = s.reveal.guesses.filter(function (x) { return x.name == p.name; })[0];
         return {p: p, guessed: !!g, score: g && g.x !== null ? g.score : -1, total: g ? g.upto : p.total};
     }).filter(function (r) {
+        if (s.mode != 'classic') {
+            return r.p.seat;
+        }
         return r.guessed || (s.live && r.p.here);
     }).sort(function (a, b) {
-        return b.score - a.score;
+        // whoever was already out goes last
+        var outA = a.p.out != null && a.p.out < s.round, outB = b.p.out != null && b.p.out < s.round;
+        return outA - outB || b.score - a.score;
     });
     $('#reveal-rows').html(rows.map(function (r) {
-        return "<tr" + (r.p.you ? " class='you'" : '') + "><td>" + dot(r.p) + esc(r.p.name) + "</td>" +
+        var gone = r.p.out != null && r.p.out < s.round, last;
+        if (s.mode == 'classic') {
+            last = r.total.toLocaleString('en-US');
+        } else if (gone) {
+            last = 'Out';
+        } else if (r.p.out == s.round) {
+            last = (s.mode == 'royale' ? hearts(0) + ' ' : '') + "<span class='room-loss'>Out!</span>";
+        } else if (s.mode == 'duel') {
+            last = '<div>' + r.p.left.toLocaleString('en-US') + change(r.p) + '</div>' + health(r.p);
+        } else {
+            last = hearts(r.p.left) + change(r.p);
+        }
+        return "<tr class='" + (r.p.you ? 'you' : '') + (gone ? ' room-out' : '') + "'><td>" + dot(r.p) + esc(r.p.name) + "</td>" +
             "<td class='num'>" + (r.score >= 0 ? '+' + r.score.toLocaleString('en-US') : '-') + "</td>" +
-            "<td class='num'>" + r.total.toLocaleString('en-US') + "</td></tr>";
+            "<td class='num'>" + last + "</td></tr>";
     }).join(''));
 
     if (s.next_in !== undefined) {
@@ -410,10 +536,15 @@ function reveal() {
     nextButton();
 }
 
+// is the round on display the last one?
+function lastRound() {
+    return s.round >= s.rounds || (s.mode != 'classic' && standingNow().length <= 1);
+}
+
 function nextButton() {
-    var b = $('#next-button'), label = s.round >= s.rounds ? 'See Results' : 'Next Round';
+    var b = $('#next-button'), label = lastRound() ? 'See Results' : 'Next Round';
     if (!s.live) {
-        b.prop('disabled', false).text(s.round >= s.rounds ? label : 'Next Location');
+        b.prop('disabled', false).text(lastRound() ? label : 'Next Location');
         return;
     }
     var left = nextAt === null ? 0 : Math.max(0, Math.ceil((nextAt - Date.now()) / 1000));
@@ -452,26 +583,45 @@ function results() {
         }
     }
     var medals = ['#d4af37', '#c0c0c0', '#cd7f32'];
-    var rows = s.players.filter(function (p) { return p.played > 0; }).sort(function (a, b) { return b.total - a.total; });
+    var rows, value, same;
+    if (s.mode == 'classic') {
+        rows = s.players.filter(function (p) { return p.played > 0; }).sort(function (a, b) { return b.total - a.total; });
+        value = function (p) {
+            var missing = p.played < s.rounds ? " <small>(" + p.played + '/' + s.rounds + " rounds)</small>" : '';
+            return [missing, p.total.toLocaleString('en-US')];
+        };
+        same = function (a, b) { return a.total == b.total; };
+    } else {
+        // still standing first, then the latest to fall
+        rows = contestants().sort(function (a, b) {
+            return (a.out != null) - (b.out != null) || b.left - a.left || (b.out || 0) - (a.out || 0) || b.total - a.total;
+        });
+        value = function (p) {
+            return ['', p.out != null ? 'Out in round ' + p.out : standing(p)];
+        };
+        same = function (a, b) { return a.out == b.out && a.left == b.left && a.total == b.total; };
+    }
     var rank = 0;
     $('#results-rows').html(rows.map(function (p, i) {
-        if (i == 0 || p.total != rows[i - 1].total) {
+        if (i == 0 || !same(p, rows[i - 1])) {
             rank = i + 1;
         }
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
-        var missing = p.played < s.rounds ? " <small>(" + p.played + '/' + s.rounds + " rounds)</small>" : '';
+        var v = value(p);
         return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + "'><td>" + place + "</td>" +
-            "<td class='room-name'>" + dot(p) + esc(p.name) + missing + "</td>" +
-            "<td>" + p.total.toLocaleString('en-US') + "</td></tr>";
+            "<td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td>" +
+            "<td>" + v[1] + "</td></tr>";
     }).join(''));
 
     var title = 'Results';
-    if (rows.length > 1 && rows[0].total == rows[1].total) {
+    if (rows.length > 1 && same(rows[0], rows[1])) {
         title = 'Draw!';
     } else if (rows.length > 1) {
         title = rows[0].you ? 'You Win!' : rows[0].name + ' Wins!';
     }
     $('#results-title').text(title);
+    $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
+    $('#results-replay').prop('hidden', s.mode != 'classic');
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? 'If ' + host.name + ' starts a new game, you will follow automatically.' : '');

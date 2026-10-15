@@ -57,63 +57,60 @@ def post_score():
         else:
             look = 'No'
         provinces = request.form['provinces']
-        if request.form['rounds'] not in ['3', '5', '10', '25']:
-            return render_template('apology.html', message = "Invalid number of rounds")
-        rounds = request.form['rounds']
         totalTime = request.form['totalTime']
-        print(int(rounds) * 5000)
-        if(int(score) > int(rounds) * 5000):
-            return jsonify({"success": False})
-        if(int(rounds) * 5000 == int(score) and int(totalTime) < .5):
-            return jsonify({"success": False})
+        mode = request.form.get('mode', 'classic')
+        if mode == 'survival':
+            # the score is the number of locations found in a row
+            rounds = None
+            if not score.isnumeric() or int(score) > 1000:
+                return jsonify({"success": False})
+        else:
+            mode = 'classic'
+            if request.form['rounds'] not in ['3', '5', '10', '25']:
+                return render_template('apology.html', message = "Invalid number of rounds")
+            rounds = request.form['rounds']
+            if(int(score) > int(rounds) * 5000):
+                return jsonify({"success": False})
+            if(int(rounds) * 5000 == int(score) and float(totalTime) < .5):
+                return jsonify({"success": False})
         with connect() as c:
-            c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time) VALUES (?, ?, ?, ?, ?, ?, ?)", (session['user_id'], score, date.today(), look, provinces, rounds, totalTime))
+            c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (session['user_id'], score, date.today(), look, provinces, rounds, totalTime, mode))
         return jsonify({"success": True})
     return jsonify({"success": False})
 
+def board(c, form, user_id = None):
+    # the games played with exactly the settings of the filters, best first
+    mode = 'survival' if form.get('mode') == 'survival' else 'classic'
+    query = '''SELECT u.username AS name, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
+        WHERE s.provinces = ? AND s.nolook = ? AND COALESCE(s.mode, 'classic') = ?'''
+    params = [form.get('provinces', ''), form.get('nolook', 'No'), mode]
+    if mode == 'classic':
+        query += " AND s.rounds = ?"
+        params.append(form.get('rounds', ''))
+    if user_id:
+        query += " AND s.user_id = ?"
+        params.append(user_id)
+    return [dict(row) for row in c.execute(query + " ORDER BY s.score DESC, s.time ASC", params)]
+
 @app.route("/api/updaterank", methods=['POST'])
 def update_rank():
-    if request.method == 'POST':
-        form = request.form
-        with connect() as c:
-            rankings = c.execute('''
-            SELECT users.username, scores.score, scores.date, scores.nolook, scores.rounds, scores.time
-            FROM users
-            JOIN (SELECT user_id,
-                    MAX(score) as max_score
-                 FROM
-                    scores
-                 WHERE
-                    provinces = ? AND nolook = ? AND rounds = ?
-                 GROUP BY
-                    user_id
-                ) as top_scores
-            ON
-                users.id = top_scores.user_id
-            JOIN
-                scores
-            ON
-                scores.user_id = top_scores.user_id AND scores.score = top_scores.max_score
-            WHERE
-                scores.provinces = ? AND scores.nolook = ? AND scores.rounds = ?
-            ORDER BY
-                scores.score DESC, scores.time ASC
-            LIMIT 50
-        ''', (str(form['provinces']), form['nolook'], form['rounds'], str(form['provinces']), form['nolook'], form['rounds'])).fetchall()
-
-        return jsonify({"rankings": [tuple(r) for r in rankings]})
-    return jsonify({"success": False})
+    # each player's best game
+    with connect() as c:
+        rows, seen = [], set()
+        for row in board(c, request.form):
+            if row['name'] not in seen:
+                seen.add(row['name'])
+                rows.append(row)
+        me = session.get('user_id') and c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+    return jsonify({"rows": rows[:50], "me": me[0] if me else None})
 
 @app.route("/api/updateprofile", methods=['POST'])
 def update_profile():
-    if request.method == 'POST':
-        if not session.get('loggedin'):
-            return jsonify({"games": []})
-        form = request.form
-        with connect() as c:
-            games = c.execute('SELECT username, score, date, nolook, rounds, time FROM users JOIN scores ON users.id = scores.user_id WHERE user_id = ? AND provinces = ? AND nolook = ? AND rounds = ? ORDER BY score DESC, time ASC LIMIT 50', (session['user_id'], str(form['provinces']), form['nolook'], form['rounds'])).fetchall()
-        return jsonify({"games": [tuple(g) for g in games]})
-    return jsonify({"success": False})
+    if not session.get('loggedin'):
+        return jsonify({"rows": []})
+    with connect() as c:
+        rows = board(c, request.form, session['user_id'])
+    return jsonify({"rows": rows[:50]})
 
 @app.route("/")
 def index():
@@ -129,38 +126,43 @@ def leaderboard():
 
 @app.route("/game", methods=['POST', 'GET'])
 def game():
+    # the mode page sends its settings in the address, so "Play Again" is a plain reload
+    form = request.values
     session['provinces'] = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']
-    if request.method == 'POST':
+    if 'rounds' in form:
+        if form.get('mode') in ('duel', 'royale'):
+            return render_template('apology.html', message = "This mode is played with friends: create a room")
+        mode = 'survival' if form.get('mode') == 'survival' else 'classic'
         #if there are no provinces selected, return apology
-        if request.form.getlist('province') == []:
+        if form.getlist('province') == []:
             return render_template('apology.html', message = "Please select at least one province")
-        provinces = request.form.getlist('province')
+        provinces = form.getlist('province')
         #if time limit is not selected, set time limit to -1
-        if request.form.get('time-limit-checkbox') == None:
+        if form.get('time-limit-checkbox') == None:
             time_limit = -1
         #if time limit is selected, check if time limit is a number and greater than 0
-        elif request.form.get('time-limit-checkbox') == 'on':
+        elif form.get('time-limit-checkbox') == 'on':
             #if time limit is not entered, return apology
-            if request.form.get('time-limit') == "":
+            if form.get('time-limit') == "":
                 return render_template('apology.html', message = "Please enter a time limit")
             #if time limit is not a number, return apology
-            if request.form.get('time-limit').isnumeric() == False:
+            if form.get('time-limit').isnumeric() == False:
                 return render_template('apology.html', message = "Time limit must be a number")
             #if time limit is less than 1, return apology
-            if int(request.form.get('time-limit')) < 0:
+            if int(form.get('time-limit')) < 0:
                 return render_template('apology.html', message = "Time limit cannot be less than 0 seconds")
-            if int(request.form.get('time-limit')) > 1800:
+            if int(form.get('time-limit')) > 1800:
                 return render_template('apology.html', message = "Time limit cannot be greater than 30 minutes")
-            time_limit = int(request.form.get('time-limit'))
+            time_limit = int(form.get('time-limit'))
         #if look is not selected, set look to False
-        look = request.form.get('look') == 'on'
-        rounds = request.form.get('rounds')
+        look = form.get('look') == 'on'
+        rounds = form.get('rounds')
         #store provinces in session
         session['provinces'] = provinces
         print(provinces, time_limit, look, rounds)
 
-        return render_template('game.html', provinces = provinces, time_limit = time_limit, look = look, rounds = rounds)
-    return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']", time_limit = -1, look = False, rounds = 5)
+        return render_template('game.html', provinces = provinces, time_limit = time_limit, look = look, rounds = rounds, mode = mode)
+    return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']", time_limit = -1, look = False, rounds = 5, mode = 'classic')
 
 @app.route("/login", methods=['POST', 'GET'])
 def login():
@@ -233,32 +235,44 @@ def apology():
 # A room is a fixed list of locations, played live by everyone who joins before
 # the end: same round at the same time, the round closes once all have guessed
 # (or the clock runs out) and the next one starts by itself after the reveal.
-# Anyone opening the room after the end plays the same locations alone and
+# Three modes: classic (most points after N rounds), duel (health points, the
+# gap to the round's best guess hurts, more and more each round) and royale
+# (lives: the worst guess of a round loses one, a bullseye wins one back).
+# Anyone opening a finished classic room plays the same locations alone and
 # lands in the same ranking. Rooms only move forward when someone asks: every
 # room request first runs tick().
 
 PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']
 ROUNDS = ['3', '5', '10', '25']
+MODES = ['classic', 'duel', 'royale']
 LAST_CALL = 15   # once someone guessed, the others have this long
 REVEAL = 10      # the answer stays on screen this long before the next round
 AWAY = 10        # a page that stopped polling this long is not waited for
 HOST_AWAY = 30   # a host gone this long hands the room over (else nobody could start)
 GRACE = 1        # guesses still accepted this long after the deadline (network lag)
 CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'  # no 0/O or 1/I/L to mistype
+DUEL_HP = 6000   # duel: everyone's health at the start
+LIVES = 3        # royale: everyone's lives at the start
+BULLSEYE = 4950  # royale: a guess this good wins a life back
+LAST_ROUND = 25  # duel and royale go on until one player is left, this long at most
 
 with connect() as c:
     c.executescript('''
         CREATE TABLE IF NOT EXISTS rooms (
             code TEXT PRIMARY KEY, host_id INTEGER, provinces TEXT, rounds INTEGER,
             time_limit INTEGER, look INTEGER, locations TEXT, state TEXT,
-            round INTEGER, round_start REAL, round_end REAL, next_code TEXT);
+            round INTEGER, round_start REAL, round_end REAL, next_code TEXT,
+            mode TEXT DEFAULT 'classic');
         CREATE TABLE IF NOT EXISTS room_players (
             code TEXT, user_id INTEGER, live INTEGER, last_seen REAL,
-            recorded INTEGER DEFAULT 0, PRIMARY KEY (code, user_id));
+            recorded INTEGER DEFAULT 0, seat INTEGER DEFAULT 0, PRIMARY KEY (code, user_id));
         CREATE TABLE IF NOT EXISTS room_guesses (
             code TEXT, user_id INTEGER, round INTEGER, x REAL, z REAL, score INTEGER,
             at REAL, time REAL, PRIMARY KEY (code, user_id, round));
     ''')
+    # the scores table comes with the original game, which had no modes
+    if 'mode' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
+        c.execute("ALTER TABLE scores ADD COLUMN mode TEXT DEFAULT 'classic'")
 
 def room_tx():
     # room requests read then write: taking the write lock first means two
@@ -271,11 +285,14 @@ def find_room(c, code):
     return c.execute("SELECT * FROM rooms WHERE code = ? COLLATE NOCASE", (code.strip(),)).fetchone()
 
 def room_settings(form):
-    # the same choices as the solo mode page; returns (settings, error)
+    # the same choices as the mode page; returns (settings, error)
+    mode = form.get('mode', 'classic')
+    if mode not in MODES:
+        return None, "Survival is played solo" if mode == 'survival' else "Unknown game mode"
     provinces = [p for p in PROVINCES if p in form.getlist('province')]
     if not provinces:
         return None, "Please select at least one province"
-    if form.get('rounds') not in ROUNDS:
+    if mode == 'classic' and form.get('rounds') not in ROUNDS:
         return None, "Invalid number of rounds"
     time_limit = -1
     if form.get('time-limit-checkbox') == 'on':
@@ -283,8 +300,8 @@ def room_settings(form):
         if not t.isnumeric() or not 0 < int(t) <= 1800:
             return None, "Time limit must be between 1 and 1800 seconds"
         time_limit = int(t)
-    return {'provinces': provinces, 'rounds': int(form['rounds']), 'time_limit': time_limit,
-            'look': int(form.get('look') == 'on')}, None
+    return {'mode': mode, 'provinces': provinces, 'rounds': int(form['rounds']) if mode == 'classic' else LAST_ROUND,
+            'time_limit': time_limit, 'look': int(form.get('look') == 'on')}, None
 
 def pick_locations(c, s):
     ids = [r[0] for r in c.execute(
@@ -299,9 +316,9 @@ def new_room(c, host, s):
     code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
     while find_room(c, code):
         code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
-    c.execute('''INSERT INTO rooms (code, host_id, provinces, rounds, time_limit, look, locations, state, round, round_start)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0)''',
-        (code, host, json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations))
+    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0)''',
+        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations))
     c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
     return code
 
@@ -320,8 +337,47 @@ def round_deadline(c, r):
         ends.append(first['at'] + LAST_CALL)
     return min(ends, default=None), first and first['username']
 
+def multiplier(n):
+    # duel: damage grows from the third round on, so that nobody is ever safe
+    return 1 if n <= 2 else 1 + (n - 2) / 2
+
+def standings(c, r, upto):
+    # duel and royale: replay the rounds up to `upto` for each contestant's
+    # health or lives: {user_id: {'left', 'out', 'delta'}}, where out is the
+    # round they were knocked out in and delta their change in round `upto`
+    seats = [p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND seat = 1 ORDER BY rowid", (r['code'],))]
+    scores = {(g[0], g[1]): g[2] for g in c.execute("SELECT user_id, round, score FROM room_guesses WHERE code = ? AND round <= ?",
+                                                     (r['code'], upto))}
+    st = {u: {'left': DUEL_HP if r['mode'] == 'duel' else LIVES, 'out': None, 'delta': 0} for u in seats}
+    for n in range(1, upto + 1):
+        alive = [u for u in seats if st[u]['out'] is None]
+        if len(alive) <= 1:
+            break
+        s = {u: scores.get((u, n), 0) for u in alive}
+        best, worst = max(s.values()), min(s.values())
+        for u in alive:
+            if r['mode'] == 'duel':
+                d = -min(st[u]['left'], round((best - s[u]) * multiplier(n)))
+            elif s[u] == worst < best:
+                d = -1
+            else:
+                d = int(s[u] >= BULLSEYE and st[u]['left'] < LIVES)
+            st[u]['left'] += d
+            if n == upto:
+                st[u]['delta'] = d
+            if st[u]['left'] <= 0:
+                st[u]['out'] = n
+    return st
+
+def guessers(c, r):
+    # who plays the current round: every live player in classic, the
+    # contestants still standing in duel and royale
+    if r['mode'] == 'classic':
+        return {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND live = 1", (r['code'],))}
+    return {u for u, p in standings(c, r, r['round'] - 1).items() if p['out'] is None}
+
 def record(c, r, uid):
-    # a finished room game also counts for the leaderboard and the profile
+    # a finished classic room game also counts for the leaderboard and the profile
     if c.execute("SELECT recorded FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()[0]:
         return
     c.execute("UPDATE room_players SET recorded = 1 WHERE code = ? AND user_id = ?", (r['code'], uid))
@@ -333,13 +389,17 @@ def record(c, r, uid):
                    r['rounds'], round(spent, 2)))
 
 def next_round(c, r):
-    if r['round'] < r['rounds']:
+    over = r['round'] >= r['rounds']
+    if r['mode'] != 'classic':
+        over = over or sum(p['out'] is None for p in standings(c, r, r['round']).values()) <= 1
+    if not over:
         c.execute("UPDATE rooms SET round = round + 1, round_start = ?, round_end = NULL WHERE code = ?",
                   (time.time(), r['code']))
     else:
         c.execute("UPDATE rooms SET state = 'finished' WHERE code = ?", (r['code'],))
-        for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND live = 1", (r['code'],)).fetchall():
-            record(c, r, p['user_id'])
+        if r['mode'] == 'classic':
+            for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND live = 1", (r['code'],)).fetchall():
+                record(c, r, p['user_id'])
 
 def tick(c, r):
     # close the round once nobody is left to wait for, then move on after the reveal
@@ -355,10 +415,9 @@ def tick(c, r):
         return find_room(c, r['code'])
     if r['round_end'] is None:
         deadline, _ = round_deadline(c, r)
-        waiting = c.execute('''SELECT COUNT(*) FROM room_players p WHERE code = ? AND live = 1 AND last_seen > ?
-            AND NOT EXISTS (SELECT 1 FROM room_guesses g WHERE g.code = p.code AND g.user_id = p.user_id AND g.round = ?)''',
-            (r['code'], now - AWAY, r['round'])).fetchone()[0]
-        if waiting and (deadline is None or now < deadline + GRACE):
+        here = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], now - AWAY))}
+        done = {g[0] for g in c.execute("SELECT user_id FROM room_guesses WHERE code = ? AND round = ?", (r['code'], r['round']))}
+        if (guessers(c, r) & here) - done and (deadline is None or now < deadline + GRACE):
             return r
         c.execute("UPDATE rooms SET round_end = ? WHERE code = ?", (now, r['code']))
     elif now >= r['round_end'] + REVEAL:
@@ -394,9 +453,10 @@ def room():
         r = find_room(c, code)
         if not r:
             return render_template('apology.html', message = "No room with the code " + code)
-        # joining before the end means playing live, even mid-game
+        # joining before the end means playing live, even mid-game; a finished
+        # classic room can still be played alone, the other modes only looked at
         c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, ?, ?)",
-                  (r['code'], session['user_id'], int(r['state'] != 'finished'), time.time()))
+                  (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time()))
     return render_template('room.html', code = r['code'])
 
 @app.route("/api/room/<code>")
@@ -419,32 +479,43 @@ def room_state(code):
             n = min(done + 1, r['rounds'])
             if request.args.get('round', '').isnumeric():
                 n = max(1, min(n, int(request.args['round'])))
-        players = c.execute('''SELECT u.username AS name, p.user_id = ? AS you, p.user_id = ? AS host,
-                p.last_seen > ? AS here, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
+        players = c.execute('''SELECT p.user_id AS uid, u.username AS name, p.user_id = ? AS you, p.user_id = ? AS host,
+                p.seat, p.last_seen > ? AS here, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
                 COALESCE(MAX(g.round = ?), 0) AS guessed
             FROM room_players p JOIN users u ON u.id = p.user_id
             LEFT JOIN room_guesses g ON g.code = p.code AND g.user_id = p.user_id
             WHERE p.code = ? GROUP BY p.user_id ORDER BY p.rowid''',
             (me['user_id'], r['host_id'], now - AWAY, n, r['code'])).fetchall()
-        out = {"success": True, "code": r['code'], "state": r['state'], "host": r['host_id'] == me['user_id'],
-               "live": live, "round": n, "rounds": r['rounds'], "next": r['next_code'],
-               "settings": {"provinces": json.loads(r['provinces']), "rounds": r['rounds'],
+        # duel and royale: health or lives after the last finished round
+        st = {}
+        if r['mode'] != 'classic' and r['state'] != 'waiting':
+            st = standings(c, r, r['round'] if r['state'] == 'finished' or r['round_end'] is not None else r['round'] - 1)
+        out = {"success": True, "code": r['code'], "mode": r['mode'], "state": r['state'],
+               "host": r['host_id'] == me['user_id'], "live": live, "round": n, "rounds": r['rounds'],
+               "next": r['next_code'],
+               "settings": {"mode": r['mode'], "provinces": json.loads(r['provinces']), "rounds": r['rounds'],
                             "time_limit": r['time_limit'], "look": bool(r['look'])},
                # the colour of a player is their place in the join order
-               "players": [dict(p, color = i) for i, p in enumerate(players)]}
+               "players": [dict(p, color = i, **st.get(p['uid'], {})) for i, p in enumerate(players)]}
+        for p in out['players']:
+            del p['uid']
+        if r['mode'] == 'duel':
+            out['multiplier'] = multiplier(max(n, 1))
         if n == 0 or (live and r['state'] == 'waiting'):
             return jsonify(out)
         loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (json.loads(r['locations'])[n - 1],)).fetchone()
         out['url'] = loc['image_url']
         out['answered'] = bool(c.execute("SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?",
                                          (r['code'], me['user_id'], n)).fetchone())
+        # false for whoever only watches: knocked out, or arrived after the start of a duel or royale
+        out['playing'] = not live or (r['state'] == 'playing' and me['user_id'] in guessers(c, r))
         if live and r['state'] == 'playing' and r['round_end'] is None:
             deadline, first = round_deadline(c, r)
             if deadline:
                 out['time_left'] = max(0, deadline - now)
             out['first'] = first
         elif live or out['answered']:
-            # the round is over for this player: everyone's guesses can be shown
+            # the round is over for this player: everyone's guesses can be shown;
             # upto: total up to this round, so that a late player compares like with like
             out['reveal'] = {"X": loc['x_position'], "Z": loc['z_position'], "guesses": [dict(g) for g in c.execute(
                 '''SELECT u.username AS name, g.x, g.z, g.score, (SELECT SUM(h.score) FROM room_guesses h
@@ -465,8 +536,8 @@ def room_set(code):
         locations = s and pick_locations(c, s)
         if not locations:
             return jsonify({"success": False, "error": error or "Not enough locations in these provinces"})
-        c.execute("UPDATE rooms SET provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ? WHERE code = ?",
-                  (json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, r['code']))
+        c.execute("UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ? WHERE code = ?",
+                  (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, r['code']))
     return jsonify({"success": True})
 
 @app.route("/api/room/<code>/start", methods=['POST'])
@@ -477,9 +548,17 @@ def room_start(code):
         if not r or r['host_id'] != me['user_id']:
             return jsonify({"success": False})
         r = tick(c, r)
+        now = time.time()
         if r['state'] == 'waiting':
+            if r['mode'] != 'classic':
+                # the players here now are the contestants; whoever comes later watches
+                here = c.execute("SELECT COUNT(*) FROM room_players WHERE code = ? AND live = 1 AND last_seen > ?",
+                                 (r['code'], now - AWAY)).fetchone()[0]
+                if here < 2:
+                    return jsonify({"success": False, "error": "This mode needs at least 2 players"})
+                c.execute("UPDATE room_players SET seat = (last_seen > ?) WHERE code = ? AND live = 1", (now - AWAY, r['code']))
             c.execute("UPDATE rooms SET state = 'playing', round = 1, round_start = ?, round_end = NULL WHERE code = ?",
-                      (time.time(), r['code']))
+                      (now, r['code']))
         elif r['state'] == 'playing' and r['round_end'] is not None:
             next_round(c, r)
         else:
@@ -497,7 +576,8 @@ def room_guess(code):
         n = request.form.get('round', '')
         n = int(n) if n.isnumeric() else 0
         if me['live']:
-            if r['state'] != 'playing' or n != r['round'] or r['round_end'] is not None:
+            if (r['state'] != 'playing' or n != r['round'] or r['round_end'] is not None
+                    or me['user_id'] not in guessers(c, r)):
                 return jsonify({"success": False})
             spent = now - r['round_start']
         else:
@@ -535,8 +615,8 @@ def room_again(code):
             return jsonify({"success": False})
         nxt = r['next_code']
         if not nxt:
-            nxt = new_room(c, me['user_id'], {'provinces': json.loads(r['provinces']), 'rounds': r['rounds'],
-                                              'time_limit': r['time_limit'], 'look': r['look']})
+            nxt = new_room(c, me['user_id'], {'mode': r['mode'], 'provinces': json.loads(r['provinces']),
+                                              'rounds': r['rounds'], 'time_limit': r['time_limit'], 'look': r['look']})
             c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (nxt, r['code']))
     return jsonify({"success": bool(nxt), "code": nxt})
 

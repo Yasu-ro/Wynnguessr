@@ -3,55 +3,12 @@
 {% block title %}: Profile{% endblock %}
 
 {% block content %}
-<h1>Profile</h1>
-<div class="profile-container">
-    <h2 class="profile-information">Username: {{ username }}</h2>
-    <h2>Previous Games:</h2>
-</div>
-<div class="leaderboard">
-    <form class="filter-option-container" id="filter-options">
-        <input type="checkbox" id="wynn" checked="true" value="wynn">
-        <label for="wynn" class="filter-option" >Wynn</label>
-        <input type="checkbox" id="gavel" checked="true" value="gavel">
-        <label for="gavel" class="filter-option" >Gavel</label>
-        <input type="checkbox" id="corkus" checked="true" value="corkus">
-        <label for="corkus" class="filter-option" >Corkus</label>
-        <input type="checkbox" id="ocean" checked="true" value="ocean">
-        <label for="ocean" class="filter-option" >Ocean</label>
-        <input type="checkbox" id="silent-expanse" checked="true" value="silent-expanse">
-        <label for="silent-expanse" class="filter-option" >Silent Expanse</label>
-        <input type="checkbox" id="no-look" value="no-look">
-        <label for="no-look" class="filter-option" >Locked</label>
-        <input type="radio" id="three-rounds" name="rounds" value="three">
-        <label for="three-rounds" class="filter-option" >3 Rounds</label>
-        <input type="radio" id="five-rounds" name="rounds" checked="true" value="five">
-        <label for="five-rounds" class="filter-option" >5 Rounds</label>
-        <input type="radio" id="ten-rounds" name="rounds" value="ten">
-        <label for="ten-rounds" class="filter-option">10 Rounds</label>
-        <input type="radio" id="twenty-five-rounds" name="rounds" value="twenty-five">
-        <label for="twenty-five-rounds" class="filter-option">25 Rounds</label>
-        
-    </form>
-        
-    
-    <table class="leaderboard-table" id="leaderboard-table">
-        <thead>
-            <tr class="leaderboard-row">
-                <th class="leaderboard-header">Rank</th>
-                <th class="leaderboard-header">Username</th>
-                <th class="leaderboard-header">Score</th>
-                <th class="leaderboard-header">Date</th>
-                <th class="leaderboard-header">Locked</th>
-                <th class="leaderboard-header">Rounds</th>
-                <th class="leaderboard-header">Time</th>
-            </tr>
-        </thead>
-        <tbody id="table-body">
-
-        </tbody>
-    </table>
+<h1>{{ username }}</h1>
+<div class="board board-own" data-api="api/updateprofile">
+    <h2 class="board-title">Your Best Games</h2>
+{% include "board.html" %}
 </div>
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-<script src="static/js/profile.js"></script>
+<script src="static/js/board.js"></script>
 {% endblock %}
