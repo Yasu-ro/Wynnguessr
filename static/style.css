@@ -1601,12 +1601,13 @@ h1.sign{
     text-shadow: 0 2px 0 #402523;
 }
 /* the two ropes it hangs from */
+/* long enough to always reach up under the menu bar, which hides the rest */
 h1.sign::before, h1.sign::after{
     content: "";
     position: absolute;
-    top: -26px;
+    bottom: 100%;
     width: 4px;
-    height: 22px;
+    height: 200px;
     background-color: #402523;
 }
 h1.sign::before{

@@ -91,6 +91,7 @@ function showScoreScreen() {
         document.getElementById('score').innerHTML = "No location selected!";
         document.getElementById('progress').style.width = "0%";
         document.getElementById('distance').innerHTML = mode == 'survival' ? "Game over!" : "Distance: 0 blocks away!";
+        saveIfOver(false);
         document.getElementById('next-button').onclick = function(){
             nextStep(false);
         };
@@ -129,6 +130,7 @@ function showScoreScreen() {
             document.getElementById('next-button').innerHTML = "See Results";
         }
     }
+    saveIfOver(survived);
     document.getElementById('next-button').onclick = function(){
         nextStep(survived);
     };
@@ -234,16 +236,34 @@ function showNextLocation() {
 }
 
 // after a score: the next location, or the end of the game
-function nextStep(survived) {
-    var over = mode == 'survival' ? !survived || LOCATIONS.length == 0 : round >= maxRounds;
-    if (!over) {
-        showNextLocation();
-    } else if (mode == 'survival') {
+function isOver(survived) {
+    return mode == 'survival' ? !survived || LOCATIONS.length == 0 : round >= maxRounds;
+}
+
+// the score is saved as soon as the game ends, not on the button:
+// a player who leaves on the last score screen keeps their game
+var saved = false;
+function saveIfOver(survived) {
+    if (saved || !isOver(survived)) {
+        return;
+    }
+    saved = true;
+    gameOver = true;
+    if (mode == 'survival') {
+        if (streak == 0) {
+            return;  // nothing found: nothing for the leaderboard
+        }
         post('api/score', {'score': streak, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'mode': 'survival'});
-        finalScore();
     } else {
         post('api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
+    }
+}
+
+function nextStep(survived) {
+    if (isOver(survived)) {
         finalScore();
+    } else {
+        showNextLocation();
     }
 }
 
