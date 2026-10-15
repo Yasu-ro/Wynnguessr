@@ -6,69 +6,25 @@
     <h1>Mode Selection</h1>
     <div>
         <form action="game" class="mode-select-form" method="post">
-            <fieldset class="mode-select-box" id="provinces">
-                <h3 class="mode-select-header">Provinces (all are selected by default)</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="checkbox" name="province" id="wynn-province" checked="true" value="wynn">
-                    <label class="mode-select-option" for="wynn-province">Wynn</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="gavel-province" checked="true" value="gavel">
-                    <label class="mode-select-option" for="gavel-province">Gavel</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="corkus-province" checked="true" value="corkus">
-                    <label class="mode-select-option" for="corkus-province">Corkus</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="ocean-province" checked="true" value="ocean">
-                    <label class="mode-select-option" for="ocean-province">Ocean</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="silent-expanse-province" checked="true" value="silent-expanse">
-                    <label class="mode-select-option" for="silent-expanse-province">Silent Expanse</label>
-                </div>
-                
-            </fieldset>
-            <fieldset class="mode-select-box" id="timer">
-                <h3 class="mode-select-header">Time Limit</h3>
-                <div class="mode-select-option-box" >
-                    <input class="form-check-input" type="checkbox" id="time-limit-checkbox" name="time-limit-checkbox">
-                    <label class="mode-select-option" for="time-limit-checkbox" onclick="enableTextBox();">Timed</label>
-                    <div class="mode-select-option-box" id="input-text-box"></div>
-                </div>
-            </fieldset>
-        
-            <fieldset class="mode-select-box" id="look">
-                <h3 class="mode-select-header">View Locked Mode</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="checkbox" id="no-look" name="look">
-                    <label class="mode-select-option" for="no-look">Locked</label>
-                </div>
-            </fieldset>
+{% include "settings.html" %}
 
-            <fieldset class="mode-select-box" id="rounds">
-                <h3 class="mode-select-header">Rounds</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="radio" id="three" name="rounds" value="3">
-                    <label class="mode-select-option" for="three">3 Rounds</label>
-                    <input class="form-check-input" type="radio" id="five" name="rounds" value="5" checked="true">
-                    <label class="mode-select-option" for="five">5 Rounds</label>
-                    <input class="form-check-input" type="radio" id="ten" name="rounds" value="10">
-                    <label class="mode-select-option" for="ten">10 Rounds</label>
-                    <input class="form-check-input" type="radio" id="twentyfive" name="rounds" value="25">
-                    <label class="mode-select-option" for="twentyfive">25 Rounds</label>
-                </div>
+            <button type="submit" class="form-submit" id="mode-submit-button">Play Solo</button>
+
+            <fieldset class="mode-select-box" id="friends">
+                <h3 class="mode-select-header">Play With Friends</h3>
+                {% if session['user_id'] %}
+                    <div class="mode-select-option-box friends-box">
+                        <button type="submit" class="form-submit friends-button" formaction="room/create">Create a Room</button>
+                        <span class="friends-or">or</span>
+                        <input form="join-form" class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
+                        <button form="join-form" type="submit" class="form-submit friends-button">Join</button>
+                    </div>
+                    <p class="friends-hint">A new room starts with the settings above. You can still change them in the room before the game starts.</p>
+                {% else %}
+                    <p class="friends-hint"><a href="login?next=mode">Log in</a> or <a href="register?next=mode">register</a> to play with your friends.</p>
+                {% endif %}
             </fieldset>
-            
-            <button type="submit" class="form-submit" id="mode-submit-button">Play</button>
-            <button type="submit" class="form-submit" formaction="room/create">Create a room</button>
         </form>
-        
-        
-
+        <form id="join-form" action="room" method="get"></form>
     </div>
-    <script>
-        function enableTextBox(){
-            if (document.getElementById("time-limit-checkbox").checked) {
-                document.getElementById("input-text-box").innerHTML='';
-            }
-            else{
-                document.getElementById("input-text-box").innerHTML='<input type="number" id="time-limit" name="time-limit" placeholder="Time Limit (s)" value="30"> ';
-            }
-        }
-        
-    </script>
 {% endblock %}

@@ -48,10 +48,11 @@
                 </div>
             {% else %}
             <div>
-                <a href="register">
+                {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
+                <a href="register{{ next }}">
                     <div class="nav-link-right">Register</div>
                 </a>
-                <a href="login">
+                <a href="login{{ next }}">
                     <div class="nav-link-right">Login</div>
                 </a>
             </div>

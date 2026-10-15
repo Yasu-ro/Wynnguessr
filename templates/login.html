@@ -3,17 +3,22 @@
 {% block title %}: Login{% endblock %}
 
 {% block content %}
+    {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
     <h1> Login</h1>
-    <form class="login-form" action="login" method="post">
+    {% if 'room' in request.args.get('next', '') %}
+        <p class="friends-hint">Log in to join your friends' room.</p>
+    {% endif %}
+    <form class="login-form" action="login{{ next }}" method="post">
         <div>
             <input placeholder="Username" class="login-input" name="username" autocomplete="off">
         </div>
         <div>
             <input placeholder="Password" type="password" class="login-input" name="password" autocomplete="off">
-        </div>            
+        </div>
         <div>
             <button type="submit" class="form-submit">Login</button>
         </div>
     </form>
-    
+    <p class="friends-hint">No account yet? <a href="register{{ next }}">Register</a></p>
+
 {% endblock %}

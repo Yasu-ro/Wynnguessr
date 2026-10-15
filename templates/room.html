@@ -1,39 +1,81 @@
-<!DOCTYPE html>
+{% extends "layout.html" %}
 
-<head>
-    <title>Wynnguesser: Room</title>
-    <link rel="stylesheet" href="static/style.css">
-    <link rel="icon" href="static/wynnlogo.png" type="image/x-icon">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="crossorigin=""/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta id="room-variables" code="{{code}}" rounds="{{rounds}}" timeLimit="{{time_limit}}" look="{{look}}">
-</head>
+{% block title %}: Room {{ code }}{% endblock %}
 
-<body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a class="nav-icon" href="./">
-                <img src="static/wynnlogo.png" alt="logo" height=31.1>
-            </a>
-            <a href="./">
-                <div class="nav-link-left">
-                    <i class="material-icons">home</i>Home
-                </div>
-            </a>
-            <p id="round-number">Round: 0/{{rounds}}</p>
-            <p id="totalScore">Score: 0</p>
-            {% if time_limit > 0 %}
-                <p id="time-left">Time: {{time_limit}}</p>
-            {% endif %}
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+<div id="room" data-code="{{ code }}">
+
+    <section id="lobby" class="room-page" hidden>
+        <h1>Room {{ code }}</h1>
+        <div class="room-columns">
+            <div class="room-column">
+                <fieldset class="mode-select-box">
+                    <h3 class="mode-select-header">Invite Your Friends</h3>
+                    <div class="mode-select-option-box room-invite">
+                        <span class="room-code" title="Room code">{{ code }}</span>
+                        <button type="button" class="form-submit friends-button" data-copy>Copy Link</button>
+                    </div>
+                    <p class="friends-hint">Send them the link, or the code to type in Play → Join.</p>
+                </fieldset>
+                <fieldset class="mode-select-box">
+                    <h3 class="mode-select-header">Players</h3>
+                    <div class="mode-select-option-box" id="lobby-players"></div>
+                </fieldset>
+            </div>
+            <form id="room-settings" class="room-column" onsubmit="return false">
+                <fieldset id="room-settings-fields" class="room-settings" disabled>
+{% include "settings.html" %}
+                </fieldset>
+                <p id="settings-error" class="room-error"></p>
+            </form>
         </div>
-    </nav>
-    <div class="room-screen" id="room-screen" style="display: none"></div>
-    <div class="guess-screen" id="guess-screen"></div>
-    <div class="score-screen" id="score-screen"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-    <script src="static/js/room.js"></script>
-</body>
+        <button type="button" id="start-button" class="form-submit room-start" disabled>Start the Game</button>
+    </section>
+
+    <section id="guess-screen" class="room-screen" hidden>
+        <div id="room-panorama"></div>
+        <div class="room-hud">
+            <div class="room-hud-line"><span id="hud-round"></span><span id="hud-score"></span><span id="hud-time"></span></div>
+            <div id="hud-call" class="room-hud-call"></div>
+            <div id="hud-players" class="room-hud-players"></div>
+        </div>
+        <div class="map-container">
+            <div id="map"></div>
+            <button type="button" id="guess-button" class="guess-button">Guess!</button>
+        </div>
+    </section>
+
+    <section id="reveal-screen" class="room-screen room-reveal" hidden>
+        <div id="reveal-map"></div>
+        <div class="room-panel">
+            <h2 id="reveal-title"></h2>
+            <p id="reveal-mine" class="room-mine"></p>
+            <table class="room-table">
+                <thead><tr><th>Player</th><th class="num">Round</th><th class="num">Total</th></tr></thead>
+                <tbody id="reveal-rows"></tbody>
+            </table>
+            <button type="button" id="next-button" class="next-button room-next"></button>
+        </div>
+    </section>
+
+    <section id="results" class="room-page" hidden>
+        <h1 id="results-title">Results</h1>
+        <table class="leaderboard-table room-results">
+            <thead><tr class="leaderboard-row"><th>Rank</th><th>Player</th><th>Score</th></tr></thead>
+            <tbody id="results-rows"></tbody>
+        </table>
+        <div class="room-actions">
+            <button type="button" id="again-button" class="form-submit room-action" hidden>Play Again</button>
+            <a href="mode" class="form-submit room-action room-leave">Back to Menu</a>
+        </div>
+        <p id="results-hint" class="friends-hint"></p>
+        <p class="friends-hint">Anyone can still play these same locations with the code <b>{{ code }}</b> · <a href="#" data-copy>copy the link</a></p>
+    </section>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="static/js/room.js"></script>
+{% endblock %}

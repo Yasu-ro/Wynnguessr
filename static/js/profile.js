@@ -57,10 +57,10 @@ $( document ).ready(function() {
                     cell.className = 'leaderboard-data';
                     for(let j = 1; j < response[i].length + 1; j++){
                         let cell = row.insertCell(j);
-                        cell.innerHTML = response[i][j - 1];
+                        cell.textContent = response[i][j - 1];
                         cell.className = 'leaderboard-data';
                         if(j == response[i].length){
-                            let time = Number(cell.innerHTML);
+                            let time = Number(cell.textContent);
                             let hours = Math.floor(time / 3600);
                             let minutes = Math.floor((time % 3600) / 60);
                             let seconds = Math.floor(time % 60);

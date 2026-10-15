@@ -158,10 +158,6 @@ function showNextLocation() {
         showScoreScreen();
     };
 
-    if (look === 'True') {
-        $('#panorama').css('pointer-events', 'none');
-    }
-    
     /*var vrView = new VRView.Player('#vrview', {
         image: images[round - 1]['url'],
         is_stereo: false,
@@ -169,10 +165,16 @@ function showNextLocation() {
     });*/
 
     //initailize panorama viewer
+    let locked = look === 'True';
     let viewer = pannellum.viewer('game-panorama', {
         "type": "equirectangular",
         "panorama": images[round - 1]['url'],
-        "autoLoad": true
+        "autoLoad": true,
+        "draggable": !locked,
+        "mouseZoom": !locked,
+        "keyboardZoom": !locked,
+        "disableKeyboardCtrl": locked,
+        "showControls": !locked
     });
     viewer.on('load', function(){
         let countdown = timeLimit;
@@ -209,7 +211,7 @@ function showNextLocation() {
 function showContent(contentId){
     document.getElementById('guess-screen').style.display = "none";
     document.getElementById('score-screen').style.display = "none";
-    document.getElementById(contentId).style.display = "block";
+    document.getElementById(contentId).style.display = contentId == 'score-screen' ? "flex" : "block";
 }
 
 function finalScore() {
