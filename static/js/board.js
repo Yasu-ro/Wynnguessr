@@ -21,6 +21,15 @@ $(function () {
         return isNaN(d) ? iso : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
     }
 
+    // a name proven by Wynncraft links to the player's Wynncraft profile
+    function player(row) {
+        if (!row.mc) {
+            return esc(row.name);
+        }
+        return "<a class='board-verified' href='https://wynncraft.com/stats/player/" + encodeURIComponent(row.mc) +
+            "' target='_blank' rel='noopener'>" + esc(row.name) + "<i class='material-icons wynn-check'>verified</i></a>";
+    }
+
     function load() {
         var mode = form.find('[name=mode]:checked').val();
         var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
@@ -44,7 +53,7 @@ $(function () {
         $('#table-body').html(rows.map(function (row, i) {
             var rank = i < 3 ? "<i class='material-icons' style='color:" + medals[i] + "'>emoji_events</i>" : i + 1;
             return "<tr class='leaderboard-row" + (row.name == me ? ' you' : '') + "'><td>" + rank + "</td>" +
-                "<td class='board-player'>" + esc(row.name) + "</td>" +
+                "<td class='board-player'>" + player(row) + "</td>" +
                 "<td>" + Number(row.score).toLocaleString('en-US') + "</td>" +
                 "<td>" + duration(row.time) + "</td>" +
                 "<td class='board-date'>" + day(row.date) + "</td></tr>";

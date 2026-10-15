@@ -9,7 +9,8 @@ import math
 import secrets
 import time
 from datetime import date
-from urllib.parse import quote
+import urllib.request
+from urllib.parse import quote, urlencode
 from flask_bcrypt import Bcrypt
 from config import Config
 
@@ -92,7 +93,7 @@ def post_score():
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
     mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-    query = '''SELECT u.username AS name, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
+    query = '''SELECT u.username AS name, u.mc_name AS mc, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
         WHERE s.provinces = ? AND s.nolook = ? AND COALESCE(s.mode, 'classic') = ?'''
     params = [form.get('provinces', ''), form.get('nolook', 'No'), mode]
     if mode == 'classic':
@@ -185,7 +186,7 @@ def login():
             return render_template('apology.html', message = "Please fill in all fields")
         with connect() as c:
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
-        if user and bcrypt.check_password_hash(user[2], password):
+        if user and user[2] and bcrypt.check_password_hash(user[2], password):
             session.permanent = True
             session['guest'] = False
             session['loggedin'] = True
@@ -209,7 +210,7 @@ def register():
                 return render_template('apology.html', message = "Password must be 64 characters or less")
             if password != confirmation:
                 return render_template('apology.html', message = "Passwords do not match")
-            elif c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchall():
+            elif c.execute("SELECT * FROM users WHERE (username = ? AND COALESCE(guest, 0) = 0) OR mc_name = ? COLLATE NOCASE", (username, username)).fetchall():
                 return render_template('apology.html', message = "Username is already taken")
             elif username == "" or password == "" or confirmation == "":
                 return render_template('apology.html', message = "Please fill in all fields")
@@ -256,8 +257,81 @@ def profile():
     if not session.get('loggedin'):
         return redirect('login?next=profile')
     with connect() as c:
-        profile = c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
-    return render_template('profile.html', username = profile[0])
+        profile = c.execute("SELECT username, mc_name FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+    return render_template('profile.html', username = profile[0], mc_name = profile[1])
+
+# ---------- Wynncraft account ----------
+# "Log in with Wynncraft" (OAuth2): Wynncraft vouches for the Minecraft
+# account, so a linked name on the leaderboard is really that player. The
+# application's id and secret live in wynncraft_oauth.json (not in git);
+# without that file the button is simply not shown.
+
+WYNN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wynncraft_oauth.json')
+
+def wynn_config():
+    try:
+        with open(WYNN_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+@app.context_processor
+def wynn_button():
+    return {'wynn_login': wynn_config() is not None}
+
+def wynn_api(url, data = None, token = None):
+    req = urllib.request.Request(url, data = urlencode(data).encode() if data else None,
+                                 headers = {'Authorization': 'Bearer ' + token} if token else {})
+    with urllib.request.urlopen(req, timeout = 10) as r:
+        return json.load(r)
+
+@app.route("/auth/wynncraft")
+def wynn_start():
+    cfg = wynn_config()
+    if not cfg:
+        return render_template('apology.html', message = "Wynncraft login is not set up yet")
+    session['wynn_state'] = secrets.token_urlsafe(16)
+    session['wynn_next'] = next_page()
+    url = cfg['authorize_url']
+    return redirect(url + ('&' if '?' in url else '?') + urlencode({'state': session['wynn_state']}))
+
+@app.route("/auth/wynncraft/callback")
+def wynn_back():
+    cfg = wynn_config()
+    state = session.pop('wynn_state', None)
+    if not cfg or not state or request.args.get('state') != state:
+        return render_template('apology.html', message = "Wynncraft login failed, please try again")
+    if not request.args.get('code'):
+        return render_template('apology.html', message = "Wynncraft login was cancelled")
+    try:
+        token = wynn_api('https://api.wynncraft.com/v3/oauth/token', {
+            'grant_type': 'authorization_code', 'code': request.args['code'], 'redirect_uri': cfg['redirect_uri'],
+            'client_id': cfg['client_id'], 'client_secret': cfg['client_secret']})['access_token']
+        profiles = wynn_api('https://api.wynncraft.com/v3/oauth/me', token = token)['profiles']
+        uuid, profile = sorted(profiles.items(), key = lambda p: not p[1].get('primary'))[0]
+        name = profile['username']
+    except Exception:
+        return render_template('apology.html', message = "Wynncraft did not answer, please try again")
+    with connect() as c:
+        owner = c.execute("SELECT id FROM users WHERE mc_uuid = ?", (uuid,)).fetchone()
+        if session.get('loggedin'):
+            # linking an existing account, from the profile page
+            if owner and owner[0] != session['user_id']:
+                return render_template('apology.html', message = "This Minecraft account is already linked to another account")
+            c.execute("UPDATE users SET mc_uuid = ?, mc_name = ? WHERE id = ?", (uuid, name, session['user_id']))
+            return redirect('../../profile')
+        if owner:
+            c.execute("UPDATE users SET mc_name = ? WHERE id = ?", (name, owner[0]))  # Minecraft names can change
+            uid = owner[0]
+        elif c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
+            return render_template('apology.html', message = "An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
+        else:
+            uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
+    session.permanent = True
+    session['guest'] = False
+    session['loggedin'] = True
+    session['user_id'] = uid
+    return redirect('../../' + session.pop('wynn_next', './'))
 
 @app.route("/apology")
 def apology():
@@ -311,6 +385,10 @@ with connect() as c:
     # guests: players with a nickname and no account
     if 'guest' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
         c.execute("ALTER TABLE users ADD COLUMN guest INTEGER DEFAULT 0")
+    # Wynncraft account linked to this one (see /auth/wynncraft)
+    if 'mc_uuid' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN mc_uuid TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN mc_name TEXT")
 
 def room_tx():
     # room requests read then write: taking the write lock first means two

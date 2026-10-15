@@ -2,3 +2,4 @@
 __pycache__/
 *.log
 secret_key
+wynncraft_oauth.json

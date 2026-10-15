@@ -4,6 +4,12 @@
 
 {% block content %}
 <h1>{{ username }}</h1>
+{% if mc_name %}
+    <p class="friends-hint"><i class="material-icons wynn-check">verified</i> Linked to Wynncraft as <a href="https://wynncraft.com/stats/player/{{ mc_name | urlencode }}" target="_blank" rel="noopener">{{ mc_name }}</a></p>
+{% elif wynn_login %}
+    <a class="form-submit wynn-button" href="auth/wynncraft">Link my Wynncraft account</a>
+    <p class="friends-hint">Proves it is really you: your name gets a check mark and links to your Wynncraft profile on the leaderboard.</p>
+{% endif %}
 <div class="board board-own" data-api="api/updateprofile">
     <h2 class="board-title">Your Best Games</h2>
 {% include "board.html" %}
