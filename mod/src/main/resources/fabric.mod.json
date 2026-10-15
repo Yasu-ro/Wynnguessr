@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "wynndle-panorama",
+	"version": "${version}",
+	"name": "Wynndle Panorama",
+	"description": "Takes 360° panoramas for wynndle.com, named after their coordinates.",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["com.wynndle.panorama.WynndlePanorama"]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~1.21.11",
+		"fabric-api": "*"
+	}
+}

@@ -179,6 +179,26 @@ Inspiré de wynncraft.com **sans rien en reprendre** (ni image ni logo).
 - Les vrais joueurs (Yasuro, Ragus, kemmi, 13tiak, Yulofox, Roguefort…) jouent
   réellement : regarder la base avant de supposer un bug.
 
+## Mod de capture (`mod/`)
+
+Mod Fabric client **Wynndle Panorama**, pour refaire les images (les 622 de
+l'origine datent d'août 2024). Touche **F7** (réglable, catégorie Divers) :
+appelle le panorama intégré de Minecraft (`grabPanoramixScreenshot` : 6 faces
+rendues en 4096 et enregistrées en 1024, monde seul, sans interface ni main),
+assemble les faces en équirectangulaire 4096×2048 (le format des images
+actuelles), centre = **nord**, et écrit `.minecraft/wynndle/<X>_<Z>.jpg`
+(`_2`… si le nom existe déjà). La province n'est pas dans le nom : à déduire
+de la position à l'import.
+
+- Cible : pack Modrinth **Wynncraft Plus** (Fabric, MC 1.21.11), celui de Yasuro.
+  Il contient Iris, Distant Horizons, Sodium : leur effet sur la capture n'a
+  pas encore été vérifié en jeu.
+- Compiler : `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew build`
+  → `build/libs/`. JDK 21 installé par apt le 2026-10-16 (il n'y avait que le
+  JRE). **Loom 1.15.5 et pas 1.18** : la 1.18 exige Java 25 pour tourner.
+- L'assemblage a été vérifié hors jeu (une ancienne image découpée en cube à
+  la manière de Minecraft puis réassemblée : identique, sans couture).
+
 ## En suspens
 
 - Survival de Yasuro absente du classement après correction : le test réel
