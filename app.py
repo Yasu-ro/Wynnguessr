@@ -116,14 +116,6 @@ def update_rank():
         me = session.get('user_id') and c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
     return jsonify({"rows": rows[:50], "me": me[0] if me else None})
 
-@app.route("/api/updateprofile", methods=['POST'])
-def update_profile():
-    if not session.get('loggedin'):
-        return jsonify({"rows": []})
-    with connect() as c:
-        rows = board(c, request.form, session['user_id'])
-    return jsonify({"rows": rows[:50]})
-
 @app.route("/")
 def index():
     return render_template('index.html')
@@ -258,7 +250,45 @@ def profile():
         return redirect('login?next=profile')
     with connect() as c:
         profile = c.execute("SELECT username, mc_name FROM users WHERE id = ?", (session['user_id'],)).fetchone()
-    return render_template('profile.html', username = profile[0], mc_name = profile[1])
+        games = history(c, session['user_id'])
+    multi = [g for g in games if g['multi']]
+    return render_template('profile.html', username = profile[0], mc_name = profile[1], games = games[:30],
+                           played = len(multi), wins = sum(g['win'] for g in multi))
+
+def history(c, uid):
+    # the player's games, newest first: finished rooms with at least two
+    # players (with their place), and solo games (room games also sit in
+    # scores, marked with their room: they are not counted twice)
+    games = []
+    for r in c.execute('''SELECT r.* FROM rooms r JOIN room_players p ON p.code = r.code
+            WHERE p.user_id = ? AND r.state = 'finished' ''', (uid,)).fetchall():
+        totals = dict(c.execute("SELECT user_id, SUM(score) FROM room_guesses WHERE code = ? GROUP BY user_id", (r['code'],)).fetchall())
+        when = c.execute("SELECT MAX(at) FROM room_guesses WHERE code = ?", (r['code'],)).fetchone()[0]
+        if r['mode'] == 'classic':
+            st = {}
+            players = list(totals)
+            key = lambda u: totals[u]
+        else:
+            st = standings(c, r, r['round'])
+            players = list(st)
+            key = lambda u: (st[u]['out'] is None, st[u]['left'], st[u]['out'] or 0, totals.get(u, 0))
+        if uid not in players or len(players) < 2:
+            continue
+        rank = 1 + sum(key(u) > key(uid) for u in players)
+        games.append({'multi': True, 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
+                      'score': totals.get(uid, 0), 'rounds': r['round'], 'when': when or 0,
+                      'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out')})
+    for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode FROM scores
+            WHERE user_id = ? AND room IS NULL''', (uid,)).fetchall():
+        try:
+            when = time.mktime(time.strptime(g['date'], '%Y-%m-%d'))
+        except (TypeError, ValueError):
+            when = 0
+        games.append({'multi': False, 'mode': g['mode'], 'score': g['score'], 'rounds': g['rounds'],
+                      'time': g['time'], 'when': when})
+    for g in games:
+        g['day'] = time.strftime('%b %d, %Y', time.localtime(g['when'])) if g['when'] else ''
+    return sorted(games, key = lambda g: g['when'], reverse = True)
 
 # ---------- Wynncraft account ----------
 # "Log in with Wynncraft" (OAuth2): Wynncraft vouches for the Minecraft
@@ -391,6 +421,9 @@ with connect() as c:
     # the scores table comes with the original game, which had no modes
     if 'mode' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN mode TEXT DEFAULT 'classic'")
+    # a game played in a room keeps its room code, so the profile does not list it twice
+    if 'room' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
+        c.execute("ALTER TABLE scores ADD COLUMN room TEXT")
     # guests: players with a nickname and no account
     if 'guest' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
         c.execute("ALTER TABLE users ADD COLUMN guest INTEGER DEFAULT 0")
@@ -511,9 +544,9 @@ def record(c, r, uid):
     total, spent, guessed = c.execute('''SELECT COALESCE(SUM(score), 0), COALESCE(SUM(time), 0), COUNT(x)
         FROM room_guesses WHERE code = ? AND user_id = ?''', (r['code'], uid)).fetchone()
     if guessed:
-        c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, room) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                   (uid, total, date.today(), 'Yes' if r['look'] else 'No', str(json.loads(r['provinces'])),
-                   r['rounds'], round(spent, 2)))
+                   r['rounds'], round(spent, 2), r['code']))
 
 def next_round(c, r):
     over = r['round'] >= r['rounds']

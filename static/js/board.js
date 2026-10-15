@@ -27,7 +27,8 @@ $(function () {
             return esc(row.name);
         }
         return "<a class='board-verified' href='https://wynncraft.com/stats/player/" + encodeURIComponent(row.mc) +
-            "' target='_blank' rel='noopener'>" + esc(row.name) + "<i class='material-icons wynn-check'>verified</i></a>";
+            "' target='_blank' rel='noopener' title='Open their Wynncraft profile'>" + esc(row.name) +
+            "<i class='material-icons wynn-check'>verified</i><i class='material-icons'>open_in_new</i></a>";
     }
 
     function load() {
