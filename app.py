@@ -15,6 +15,8 @@ app = Flask(__name__)
 CORS(app)
 bcrypt = Bcrypt(app) 
 app.config.from_object(Config)
+# other sites share this domain behind Tailscale Funnel
+app.config['SESSION_COOKIE_NAME'] = 'wynnguessr_session'
 conn = sqlite3.connect('database.db', check_same_thread=False)
 db = conn.cursor()
 
@@ -156,7 +158,7 @@ def login():
         if user and bcrypt.check_password_hash(user[2], password):
             session['loggedin'] = True
             session['user_id'] = user[0]
-            return redirect('/')
+            return redirect('./')
         else:
             return render_template('apology.html', message = "Invalid username or password")
     else:
@@ -185,7 +187,7 @@ def register():
             user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
             session['loggedin'] = True
             session['user_id'] = user[0]
-            return redirect('/')
+            return redirect('./')
     else:
         return render_template('register.html')
     
@@ -193,12 +195,12 @@ def register():
 def logout():
     session['loggedin'] = False
     session['user_id'] = None
-    return redirect('/')
+    return redirect('./')
 
 @app.route("/profile")
 def profile():
     if not session.get('loggedin'):
-        return redirect('/login')
+        return redirect('login')
     profile = db.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
     return render_template('profile.html', username = profile[0])
     
@@ -255,7 +257,7 @@ def room_round_closed(c, room, n):
 @app.route("/room/create", methods=['POST'])
 def room_create():
     if not session.get('loggedin'):
-        return redirect('/login')
+        return redirect('login')
     provinces = [p for p in request.form.getlist('province') if p in PROVINCES]
     if not provinces:
         return render_template('apology.html', message = "Please select at least one province")
@@ -279,12 +281,12 @@ def room_create():
                   (code, session['user_id'], json.dumps(provinces), int(rounds), time_limit,
                    int(request.form.get('look') == 'on'), json.dumps(ids)))
         c.execute("INSERT INTO room_players VALUES (?, ?, 1, ?)", (code, session['user_id'], time.time()))
-    return redirect('/room?code=' + code)
+    return redirect('../room?code=' + code)
 
 @app.route("/room")
 def room():
     if not session.get('loggedin'):
-        return redirect('/login')
+        return redirect('login')
     with room_db() as c:
         r = c.execute("SELECT * FROM rooms WHERE code = ?", (request.args.get('code', ''),)).fetchone()
         if not r:

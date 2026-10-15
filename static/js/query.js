@@ -39,7 +39,7 @@ $( document ).ready(function() {
     
         //send ajax request to get rankings
         $.ajax({
-            url: '/api/updaterank',
+            url: 'api/updaterank',
             data: params,
             type: 'POST',
             dataType: 'json',

@@ -31,7 +31,7 @@ $(document).ready(function() {
 
 // Fetch location data from the server
 function fetchLocations() {
-    return fetch('/api/locations')
+    return fetch('api/locations')
     .then(response => response.json())
     .then(data => {
         LOCATIONS = data;
@@ -103,7 +103,7 @@ function showScoreScreen() {
 
     document.getElementById('next-button').onclick = function(){
         if(round >= maxRounds){
-            post('/api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
+            post('api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
             finalScore();
         }
         else{

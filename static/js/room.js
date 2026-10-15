@@ -21,14 +21,14 @@ $(document).ready(poll);
 
 // The room state is polled every second; each screen is drawn once per round
 function poll() {
-    $.getJSON('/api/room/' + code + (cur ? '?round=' + cur : ''))
+    $.getJSON('api/room/' + code + (cur ? '?round=' + cur : ''))
         .done(render)
         .always(function () { setTimeout(poll, 1000); });
 }
 
 function render(s) {
     if (!s.success) {
-        location.href = '/';
+        location.href = './';
         return;
     }
     if (!s.live && !cur) {
@@ -93,7 +93,7 @@ function lobby(s) {
             "<ul id='room-players' class='room-players'></ul>" +
             "<button id='room-button' class='next-button room-button'></button>");
         $('#invite').val(location.href).click(function () { this.select(); });
-        $('#room-button').click(function () { $.post('/api/room/' + code + '/start'); });
+        $('#room-button').click(function () { $.post('api/room/' + code + '/start'); });
     }
     $('#room-players').html(s.players.map(p => '<li>' + esc(p.username) + '</li>').join(''));
     $('#room-button').text(s.host ? 'Start' : 'Waiting for the host to start...').prop('disabled', !s.host);
@@ -176,7 +176,7 @@ function submit(round) {
         data.z = -marker.getLatLng().lat;
     }
     $('#guess-button').text('Waiting for other players...').css('background-color', '');
-    $.post('/api/room/' + code + '/guess', data);
+    $.post('api/room/' + code + '/guess', data);
 }
 
 // End of a round: the answer and everyone's guess
@@ -208,7 +208,7 @@ function reveal(s) {
         var last = s.round >= s.rounds;
         $('#next-button').click(function () {
             if (s.live) {
-                $.post('/api/room/' + code + '/start');
+                $.post('api/room/' + code + '/start');
             } else if (last) {
                 finished = true;
                 results(s);
@@ -236,7 +236,7 @@ function results(s) {
             "<ol id='room-players' class='room-players'></ol>" +
             "<p>Invite link (others can still play these locations):</p>" +
             "<input id='invite' class='room-invite' readonly>" +
-            "<a href='/mode'><button class='next-button room-button'>Play again</button></a>");
+            "<a href='mode'><button class='next-button room-button'>Play again</button></a>");
         $('#invite').val(location.href).click(function () { this.select(); });
     }
     $('#room-players').html(playerList(s));
