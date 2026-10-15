@@ -3,4 +3,4 @@ Werkzeug==2.3.6
 Flask-Session==0.4.0
 Flask-Cors==4.0.1
 Flask-Bcrypt==1.0.0
-gunicorn==20.1.0
+gunicorn==26.2.0
