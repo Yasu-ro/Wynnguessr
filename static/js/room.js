@@ -27,6 +27,16 @@ $(document).ready(function () {
 });
 $(window).on('resize', setNav);
 
+// leaving in the middle of a game (closing the tab, a menu link, back, reload)
+// asks first; the page's own moves (next room, reload on error) do not
+var leaving = false;
+window.addEventListener('beforeunload', function (e) {
+    if (!leaving && (view.indexOf('guess') == 0 || view.indexOf('reveal') == 0)) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
 // ---------- server ----------
 
 function poll() {
@@ -60,12 +70,14 @@ function send(action, data) {
 function render(data) {
     if (!data.success) {
         // logged out, or the room is gone: the page itself will say which
+        leaving = true;
         location.reload();
         return;
     }
     s = data;
     chat(s.chat);
     if (s.next && s.live && s.state == 'finished') {
+        leaving = true;
         location.href = 'room?code=' + s.next;
         return;
     }

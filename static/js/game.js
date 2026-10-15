@@ -25,6 +25,15 @@ var greenIcon = new L.Icon({
     shadowSize: [41, 41]
 });
 
+// leaving before the end of the game asks first
+var gameOver = false;
+window.addEventListener('beforeunload', function (e) {
+    if (!gameOver) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
 // Document ready function
 $(document).ready(function() {
     fetchLocations().then(() => {
@@ -245,6 +254,7 @@ function showContent(contentId){
 }
 
 function finalScore() {
+    gameOver = true;
     showContent('score-screen');
     document.getElementById('score-screen').innerHTML =
         "<div class = 'score-map' id='scoreMap'></div>" + 

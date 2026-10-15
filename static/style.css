@@ -1287,10 +1287,10 @@ a.play-card:hover{
     border-bottom: 0;
 }
 .room-chat-game{
-    position: fixed;
-    top: calc(var(--nav) + 10px);
+    position: absolute;
+    top: 10px;
     left: 50px;
-    z-index: 600;
+    z-index: 450; /* under the map, which grows over it on a phone when guessing */
     width: 290px;
 }
 .room-chat-game .room-chat{
