@@ -1114,3 +1114,66 @@ body.room-playing{
         padding: 6px;
     }
 }
+
+/* ---------- Play: solo or friends ---------- */
+.play-choices{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 25px;
+    padding: 20px 15px 40px;
+}
+.play-card{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 360px;
+    max-width: 100%;
+    padding: 25px 20px;
+    background-color: #baaa80;
+    border: 4px solid #857361;
+    border-radius: 14px;
+    color: black;
+    text-decoration: none;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+a.play-card:hover{
+    transform: scale(1.04);
+    border-color: #402523;
+    color: black;
+}
+.play-card .material-icons{
+    font-size: 64px;
+}
+.play-card h2, body .play-card h2{
+    margin: 5px 0 10px;
+    color: black;
+    font-size: 32px;
+}
+.play-card p{
+    margin: 10px 0 0;
+    font-size: 18px;
+}
+.play-modes{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.play-go{
+    width: auto;
+    margin-top: 10px;
+    padding: 6px 40px;
+}
+.play-back{
+    display: inline-block;
+    margin-bottom: 5px;
+    color: white;
+    font-size: 18px;
+    text-shadow: 0 1px 3px black;
+}
+.play-back:hover{
+    color: #83C73C;
+}
+.play-login{
+    margin-top: 30px;
+}

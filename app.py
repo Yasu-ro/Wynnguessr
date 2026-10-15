@@ -40,7 +40,7 @@ def assets():
 def next_page():
     # where to go after logging in: only a page of this site, e.g. "room?code=ABC234"
     page = request.args.get('next', '')
-    return page if re.fullmatch(r'[a-z]+(\?code=[A-Za-z0-9_-]+)?', page) else './'
+    return page if re.fullmatch(r'[a-z]+(\?(code|play)=[A-Za-z0-9_-]+)?', page) else './'
 
 @app.route("/api/locations", methods = ['GET'])
 def get_locations():
@@ -445,7 +445,7 @@ def member(c, code):
 @app.route("/room/create", methods=['POST'])
 def room_create():
     if not session.get('loggedin'):
-        return redirect('../login?next=mode')
+        return redirect('../login?next=' + quote('mode?play=friends'))
     s, error = room_settings(request.form)
     if error:
         return render_template('apology.html', message = error)

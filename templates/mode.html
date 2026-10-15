@@ -1,45 +1,65 @@
 {% extends "layout.html" %}
 
-{% block title %}: Mode Select{% endblock %}
+{% block title %}: Play{% endblock %}
 
 {% block content %}
-    <h1>Mode Selection</h1>
+{% set play = request.args.get('play') %}
+{% if play == 'solo' %}
+    <h1>Play Solo</h1>
+    <a class="play-back" href="mode">← Back</a>
     <div>
         <form action="game" class="mode-select-form" method="get">
-{% with modes = [('classic', 'Classic'), ('survival', 'Survival'), ('duel', 'Duel'), ('royale', 'Battle Royale')] %}{% include "modes.html" %}{% endwith %}
+{% with modes = [('classic', 'Classic'), ('survival', 'Survival')] %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
-
-            <button type="submit" class="form-submit" id="mode-submit-button">Play Solo</button>
-
-            <fieldset class="mode-select-box" id="friends">
-                <h3 class="mode-select-header">Play With Friends</h3>
-                {% if session['user_id'] %}
-                    <div class="mode-select-option-box friends-box">
-                        <button type="submit" class="form-submit friends-button" id="create-button" formaction="room/create" formmethod="post">Create a Room</button>
-                        <span class="friends-or">or</span>
-                        <input form="join-form" class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
-                        <button form="join-form" type="submit" class="form-submit friends-button">Join</button>
-                    </div>
-                    <p class="friends-hint">A new room starts with the settings above. You can still change them in the room before the game starts.</p>
-                {% else %}
-                    <p class="friends-hint"><a href="login?next=mode">Log in</a> or <a href="register?next=mode">register</a> to play with your friends.</p>
-                {% endif %}
-            </fieldset>
+            <button type="submit" class="form-submit" id="mode-submit-button">Play</button>
         </form>
-        <form id="join-form" action="room" method="get"></form>
     </div>
-    <script>
-        // each mode says where it can be played
-        document.addEventListener('modechange', function (e) {
-            var solo = e.detail == 'classic' || e.detail == 'survival';
-            var play = document.getElementById('mode-submit-button'), create = document.getElementById('create-button');
-            play.disabled = !solo;
-            play.textContent = solo ? 'Play Solo' : 'This mode is played with friends: create a room below';
-            if (create) {
-                create.disabled = e.detail == 'survival';
-                create.textContent = e.detail == 'survival' ? 'Survival is played solo' : 'Create a Room';
-            }
-        });
-        showRules();
-    </script>
+    <script>showRules();</script>
+{% elif play == 'friends' %}
+    <h1>Play With Friends</h1>
+    <a class="play-back" href="mode">← Back</a>
+    {% if session['user_id'] %}
+    <div class="play-choices">
+        <form class="play-card" action="room/create" method="post">
+            <i class="material-icons">add_circle</i>
+            <h2>Create a Room</h2>
+            <div class="play-modes">
+                <input class="form-check-input" type="radio" name="mode" id="new-classic" value="classic" checked>
+                <label class="mode-select-option" for="new-classic">Classic</label>
+                <input class="form-check-input" type="radio" name="mode" id="new-duel" value="duel">
+                <label class="mode-select-option" for="new-duel">Duel</label>
+                <input class="form-check-input" type="radio" name="mode" id="new-royale" value="royale">
+                <label class="mode-select-option" for="new-royale">Battle Royale</label>
+            </div>
+            {% for p in ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse'] %}<input type="hidden" name="province" value="{{ p }}">{% endfor %}
+            <input type="hidden" name="rounds" value="5">
+            <button type="submit" class="form-submit play-go">Create</button>
+            <p>Then send the link or the code to your friends. Rules and settings can be changed in the room.</p>
+        </form>
+        <form class="play-card" action="room" method="get">
+            <i class="material-icons">login</i>
+            <h2>Join a Room</h2>
+            <input class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
+            <button type="submit" class="form-submit play-go">Join</button>
+            <p>Type the code a friend gave you, or just open their link.</p>
+        </form>
+    </div>
+    {% else %}
+    <p class="friends-hint play-login"><a href="login?next=mode%3Fplay%3Dfriends">Log in</a> or <a href="register?next=mode%3Fplay%3Dfriends">register</a> to play with your friends.</p>
+    {% endif %}
+{% else %}
+    <h1>How Do You Want to Play?</h1>
+    <div class="play-choices">
+        <a class="play-card" href="mode?play=solo">
+            <i class="material-icons">person</i>
+            <h2>Solo</h2>
+            <p>Classic or Survival, at your own pace. Your best games go on the leaderboard.</p>
+        </a>
+        <a class="play-card" href="mode?play=friends">
+            <i class="material-icons">groups</i>
+            <h2>With Friends</h2>
+            <p>Create a room or join one: Classic, Duel or Battle Royale, everyone on the same locations at the same time.</p>
+        </a>
+    </div>
+{% endif %}
 {% endblock %}
