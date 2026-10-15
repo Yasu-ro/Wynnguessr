@@ -216,7 +216,7 @@ function change(p) {
     if (s.mode == 'duel') {
         return " <span class='room-loss'>" + p.delta.toLocaleString('en-US') + "</span>";
     }
-    return p.delta < 0 ? " <span class='room-loss'>-1</span>" : " <span class='room-gain'>+1</span>";
+    return " <span class='" + (p.delta < 0 ? "room-loss'>-1" : "room-gain'>+1") + "<i class='material-icons room-heart'>favorite</i></span>";
 }
 
 function contestants() {
@@ -394,8 +394,10 @@ function guess() {
     var inRound = s.players.filter(function (p) {
         return s.mode == 'classic' ? p.here || p.guessed : p.seat && p.out == null;
     });
+    // everyone's health or lives stay in sight during the round
     $('#hud-players').html(!s.live ? '' : inRound.map(function (p) {
-        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) +
+        var left = s.mode == 'duel' ? ' ' + p.left.toLocaleString('en-US') + ' HP' : s.mode == 'royale' ? hearts(p.left) : '';
+        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + left +
             "<i class='material-icons'>" + (p.guessed ? 'check_circle' : 'more_horiz') + "</i></span>";
     }).join(''));
 }

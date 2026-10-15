@@ -26,6 +26,17 @@ def connect():
     c.row_factory = sqlite3.Row
     return c
 
+@app.context_processor
+def assets():
+    # Cloudflare tells browsers to keep static files 4 hours without asking
+    # again: a changed file needs a new address to be seen at once
+    def asset(path):
+        try:
+            return 'static/' + path + '?v=' + str(int(os.path.getmtime(os.path.join(app.static_folder, path))))
+        except OSError:
+            return 'static/' + path
+    return {'asset': asset}
+
 def next_page():
     # where to go after logging in: only a page of this site, e.g. "room?code=ABC234"
     page = request.args.get('next', '')
@@ -253,7 +264,7 @@ GRACE = 1        # guesses still accepted this long after the deadline (network 
 CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'  # no 0/O or 1/I/L to mistype
 DUEL_HP = 6000   # duel: everyone's health at the start
 LIVES = 3        # royale: everyone's lives at the start
-BULLSEYE = 4950  # royale: a guess this good wins a life back
+BULLSEYE = 4950  # royale: a guess this good never loses a life, and wins one back
 LAST_ROUND = 25  # duel and royale go on until one player is left, this long at most
 
 with connect() as c:
@@ -358,10 +369,10 @@ def standings(c, r, upto):
         for u in alive:
             if r['mode'] == 'duel':
                 d = -min(st[u]['left'], round((best - s[u]) * multiplier(n)))
-            elif s[u] == worst < best:
-                d = -1
+            elif s[u] >= BULLSEYE:
+                d = int(st[u]['left'] < LIVES)  # a bullseye is always safe, and heals
             else:
-                d = int(s[u] >= BULLSEYE and st[u]['left'] < LIVES)
+                d = -int(s[u] == worst < best)
             st[u]['left'] += d
             if n == upto:
                 st[u]['delta'] = d

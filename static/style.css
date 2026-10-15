@@ -1025,6 +1025,13 @@ body.room-playing{
 .material-icons.room-heart.empty{
     color: #5a5870;
 }
+.room-hud-player .material-icons.room-heart{
+    font-size: 14px;
+    vertical-align: -2px;
+}
+.room-hud-player .room-heart:first-of-type{
+    margin-left: 5px;
+}
 .room-out td{
     opacity: .45;
 }
