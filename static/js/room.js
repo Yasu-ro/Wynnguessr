@@ -17,6 +17,8 @@ var deadline = null;     // when the round closes, local clock
 var shownAt = 0;         // when the round appeared, local clock
 var nextAt = null;       // when the next round starts by itself, local clock
 var polling = false, pollAgain = false, pollTimer = null;
+var heard = null;        // players already known to have guessed this round
+var lastSecond = null;   // last whole second of the clock shown
 
 $(document).ready(function () {
     setNav();
@@ -34,7 +36,7 @@ function poll() {
         return;
     }
     polling = true;
-    $.ajax({url: 'api/room/' + code + (cur ? '?round=' + cur : ''), dataType: 'json', timeout: 8000})
+    $.ajax({url: 'api/room/' + code, data: cur ? {round: cur, chat: chatId} : {chat: chatId}, dataType: 'json', timeout: 8000})
         .always(function (data) {
             polling = false;
             try {
@@ -62,6 +64,7 @@ function render(data) {
         return;
     }
     s = data;
+    chat(s.chat);
     if (s.next && s.live && s.state == 'finished') {
         location.href = 'room?code=' + s.next;
         return;
@@ -92,6 +95,14 @@ function show(id) {
     });
     var playing = id == 'guess-screen' || id == 'reveal-screen';
     $('body').toggleClass('room-playing', playing);
+    // one chat, moved where it belongs: under the players, over the panorama,
+    // in the side panel of a reveal (never over the map), under the results
+    var slot = {'guess-screen': '#chat-slot-game', 'reveal-screen': '#chat-slot-reveal', 'results': '#chat-slot-results'}[id] || '#chat-slot-lobby';
+    if (!$('#room-chat').parent().is(slot)) {
+        // on a phone the panorama is small: the chat starts folded over it
+        $('#room-chat').appendTo(slot).toggleClass('folded', id == 'guess-screen' && window.innerWidth <= 800);
+    }
+    $('#chat-slot-game').prop('hidden', id != 'guess-screen');
     if (playing) {
         window.scrollTo(0, 0);
     }
@@ -181,6 +192,115 @@ $(document).on('click', '[data-copy]', function (e) {
         window.prompt('Copy this link:', link);
     });
 });
+
+// ---------- chat ----------
+
+var chatId = 0;          // last message shown
+var unread = 0;          // messages that came while the chat was folded
+
+function chat(messages) {
+    var log = $('#chat-log'), atBottom = log[0].scrollHeight - log.scrollTop() - log.innerHeight() < 30;
+    (messages || []).forEach(function (m) {
+        if (m.id <= chatId) {
+            return;
+        }
+        chatId = m.id;
+        log.append("<p><b style='color:" + COLORS[m.color % COLORS.length] + "'>" + esc(m.name) + "</b> " + esc(m.text) + "</p>");
+        if ($('#room-chat').hasClass('folded') && m.name != me().name) {
+            unread++;
+        }
+    });
+    log.children().slice(0, -100).remove();
+    // follow the conversation, unless the player scrolled up to read
+    if (atBottom) {
+        log.scrollTop(log[0].scrollHeight);
+    }
+    $('#chat-title').text(unread ? 'Chat (' + unread + ')' : 'Chat');
+}
+
+$('#chat-form').on('submit', function (e) {
+    e.preventDefault();
+    var input = $('#chat-input'), text = $.trim(input.val());
+    if (!text) {
+        return;
+    }
+    input.val('');
+    send('chat', {text: text}).done(function (r) {
+        if (!r.success) {
+            input.val(text);
+        }
+    }).fail(function () { input.val(text); });
+});
+
+// in game the chat can be folded away; its title then counts what was missed
+$('.room-chat-head').on('click', function (e) {
+    if ($(e.target).closest('#sound-button').length) {
+        return;
+    }
+    $('#room-chat').toggleClass('folded');
+    unread = 0;
+    $('#chat-title').text('Chat');
+});
+
+// ---------- sounds ----------
+// short beeps made on the spot, no files: a player guessed, and the last
+// seconds of the clock (10, 5, 3, 2, 1). Browsers only allow sound after the
+// first click or key on the page.
+
+var audio = null, muted = false;
+try {
+    muted = localStorage.getItem('wynnguessr-muted') == '1';
+} catch (e) {}
+
+function showMute() {
+    $('#sound-button i').text(muted ? 'volume_off' : 'volume_up');
+}
+showMute();
+
+$(document).on('pointerdown keydown', function () {
+    try {
+        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+        if (audio.state == 'suspended') {
+            audio.resume();
+        }
+    } catch (e) {}
+});
+
+$('#sound-button').on('click', function () {
+    muted = !muted;
+    try {
+        localStorage.setItem('wynnguessr-muted', muted ? '1' : '0');
+    } catch (e) {}
+    showMute();
+});
+
+function beep(freq, length, delay) {
+    var start = audio.currentTime + (delay || 0);
+    var osc = audio.createOscillator(), gain = audio.createGain();
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.25, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(start);
+    osc.stop(start + length + 0.05);
+}
+
+function sound(kind) {
+    if (muted || !audio || audio.state != 'running') {
+        return;
+    }
+    if (kind == 'guess') {
+        beep(660, 0.12);
+        beep(990, 0.18, 0.11);
+    } else if (kind == 'warn') {
+        beep(520, 0.35);
+    } else if (kind == 'tick') {
+        beep(880, 0.15);
+    } else if (kind == 'last') {
+        beep(1175, 0.4);
+    }
+}
 
 // ---------- modes ----------
 // duel: health points; royale: lives. Both come from the server (left, out,
@@ -363,7 +483,15 @@ function guess() {
             "showControls": !locked
         });
         $('#guess-button').prop('disabled', false).removeClass('room-warn').text('Guess!');
+        heard = null;
+        lastSecond = null;
     }
+    // a sound each time another player guesses (not for those already in when the page opened)
+    var now = s.players.filter(function (p) { return p.guessed && !p.you; }).map(function (p) { return p.name; });
+    if (heard && now.some(function (n) { return heard.indexOf(n) < 0; })) {
+        sound('guess');
+    }
+    heard = now;
     // live rounds follow the server's clock
     if (s.live && s.time_left !== undefined) {
         var d = Date.now() + s.time_left * 1000;
@@ -437,12 +565,30 @@ function clocks() {
     if (!s) {
         return;
     }
+    if (view.indexOf('guess') != 0) {
+        $('#room-countdown').prop('hidden', true);
+    }
     if (view.indexOf('guess') == 0) {
         if (deadline === null) {
             $('#hud-time').empty();
+            $('#room-countdown').prop('hidden', true);
         } else {
             var left = Math.max(0, (deadline - Date.now()) / 1000);
             $('#hud-time').html("<i class='material-icons'>timer</i>" + clock(left)).toggleClass('urgent', left <= 10);
+            // the last ten seconds, big in the middle of the screen and out loud, for whoever still has to guess
+            var second = Math.ceil(left), guessing = !submitted && (!s.live || s.playing);
+            $('#room-countdown').prop('hidden', !(guessing && left > 0 && left <= 10)).text(second)
+                .toggleClass('final', second <= 3);
+            if (guessing && second != lastSecond && left > 0) {
+                if (second == 10 || second == 5) {
+                    sound('warn');
+                } else if (second == 3 || second == 2) {
+                    sound('tick');
+                } else if (second == 1) {
+                    sound('last');
+                }
+            }
+            lastSecond = second;
             if (left <= 0.2) {
                 submit(true);
             }

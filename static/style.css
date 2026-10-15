@@ -1177,3 +1177,137 @@ a.play-card:hover{
 .play-login{
     margin-top: 30px;
 }
+
+/* ---------- Room chat ---------- */
+.room-chat{
+    display: flex;
+    flex-direction: column;
+    margin: 5px;
+    background-color: rgba(20, 19, 35, .9);
+    border: 3px solid black;
+    border-radius: 12px;
+    color: white;
+    text-align: left;
+    overflow: hidden;
+}
+.room-chat-slot{
+    margin: 5px 20px;
+}
+.room-chat-results{
+    max-width: 600px;
+    margin: 10px auto;
+}
+.room-chat-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 10px;
+    background-color: #857361;
+    color: black;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.room-sound{
+    display: flex;
+    padding: 0;
+    background: none;
+    border: 0;
+    color: black;
+    cursor: pointer;
+}
+.room-chat-log{
+    height: 160px;
+    padding: 6px 10px;
+    overflow-y: auto;
+    font-size: 16px;
+}
+.room-chat-log p{
+    margin: 0 0 3px;
+    overflow-wrap: anywhere;
+}
+.room-chat-form{
+    display: flex;
+    border-top: 2px solid #3a3950;
+}
+.room-chat-form input{
+    flex: 1;
+    min-width: 0;
+    padding: 5px 10px;
+    background: none;
+    border: 0;
+    color: white;
+    font-size: 16px;
+    outline: none;
+}
+.room-chat-form button{
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background: none;
+    border: 0;
+    color: #83C73C;
+    cursor: pointer;
+}
+.room-chat.folded .room-chat-log, .room-chat.folded .room-chat-form{
+    display: none;
+}
+.room-chat-game{
+    position: fixed;
+    top: calc(var(--nav) + 10px);
+    left: 50px;
+    z-index: 600;
+    width: 280px;
+}
+.room-chat-game .room-chat{
+    margin: 0;
+}
+.room-chat-game .room-chat-log{
+    height: 110px;
+}
+.room-chat-panel{
+    margin-top: 15px;
+}
+.room-chat-panel .room-chat{
+    margin: 0;
+}
+.room-chat-panel .room-chat-log{
+    height: 120px;
+}
+
+/* ---------- Countdown ---------- */
+.room-countdown{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 550;
+    transform: translate(-50%, -50%);
+    color: #ffd54a;
+    font-size: 140px;
+    font-weight: bold;
+    text-shadow: 0 0 12px black, 0 4px 8px black;
+    pointer-events: none;
+    animation: room-pulse 1s infinite;
+}
+.room-countdown.final{
+    color: #ff4d4d;
+}
+@keyframes room-pulse{
+    0%{ transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+    100%{ transform: translate(-50%, -50%) scale(1); opacity: .75; }
+}
+@media (max-width: 800px){
+    .room-chat-game{
+        top: auto;
+        bottom: 10px;
+        left: 10px;
+        width: 190px;
+    }
+    .room-chat-game .room-chat-log{
+        height: 70px;
+        font-size: 14px;
+    }
+    .room-countdown{
+        font-size: 90px;
+    }
+}

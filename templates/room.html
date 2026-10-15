@@ -23,6 +23,19 @@
                     <h3 class="mode-select-header">Players</h3>
                     <div class="mode-select-option-box" id="lobby-players"></div>
                 </fieldset>
+                <div class="room-chat-slot" id="chat-slot-lobby">
+                    <div id="room-chat" class="room-chat">
+                        <div class="room-chat-head">
+                            <span id="chat-title">Chat</span>
+                            <button type="button" id="sound-button" class="room-sound" title="Sound on/off"><i class="material-icons">volume_up</i></button>
+                        </div>
+                        <div id="chat-log" class="room-chat-log"></div>
+                        <form id="chat-form" class="room-chat-form" autocomplete="off">
+                            <input id="chat-input" maxlength="200" placeholder="Say something...">
+                            <button type="submit" title="Send"><i class="material-icons">send</i></button>
+                        </form>
+                    </div>
+                </div>
             </div>
             <form id="room-settings" class="room-column" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
@@ -37,6 +50,7 @@
 
     <section id="guess-screen" class="room-screen" hidden>
         <div id="room-panorama"></div>
+        <div id="room-countdown" class="room-countdown" hidden></div>
         <div class="room-hud">
             <div class="room-hud-line"><span id="hud-round"></span><span id="hud-mult"></span><span id="hud-score"></span><span id="hud-time"></span></div>
             <div id="hud-call" class="room-hud-call"></div>
@@ -58,6 +72,7 @@
                 <tbody id="reveal-rows"></tbody>
             </table>
             <button type="button" id="next-button" class="next-button room-next"></button>
+            <div class="room-chat-panel" id="chat-slot-reveal"></div>
         </div>
     </section>
 
@@ -72,9 +87,11 @@
             <a href="mode" class="form-submit room-action room-leave">Back to Menu</a>
         </div>
         <p id="results-hint" class="friends-hint"></p>
+        <div class="room-chat-slot room-chat-results" id="chat-slot-results"></div>
         <p class="friends-hint" id="results-replay">Anyone can still play these same locations with the code <b>{{ code }}</b> · <a href="#" data-copy>copy the link</a></p>
     </section>
 </div>
+<div class="room-chat-game" id="chat-slot-game" hidden></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>

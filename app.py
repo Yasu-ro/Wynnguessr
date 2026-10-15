@@ -280,6 +280,8 @@ with connect() as c:
         CREATE TABLE IF NOT EXISTS room_guesses (
             code TEXT, user_id INTEGER, round INTEGER, x REAL, z REAL, score INTEGER,
             at REAL, time REAL, PRIMARY KEY (code, user_id, round));
+        CREATE TABLE IF NOT EXISTS room_chat (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, user_id INTEGER, at REAL, text TEXT);
     ''')
     # the scores table comes with the original game, which had no modes
     if 'mode' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
@@ -508,7 +510,14 @@ def room_state(code):
                             "time_limit": r['time_limit'], "look": bool(r['look'])},
                # the colour of a player is their place in the join order
                "players": [dict(p, color = i, **st.get(p['uid'], {})) for i, p in enumerate(players)]}
-        for p in out['players']:
+        # chat: the messages the page has not seen yet (it says which was its last)
+        colors = {p['uid']: p['color'] for p in out['players']}
+        since = request.args.get('chat', '')
+        out['chat'] = [dict(m, color = colors.get(m['uid'], 0)) for m in reversed(c.execute(
+            '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text FROM room_chat m JOIN users u ON u.id = m.user_id
+            WHERE m.code = ? AND m.id > ? ORDER BY m.id DESC LIMIT 50''',
+            (r['code'], int(since) if since.isnumeric() else 0)).fetchall())]
+        for p in out['players'] + out['chat']:
             del p['uid']
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
@@ -535,6 +544,19 @@ def room_state(code):
             if live and r['state'] == 'playing':
                 out['next_in'] = max(0, r['round_end'] + REVEAL - now)
         return jsonify(out)
+
+@app.route("/api/room/<code>/chat", methods=['POST'])
+def room_chat(code):
+    text = ' '.join(request.form.get('text', '').split())[:200]
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or not text:
+            return jsonify({"success": False})
+        last = c.execute("SELECT MAX(at) FROM room_chat WHERE code = ? AND user_id = ?", (r['code'], me['user_id'])).fetchone()[0]
+        if last and time.time() - last < 0.7:
+            return jsonify({"success": False, "error": "Slow down a little"})
+        c.execute("INSERT INTO room_chat (code, user_id, at, text) VALUES (?, ?, ?, ?)", (r['code'], me['user_id'], time.time(), text))
+    return jsonify({"success": True})
 
 @app.route("/api/room/<code>/settings", methods=['POST'])
 def room_set(code):
