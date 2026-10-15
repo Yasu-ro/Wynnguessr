@@ -12,7 +12,6 @@
                 <i class="material-icons wynn-check">verified</i> Wynncraft: {{ mc_name }} <i class="material-icons">open_in_new</i></a>
         {% elif wynn_login %}
             <a class="form-submit wynn-button" href="auth/wynncraft">Link my Wynncraft account</a>
-            <p class="friends-hint">Proves it is really you: your name gets a check mark and links to your Wynncraft profile on the leaderboard.</p>
         {% endif %}
     </div>
 
@@ -48,7 +47,7 @@
         </div>
         {% endif %}
     {% else %}
-        <p class="friends-hint">No games yet: go play one!</p>
+        <p class="friends-hint">No games yet.</p>
     {% endfor %}
 </div>
 {% endblock %}

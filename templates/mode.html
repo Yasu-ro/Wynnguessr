@@ -34,14 +34,14 @@
             {% for p in ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse'] %}<input type="hidden" name="province" value="{{ p }}">{% endfor %}
             <input type="hidden" name="rounds" value="5">
             <button type="submit" class="form-submit play-go">Create</button>
-            <p>Then send the link or the code to your friends. Rules and settings can be changed in the room.</p>
+
         </form>
         <form class="play-card" action="room" method="get">
             <i class="material-icons">login</i>
             <h2>Join a Room</h2>
             <input class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
             <button type="submit" class="form-submit play-go">Join</button>
-            <p>Type the code a friend gave you, or just open their link.</p>
+
         </form>
     </div>
     {% else %}
@@ -55,12 +55,12 @@
         <a class="play-card" href="mode?play=solo">
             <i class="material-icons">person</i>
             <h2>Solo</h2>
-            <p>Classic or Survival, at your own pace. Your best games go on the leaderboard.</p>
+            <p>Play alone.</p>
         </a>
         <a class="play-card" href="mode?play=friends">
             <i class="material-icons">groups</i>
             <h2>With Friends</h2>
-            <p>Create a room or join one: Classic, Duel or Battle Royale, everyone on the same locations at the same time.</p>
+            <p>Play together.</p>
         </a>
     </div>
 {% endif %}

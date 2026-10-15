@@ -5,12 +5,9 @@
 {% block content %}
     {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
     <h1 class="sign"> Login</h1>
-    {% if 'room' in request.args.get('next', '') %}
-        <p class="friends-hint">Log in to join your friends' room.</p>
-    {% endif %}
     {% if wynn_login %}
         <a class="form-submit wynn-button" href="auth/wynncraft{{ next }}">Log in with Wynncraft</a>
-        <p class="friends-hint">or with a WynnGuessr account:</p>
+        <p class="friends-hint">or</p>
     {% endif %}
     <form class="login-form" action="login{{ next }}" method="post">
         <div>

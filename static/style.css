@@ -1636,3 +1636,23 @@ h1.sign::after{
     font-style: italic;
     font-weight: bold;
 }
+
+/* ---------- Footer ---------- */
+.site-footer{
+    padding: 10px 15px;
+    background-color: #baaa80;
+    border-top: 3px solid #857361;
+    color: black;
+    font-size: 15px;
+    text-align: center;
+}
+.site-footer a{
+    color: #402523;
+    font-weight: bold;
+}
+.site-footer a:hover{
+    color: black;
+}
+.site-footer span{
+    color: #5a4a3a;
+}

@@ -780,10 +780,9 @@ function results() {
     }
     $('#results-title').text(title);
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
-    $('#results-replay').prop('hidden', s.mode != 'classic');
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];
-    $('#results-hint').text(s.live && !s.host && host ? 'If ' + host.name + ' starts a new game, you will follow automatically.' : '');
+    $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
 }
 
 $('#again-button').on('click', function () {
