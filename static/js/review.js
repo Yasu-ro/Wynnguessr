@@ -2,7 +2,8 @@
 // capture, green = kept), a click opens it; keep it with a difficulty, or
 // delete it. A click on the map plans a spot for the mod's tour. Captures
 // from the mod appear by themselves, and a grey veil covers the chunks the
-// downloaded world does not have.
+// downloaded world does not have. Full screen shows one photo at a time
+// with a small map of where it was taken, and goes on to the next red dot.
 var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
 var COLORS = {planned: '#1e88e5', new: '#e53935', kept: '#378537'};
 var CHUNKS_X = 288, CHUNKS_Z = 384;   // the map in chunks, from chunk (-160, -384)
@@ -10,6 +11,13 @@ var CHUNKS_X = 288, CHUNKS_Z = 384;   // the map in chunks, from chunk (-160, -3
 var map = L.map('review-map', {crs: L.CRS.Simple, minZoom: -3, maxZoom: 3, preferCanvas: true});
 L.imageOverlay('static/map-2026.webp', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(map);
 map.fitBounds(bounds);
+crisp(map);
+
+// zoomed past 1 px per block, show blocks instead of a blur
+function crisp(m) {
+    m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
+    m.getContainer().classList.toggle('crisp', m.getZoom() > 0);
+}
 
 var dots = {};      // location id -> circle marker
 var places = {};    // location id -> location
@@ -19,6 +27,7 @@ var choice = {};    // province and difficulty picked in the panel
 var have = null;    // chunks of the downloaded world: Uint8Array, 1 = there
 var veil = null, veilData = '';
 var rings = [];     // one circle per group of holes, visible at any zoom
+var focusOn = false, focusMap = null, focusDot = null;
 
 function style(loc) {
     var on = current && current.id == loc.id;
@@ -136,7 +145,7 @@ function pick(kind, value) {
     document.querySelectorAll('[data-' + kind + ']').forEach(function (b) {
         b.classList.toggle('picked', b.dataset[kind] == value);
     });
-    document.getElementById('review-keep').disabled = !choice.difficulty;
+    document.querySelectorAll('.review-keep').forEach(function (b) { b.disabled = !choice.difficulty; });
 }
 
 function open(loc) {
@@ -148,13 +157,53 @@ function open(loc) {
     panel.hidden = false;
     panel.dataset.review = loc.review;
     map.invalidateSize();
-    document.getElementById('review-coords').textContent = 'X ' + Math.round(loc.X) + '   Z ' + Math.round(loc.Z);
+    var coords = 'X ' + Math.round(loc.X) + '   Z ' + Math.round(loc.Z);
+    document.getElementById('review-coords').textContent = coords;
+    document.getElementById('focus-coords').textContent = coords;
     pick('province', loc.province);
     pick('difficulty', loc.difficulty);
     if (viewer) { viewer.destroy(); viewer = null; }
     if (loc.review != 'planned') {
-        viewer = pannellum.viewer('review-panorama', {type: 'equirectangular', panorama: loc.url, autoLoad: true});
+        viewer = pannellum.viewer(focusOn ? 'focus-panorama' : 'review-panorama',
+            {type: 'equirectangular', panorama: loc.url, autoLoad: true});
     }
+    if (focusOn) {
+        focusDot.setLatLng([-loc.Z, loc.X]);
+        focusMap.setView([-loc.Z, loc.X], 1, {animate: false});
+    }
+}
+
+function openFocus() {
+    if (!current || current.review == 'planned') return;
+    focusOn = true;
+    document.getElementById('focus').hidden = false;
+    if (!focusMap) {
+        focusMap = L.map('focus-map', {crs: L.CRS.Simple, minZoom: -2, maxZoom: 3, zoomControl: false, attributionControl: false});
+        L.imageOverlay('static/map-2026.webp', bounds).addTo(focusMap);
+        focusMap.setView([3072, -256], 1);
+        focusDot = L.circleMarker([0, 0], {radius: 8, color: 'white', weight: 3, fillColor: COLORS.new, fillOpacity: 1}).addTo(focusMap);
+        crisp(focusMap);
+    }
+    focusMap.invalidateSize();
+    open(current);
+}
+
+function closeFocus() {
+    focusOn = false;
+    document.getElementById('focus').hidden = true;
+    if (current && places[current.id]) open(places[current.id]);
+    else if (viewer) { viewer.destroy(); viewer = null; }
+}
+
+// the nearest photo still to review: the review walks across the map
+function next() {
+    var best = null, bestDist = Infinity;
+    Object.values(places).forEach(function (l) {
+        if (l.review != 'new' || (current && l.id == current.id)) return;
+        var d = current ? (l.X - current.X) * (l.X - current.X) + (l.Z - current.Z) * (l.Z - current.Z) : 0;
+        if (d < bestDist) { bestDist = d; best = l; }
+    });
+    if (best) open(best); else closeFocus();
 }
 
 function send(action) {
@@ -163,7 +212,11 @@ function send(action) {
         body: JSON.stringify({action: action, province: choice.province, difficulty: choice.difficulty})})
         .then(function (r) { return r.json(); }).then(function (res) {
             if (!res.success) return;
-            if (action == 'delete') {
+            if (focusOn) {
+                if (action == 'delete') delete places[loc.id];
+                else places[loc.id].review = 'kept';
+                next();
+            } else if (action == 'delete') {
                 document.getElementById('review-panel').hidden = true;
                 map.invalidateSize();
                 if (viewer) { viewer.destroy(); viewer = null; }
@@ -179,10 +232,14 @@ document.querySelectorAll('[data-province]').forEach(function (b) {
 document.querySelectorAll('[data-difficulty]').forEach(function (b) {
     b.onclick = function () { pick('difficulty', b.dataset.difficulty); };
 });
-document.getElementById('review-keep').onclick = function () { send('keep'); };
-document.getElementById('review-delete').onclick = function () {
-    if (confirm('Delete this location?')) send('delete');
-};
+document.querySelectorAll('.review-keep').forEach(function (b) { b.onclick = function () { send('keep'); }; });
+document.querySelectorAll('.review-delete').forEach(function (b) {
+    b.onclick = function () { if (confirm('Delete this location?')) send('delete'); };
+});
+document.getElementById('review-full').onclick = openFocus;
+document.getElementById('focus-next').onclick = next;
+document.getElementById('focus-close').onclick = closeFocus;
+document.addEventListener('keydown', function (e) { if (e.key == 'Escape' && focusOn) closeFocus(); });
 
 load();
 setInterval(load, 10000);

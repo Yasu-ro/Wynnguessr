@@ -105,6 +105,11 @@ répondent 404/403.
   qu'on ne peut pas relier au bord de la carte par d'autres chunks manquants
   est en **magenta**, et chaque groupe est entouré d'un cercle magenta de
   taille fixe (un chunk ne fait qu'un pixel vu de loin).
+- **Plein écran** (bouton « Full screen » du panneau) : la photo sur tout
+  l'écran, une mini-carte zoomée sur le point (pour vérifier que les
+  coordonnées tombent au bon endroit), barre DA en bas. Keep/Delete passent
+  au point rouge **le plus proche** (la revue avance sur la carte) ; Next
+  saute ; Échap ferme.
 - Clic sur la carte = point `planned` (`POST api/review/plan`), refusé dans
   une zone grise. Le mod (`Tour`) lit `GET api/capture/planned` et renvoie la
   photo avec `&planned=<id>` : la ligne garde sa place et passe en `new`.
@@ -130,6 +135,12 @@ répondent 404/403.
   dans `~/wynndle-captures/`.
 - `fruma` est une province de tri, **pas encore jouable** (absente de
   `PROVINCES` et des réglages de partie).
+
+**Netteté** : au-delà de 1 px par bloc (zoom > 0), toutes les cartes
+Leaflet (jeu, salons, tri) passent en `image-rendering: pixelated` (classe
+`crisp`) : Firefox lissait l'agrandissement. Les lignes droites visibles sur
+la carte (neige/herbe nette…) sont **dans les tuiles Wynntils elles-mêmes**,
+pas des jointures d'assemblage (vérifié au pixel : X −1024/Z −2058).
 
 ## Base de données (SQLite, `database.db`)
 

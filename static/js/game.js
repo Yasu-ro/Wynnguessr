@@ -82,6 +82,7 @@ function showScoreScreen() {
     }).setView([0, 0], 0);
     var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
     L.imageOverlay('static/map-2026.webp', bounds).addTo(scoreMap);
+    crisp(scoreMap);
     scoreMap.setView([3072, -256], -1);
     scoreMap.on('click', onMapClick);
 
@@ -163,6 +164,7 @@ function showNextLocation() {
 
     var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
     L.imageOverlay('static/map-2026.webp', bounds).addTo(map);
+    crisp(map);
     map.setView([3072, -256], -2);
     map.on('click', onMapClick);
 
@@ -295,6 +297,7 @@ function finalScore() {
     }).setView([0, 0], 0);
     var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
     L.imageOverlay('static/map-2026.webp', bounds).addTo(scoreMap);
+    crisp(scoreMap);
     scoreMap.setView([3072, -256], -1);
     scoreMap.on('click', onMapClick);
     
@@ -356,4 +359,10 @@ function post(path, params, method='post') {
             console.log(error);
         }
     });
+}
+
+// zoomed past 1 px per block, show blocks instead of a blur
+function crisp(m) {
+    m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
+    m.getContainer().classList.toggle('crisp', m.getZoom() > 0);
 }

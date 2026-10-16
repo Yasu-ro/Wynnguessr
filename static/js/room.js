@@ -167,6 +167,7 @@ function pin(fill, star) {
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
     L.imageOverlay('static/map-2026.webp', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
+    crisp(m);
     m.setView([3072, -256], zoom);
     return m;
 }
@@ -797,3 +798,9 @@ $('#again-button').on('click', function () {
         })
         .fail(function () { b.prop('disabled', false); });
 });
+
+// zoomed past 1 px per block, show blocks instead of a blur
+function crisp(m) {
+    m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
+    m.getContainer().classList.toggle('crisp', m.getZoom() > 0);
+}

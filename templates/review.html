@@ -45,9 +45,31 @@
                 {% endfor %}
             </div>
             <div class="review-row">
-                <button id="review-keep" class="review-keep review-photo">Keep</button>
-                <button id="review-delete" class="review-delete">Delete</button>
+                <button class="review-keep review-photo">Keep</button>
+                <button class="review-delete">Delete</button>
             </div>
+            <div class="review-row">
+                <button id="review-full" class="review-choice review-photo">Full screen</button>
+            </div>
+        </div>
+    </div>
+    <div id="focus" hidden>
+        <div id="focus-panorama"></div>
+        <div id="focus-map"></div>
+        <div class="focus-bar">
+            <span id="focus-coords"></span>
+            {% for p in provinces %}
+                <button class="review-choice" data-province="{{ p }}">{{ p.replace('-', ' ').title() }}</button>
+            {% endfor %}
+            <span class="focus-gap"></span>
+            {% for d in difficulties %}
+                <button class="review-choice" data-difficulty="{{ d }}">{{ d.title() }}</button>
+            {% endfor %}
+            <span class="focus-gap"></span>
+            <button class="review-keep">Keep</button>
+            <button class="review-delete">Delete</button>
+            <button id="focus-next" class="review-choice">Next</button>
+            <button id="focus-close" class="review-choice">Close</button>
         </div>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>

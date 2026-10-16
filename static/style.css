@@ -1767,3 +1767,69 @@ h1.sign::after{
         height: 220px;
     }
 }
+
+/* past 1 px per block, the map shows blocks instead of a blur */
+.crisp .leaflet-image-layer{
+    image-rendering: pixelated;
+}
+
+/* review in full screen: the photo, a small map of the spot, the buttons */
+#focus{
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background-color: #6b5236;
+}
+#focus[hidden]{
+    display: none;
+}
+#focus-panorama{
+    position: absolute;
+    inset: 0;
+}
+#focus-map{
+    position: absolute;
+    right: 12px;
+    bottom: 76px;
+    width: 340px;
+    height: 250px;
+    border: 3px solid black;
+    border-radius: 10px;
+    z-index: 3;
+    background-color: #6b5236;
+}
+.focus-bar{
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 3;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background-color: #baaa80;
+    border-top: 3px solid #857361;
+}
+.focus-bar .review-keep, .focus-bar .review-delete{
+    flex: 0 0 auto;
+    padding: 6px 18px;
+    font-size: 18px;
+}
+#focus-coords{
+    color: #402523;
+    font-size: 18px;
+    white-space: pre;
+    margin-right: 8px;
+}
+.focus-gap{
+    width: 14px;
+}
+@media (max-width: 800px){
+    #focus-map{
+        width: 180px;
+        height: 130px;
+        bottom: 150px;
+    }
+}
