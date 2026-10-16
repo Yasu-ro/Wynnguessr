@@ -30,6 +30,9 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 // One key: Minecraft's own panorama (6 cube faces, world only, no GUI),
@@ -43,11 +46,19 @@ public class WynndlePanorama implements ClientModInitializer {
 	static class Config {
 		String url = "https://beta.wynndle.com";
 		String key = "";
+		double spinSeconds = 2;  // tour: one full turn before the picture (Distant Horizons)
+		double waitSeconds = 1;  // tour: then this long still
 	}
 
 	static KeyMapping key, tourKey;
-	static volatile boolean busy;
-	static volatile boolean lastSent; // did the last panorama reach the site
+	// stitching, saving and sending run one after the other here, so the
+	// tour can fly on as soon as a panorama is drawn
+	static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> {
+		Thread t = new Thread(r, "wynndle-panorama");
+		t.setDaemon(true);
+		return t;
+	});
+	static final AtomicInteger pending = new AtomicInteger();
 	public static boolean capturing; // read by the mixins: hide entities and names
 	static Config config = new Config();
 
@@ -60,7 +71,7 @@ public class WynndlePanorama implements ClientModInitializer {
 			"key.wynndle-panorama.tour", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_CONTROL, KeyMapping.Category.MISC));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			while (key.consumeClick()) {
-				if (mc.player != null && mc.level != null && !busy && Tour.step == Tour.Step.IDLE) capture(mc, -1);
+				if (mc.player != null && mc.level != null && Tour.step == Tour.Step.IDLE) capture(mc, -1);
 			}
 			while (tourKey.consumeClick()) {
 				if (mc.player != null && mc.level != null) Tour.toggle(mc);
@@ -93,10 +104,8 @@ public class WynndlePanorama implements ClientModInitializer {
 			p.yRotO = yawO;
 		}
 
-		busy = true;
-		lastSent = false;
-		say(mc, Component.literal("Wynndle: saving " + x + " " + z + "…").withStyle(ChatFormatting.GRAY));
-		Thread t = new Thread(() -> {
+		pending.incrementAndGet();
+		WORKER.execute(() -> {
 			try {
 				BufferedImage[] faces = readFaces(tmp.resolve("screenshots"));
 				File file = freeName(out, x + "_" + z);
@@ -105,7 +114,6 @@ public class WynndlePanorama implements ClientModInitializer {
 					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
 				} else {
 					String error = upload(file, x, z, planned);
-					lastSent = error == null;
 					say(mc, error == null
 						? Component.literal("Wynndle: " + file.getName() + " sent").withStyle(ChatFormatting.GREEN)
 						: Component.literal("Wynndle: " + file.getName() + " saved, not sent (" + error + ")").withStyle(ChatFormatting.GOLD));
@@ -114,11 +122,9 @@ public class WynndlePanorama implements ClientModInitializer {
 				say(mc, Component.literal("Wynndle: failed (" + e.getMessage() + ")").withStyle(ChatFormatting.RED));
 			} finally {
 				deleteTree(tmp);
-				busy = false;
+				pending.decrementAndGet();
 			}
-		}, "wynndle-panorama");
-		t.setDaemon(true);
-		t.start();
+		});
 	}
 
 	// The file is created empty on the first start; the key goes in by hand.

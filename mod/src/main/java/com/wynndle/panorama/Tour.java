@@ -38,20 +38,20 @@ import java.util.stream.Stream;
 //   veil on the review map covers the others);
 // - the tour key flies to every spot planned on the review map, one by one:
 //   teleport, turn around once (Distant Horizons loads what is looked at),
-//   wait, take the panorama, send it.
+//   wait, take the panorama and fly on while it is being sent. Turn and wait
+//   times come from the config file (spinSeconds, waitSeconds).
 public class Tour {
-	static final int SPIN_TICKS = 80;   // one full turn in 4 s
-	static final int WAIT_TICKS = 100;  // then 5 s more before the picture
 	static final int LOAD_TIMEOUT = 300; // a spot whose chunk never comes is skipped
 
-	enum Step { IDLE, FETCHING, GOING, LANDING, SPINNING, WAITING, CAPTURING }
+	enum Step { IDLE, FETCHING, GOING, LANDING, SPINNING, WAITING }
 
 	static Step step = Step.IDLE;
 	static int ticks;
 	static int id, x, z;
 	static volatile JsonArray fetched;
 	static volatile boolean fetchFailed;
-	static final Set<Integer> skipped = new HashSet<>();
+	static final Set<Integer> skipped = new HashSet<>(); // taken or given up during this tour
+	static int spinTicks, waitTicks;
 	static Object coverageLevel;
 
 	static void toggle(Minecraft mc) {
@@ -68,6 +68,8 @@ public class Tour {
 			return;
 		}
 		skipped.clear();
+		spinTicks = (int) Math.round(Math.max(0, WynndlePanorama.config.spinSeconds) * 20);
+		waitTicks = (int) Math.round(Math.max(0, WynndlePanorama.config.waitSeconds) * 20);
 		say(mc, "tour started", ChatFormatting.GRAY);
 		fetch();
 	}
@@ -110,17 +112,23 @@ public class Tour {
 				// nearest spot first: short flights
 				JsonObject best = null;
 				double bestDist = Double.MAX_VALUE;
+				int left = 0;
 				for (JsonElement e : fetched) {
 					JsonObject o = e.getAsJsonObject();
 					if (skipped.contains(o.get("id").getAsInt())) continue;
+					left++;
 					double dx = o.get("x").getAsInt() - p.getX(), dz = o.get("z").getAsInt() - p.getZ();
 					if (dx * dx + dz * dz < bestDist) { bestDist = dx * dx + dz * dz; best = o; }
 				}
-				if (best == null) { stop(mc, "tour done: no planned spot left"); return; }
+				if (best == null) {
+					int sending = WynndlePanorama.pending.get();
+					stop(mc, "tour done" + (sending > 0 ? ", " + sending + " photos still being sent" : ""));
+					return;
+				}
 				id = best.get("id").getAsInt();
 				x = best.get("x").getAsInt();
 				z = best.get("z").getAsInt();
-				say(mc, "flying to " + x + " " + z + " (" + (fetched.size() - skipped.size()) + " left)", ChatFormatting.GRAY);
+				say(mc, "flying to " + x + " " + z + " (" + left + " left)", ChatFormatting.GRAY);
 				// from above, while the ground is not known yet
 				p.getAbilities().flying = true;
 				p.connection.sendCommand("tp @s " + (x + 0.5) + " " + (mc.level.getMaxY() - 2) + " " + (z + 0.5));
@@ -135,32 +143,29 @@ public class Tour {
 					fetch();
 					return;
 				}
-				if (!mc.level.hasChunk(x >> 4, z >> 4) || ticks < 20) return;
+				if (!mc.level.hasChunk(x >> 4, z >> 4) || ticks < 5) return;
 				p.connection.sendCommand("tp @s " + (x + 0.5) + " " + ground(mc) + " " + (z + 0.5) + " 180 0");
 				step = Step.LANDING;
 				ticks = 0;
 			}
 			case LANDING -> {
-				if (++ticks >= 10) { step = Step.SPINNING; ticks = 0; }
+				if (++ticks >= 5) { step = Step.SPINNING; ticks = 0; }
 			}
 			case SPINNING -> {
 				ticks++;
-				float yaw = 180f + 360f * ticks / SPIN_TICKS;
-				p.setYRot(yaw);
-				p.setXRot(0f);
-				if (ticks >= SPIN_TICKS) { step = Step.WAITING; ticks = 0; }
+				if (ticks <= spinTicks) {
+					p.setYRot(180f + 360f * ticks / spinTicks);
+					p.setXRot(0f);
+				}
+				if (ticks >= spinTicks) { step = Step.WAITING; ticks = 0; }
 			}
 			case WAITING -> {
-				if (++ticks >= WAIT_TICKS && !WynndlePanorama.busy) {
+				if (++ticks >= waitTicks) {
 					WynndlePanorama.capture(mc, id);
-					step = Step.CAPTURING;
+					// still planned on the site until it is sent: not again in this tour
+					skipped.add(id);
+					fetch();
 				}
-			}
-			case CAPTURING -> {
-				if (WynndlePanorama.busy) return;
-				// sent: the spot is no longer planned; not sent: do not retry it in a loop
-				if (!WynndlePanorama.lastSent) skipped.add(id);
-				fetch();
 			}
 		}
 	}

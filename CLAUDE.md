@@ -296,10 +296,18 @@ reste toujours.
 `planned` le plus proche, `tp` en haut de la colonne, attente du chunk, `tp`
 au sol (premier bloc qui arrête un joueur **et qui se voit** en partant du
 haut — **piège payé** : Wynncraft coiffe des zones de barrières invisibles,
-Yasuro atterrissait dessus dans le ciel —, feuilles exclues, eau comprise), **un tour complet sur soi en 4 s** (Yasuro : Distant
-Horizons ne charge que ce qui est regardé), 5 s d'attente, photo, envoi, point
-suivant. Un point jamais chargé (15 s) ou dont l'envoi échoue est sauté pour
-la tournée en cours. Constantes en tête de `Tour.java`.
+Yasuro atterrissait dessus dans le ciel —, feuilles exclues, eau comprise), tour complet sur soi (Yasuro : Distant Horizons ne
+charge que ce qui est regardé), courte attente, photo, point suivant **sans
+attendre l'envoi** (1.5.0 : assemblage, sauvegarde et envoi passent dans une
+file à un seul fil, `WORKER`). Durées réglables dans
+`config/wynndle-panorama.json` : `spinSeconds` (2 par défaut, 4 avant la
+1.5.0) et `waitSeconds` (1, 5 avant) ; Yasuro a accéléré DH. Un point est
+fait une fois par tournée : jamais chargé (15 s) il est sauté, et un envoi
+raté le laisse bleu pour la tournée suivante.
+La province d'un point est **déjà devinée** (règle Fruma, sinon lieu
+d'origine le plus proche, `deleted` compris) : 100 % de bonnes réponses en
+validation croisée sur les 622 lieux d'origine, et juste sur les 148
+premiers points de Yasuro (vérifié sur la carte).
 Téléchargement de la carte : Yasuro a choisi **Simple World Downloader**
 (Modrinth, 1.21.11), pour voler en créatif et choisir l'heure, usage
 personnel. Dans le monde solo, couper la « distant generation » de DH, sinon
