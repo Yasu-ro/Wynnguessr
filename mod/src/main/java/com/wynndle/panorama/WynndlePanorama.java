@@ -1,5 +1,7 @@
 package com.wynndle.panorama;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -20,22 +22,37 @@ import javax.imageio.stream.ImageOutputStream;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
 // One key: Minecraft's own panorama (6 cube faces, world only, no GUI),
 // stitched into an 8192x4096 equirectangular image for Pannellum on
-// wynndle.com. The file is named X_Z after the player's block.
+// wynndle.com. The file is named X_Z after the player's block, and sent to
+// the site's review page when config/wynndle-panorama.json has a key.
 public class WynndlePanorama implements ClientModInitializer {
 	static final int WIDTH = 8192, HEIGHT = 4096;
 
+	static class Config {
+		String url = "https://beta.wynndle.com";
+		String key = "";
+	}
+
 	static KeyMapping key;
 	static volatile boolean busy;
+	static Config config = new Config();
 
 	@Override
 	public void onInitializeClient() {
+		loadConfig();
 		key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.wynndle-panorama.capture", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, KeyMapping.Category.MISC));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
@@ -73,7 +90,14 @@ public class WynndlePanorama implements ClientModInitializer {
 				BufferedImage[] faces = readFaces(tmp.resolve("screenshots"));
 				File file = freeName(out, x + "_" + z);
 				writeJpeg(stitch(faces), file);
-				say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
+				if (config.key.isEmpty()) {
+					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
+				} else {
+					String error = upload(file, x, z);
+					say(mc, error == null
+						? Component.literal("Wynndle: " + file.getName() + " sent").withStyle(ChatFormatting.GREEN)
+						: Component.literal("Wynndle: " + file.getName() + " saved, not sent (" + error + ")").withStyle(ChatFormatting.GOLD));
+				}
 			} catch (Exception e) {
 				say(mc, Component.literal("Wynndle: failed (" + e.getMessage() + ")").withStyle(ChatFormatting.RED));
 			} finally {
@@ -83,6 +107,44 @@ public class WynndlePanorama implements ClientModInitializer {
 		}, "wynndle-panorama");
 		t.setDaemon(true);
 		t.start();
+	}
+
+	// The file is created empty on the first start; the key goes in by hand.
+	static void loadConfig() {
+		Path path = FabricLoader.getInstance().getConfigDir().resolve("wynndle-panorama.json");
+		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		try {
+			if (Files.exists(path)) {
+				try (Reader r = Files.newBufferedReader(path)) {
+					Config c = gson.fromJson(r, Config.class);
+					if (c != null && c.url != null && c.key != null) config = c;
+				}
+			} else {
+				try (Writer w = Files.newBufferedWriter(path)) {
+					gson.toJson(config, w);
+				}
+			}
+		} catch (Exception ignored) {
+			// a broken file only means no sending: the panoramas are still saved
+		}
+	}
+
+	// Returns null when the site has it, else why not (the file stays saved).
+	static String upload(File file, int x, int z) {
+		try {
+			HttpRequest req = HttpRequest.newBuilder(URI.create(config.url.replaceAll("/+$", "") + "/api/capture?x=" + x + "&z=" + z))
+				.timeout(Duration.ofSeconds(60))
+				.header("X-Wynndle-Key", config.key.trim())
+				.header("Content-Type", "image/jpeg")
+				.header("User-Agent", "WynndlePanorama/1.2")
+				.POST(HttpRequest.BodyPublishers.ofFile(file.toPath()))
+				.build();
+			HttpResponse<String> res = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());
+			if (res.statusCode() == 403) return "wrong key";
+			return res.statusCode() == 200 ? null : "error " + res.statusCode();
+		} catch (Exception e) {
+			return e.getClass().getSimpleName();
+		}
 	}
 
 	// Minecraft writes the faces asynchronously: wait until all six read back.

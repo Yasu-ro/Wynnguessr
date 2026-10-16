@@ -81,6 +81,31 @@ Cloudflare garderait 4 h l'ancienne image avec les nouvelles bornes.
 Fruma (en bas à gauche) est sur la carte mais n'a encore aucun lieu ni
 province.
 
+## Tri des lieux (`/review`, bêta)
+
+Demande de Yasuro : voir sur la carte où il a déjà pris des photos, et trier
+quand il veut. Page réservée au compte **Yasuro** (`REVIEWER`), qui n'existe
+que là où il y a un fichier **`capture_key`** (bêta seulement, 0600, hors git :
+c'est la clé à mettre dans le mod). Ailleurs, `/review` et `/api/capture`
+répondent 404/403.
+
+- Colonnes `locations.review` (`old` = jeu d'origine, `new` = capture pas
+  encore vue, `kept`, `deleted`) et `locations.difficulty` (`easy`, `medium`,
+  `hard` : **simple étiquette pour l'instant**, choix de Yasuro). Le jeu ne tire
+  que `old` et `kept` (`PLAYABLE`).
+- Points : rouge = `new`, orange = `old`, vert = `kept` ; la page se recharge
+  toutes les 10 s, donc une photo prise apparaît seule.
+- Keep exige une difficulté ; la province est préremplie (Fruma si
+  `x < -1000` et `z > -2000`, sinon celle du lieu le plus proche) et se corrige.
+- Delete : une capture `new` est effacée (ligne + fichier, jamais jouée) ; tout
+  autre lieu passe en `deleted` sans être effacé, car un salon terminé peut
+  encore le rejouer par son id.
+- Captures converties en webp q85 (comme les images d'origine, ~1,3 Mo en
+  8192×4096) dans `static/captures/`, **hors git**. Originaux JPEG de Yasuro
+  dans `~/wynndle-captures/`.
+- `fruma` est une province de tri, **pas encore jouable** (absente de
+  `PROVINCES` et des réglages de partie).
+
 ## Base de données (SQLite, `database.db`)
 
 Une connexion **par requête** (`connect()`) ; l'origine partageait un curseur
@@ -226,6 +251,11 @@ d'origine, ×2 via `PanoramaDownscaleMixin` → 2048), assemble les faces en
 images d'origine, trop flou), centre = **nord**, et écrit `.minecraft/wynndle/<X>_<Z>.jpg`
 (`_2`… si le nom existe déjà). La province n'est pas dans le nom : à déduire
 de la position à l'import.
+**Envoi automatique** (1.2.0) : si `config/wynndle-panorama.json` (créé vide au
+premier lancement, lu au démarrage du jeu) contient une `key`, chaque photo est
+aussi envoyée à `POST <url>/api/capture?x=&z=` (en-tête `X-Wynndle-Key`, corps
+JPEG). Le chat dit « sent », ou « saved, not sent (raison) » : la copie locale
+reste toujours.
 
 - Cible : pack Modrinth **Wynncraft Plus** (Fabric, MC 1.21.11), celui de Yasuro.
   Il contient Iris, Distant Horizons, Sodium : leur effet sur la capture n'a
