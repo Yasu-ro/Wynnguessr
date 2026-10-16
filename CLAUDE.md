@@ -15,7 +15,10 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   mouvement (demande de Yasuro : « pour garder les choses fair »). Identité git
   locale au dépôt : `Yasu-ro` + adresse noreply GitHub.
 - **Jamais commités** (`.gitignore`) : `database.db` (comptes des joueurs ;
-  il reste suivi, donc toujours « modifié » : normal), `secret_key` (clé des
+  il reste suivi dans git, mais marqué `git update-index --skip-worktree` dans
+  les deux worktrees. **Piège payé le 2026-10-16** : un `git commit -a` l'a
+  poussé sur le fork public, retiré par force-push. Ne jamais utiliser
+  `commit -a` ici, et refaire le `--skip-worktree` après un nouveau clone), `secret_key` (clé des
   sessions, la supprimer déconnecte tout le monde), `wynncraft_oauth.json`
   (identifiants OAuth Wynncraft, 0600).
 - **Langues** : interface en **anglais**, textes **minimes**, compréhensibles
