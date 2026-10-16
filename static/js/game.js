@@ -192,17 +192,17 @@ function showNextLocation() {
 
     //initailize panorama viewer
     let locked = look === 'True';
-    let viewer = pannellum.viewer('game-panorama', {
-        "type": "equirectangular",
-        "panorama": images[round - 1]['url'],
+    let viewer = pannellum.viewer('game-panorama', panoramaConfig(images[round - 1]['url'], {
         "autoLoad": true,
         "draggable": !locked,
         "mouseZoom": !locked,
         "keyboardZoom": !locked,
         "disableKeyboardCtrl": locked,
         "showControls": !locked
-    });
-    viewer.on('load', function(){
+    }));
+    // multires tiles report "load" while the viewer is still being built,
+    // before anyone listens: then the clock starts from here
+    let clock = function(){
         let countdown = timeLimit;
         timer = setInterval(function(){
             if(countdown >= 0){
@@ -216,7 +216,8 @@ function showNextLocation() {
             totalTime = Math.round((totalTime + .01) * 100) / 100;
 
         }, 10);
-    });
+    };
+    if (viewer.isLoaded()) clock(); else viewer.on('load', clock);
 
     // Remove all markers from the map
     map.eachLayer((layer) => {
@@ -365,4 +366,15 @@ function post(path, params, method='post') {
 function crisp(m) {
     m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
     m.getContainer().classList.toggle('crisp', m.getZoom() > 0);
+}
+
+// a location is one equirectangular image, or (URL ending with "/") a folder
+// of multires tiles cut by the server (see make_tiles in app.py)
+function panoramaConfig(url, options) {
+    var config = url.slice(-1) == '/'
+        ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
+            extension: 'jpg', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
+        : {type: 'equirectangular', panorama: url};
+    for (var k in options) config[k] = options[k];
+    return config;
 }

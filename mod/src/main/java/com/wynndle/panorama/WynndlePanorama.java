@@ -34,14 +34,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
-// One key: Minecraft's own panorama (6 cube faces, world only, no GUI),
-// stitched into an 8192x4096 equirectangular image for Pannellum on
-// wynndle.com. The file is named X_Z after the player's block, and sent to
-// the site's review page when config/wynndle-panorama.json has a key. A
-// second key runs the tour of the spots planned on that page (see Tour).
+// One key: Minecraft's own panorama (6 cube faces of 4096 px, world only, no
+// GUI), kept as faces in a zip: the site cuts them into multires tiles for
+// Pannellum, nothing gets resampled into a blur. The zip is named X_Z after
+// the player's block, and sent to the site's review page when
+// config/wynndle-panorama.json has a key. A second key runs the tour of the
+// spots planned on that page (see Tour).
 public class WynndlePanorama implements ClientModInitializer {
-	static final int WIDTH = 8192, HEIGHT = 4096;
+	// Pannellum's cube faces, in Minecraft's order: north (front, every
+	// panorama faces north), east, south, west, up, down
+	static final String[] FACE_LETTERS = {"f", "r", "b", "l", "u", "d"};
 
 	static class Config {
 		String url = "https://beta.wynndle.com";
@@ -51,7 +56,7 @@ public class WynndlePanorama implements ClientModInitializer {
 	}
 
 	static KeyMapping key, tourKey;
-	// stitching, saving and sending run one after the other here, so the
+	// packing, saving and sending run one after the other here, so the
 	// tour can fly on as soon as a panorama is drawn
 	static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> {
 		Thread t = new Thread(r, "wynndle-panorama");
@@ -107,9 +112,8 @@ public class WynndlePanorama implements ClientModInitializer {
 		pending.incrementAndGet();
 		WORKER.execute(() -> {
 			try {
-				BufferedImage[] faces = readFaces(tmp.resolve("screenshots"));
 				File file = freeName(out, x + "_" + z);
-				writeJpeg(stitch(faces), file);
+				packFaces(tmp.resolve("screenshots"), file);
 				if (config.key.isEmpty()) {
 					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
 				} else {
@@ -151,7 +155,7 @@ public class WynndlePanorama implements ClientModInitializer {
 	static String upload(File file, int x, int z, int planned) {
 		try {
 			HttpRequest req = Tour.request("/api/capture?x=" + x + "&z=" + z + (planned >= 0 ? "&planned=" + planned : ""))
-				.header("Content-Type", "image/jpeg")
+				.header("Content-Type", "application/zip")
 				.POST(HttpRequest.BodyPublishers.ofFile(file.toPath()))
 				.build();
 			HttpResponse<String> res = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());
@@ -162,98 +166,54 @@ public class WynndlePanorama implements ClientModInitializer {
 		}
 	}
 
-	// Minecraft writes the faces asynchronously: wait until all six read back.
-	static BufferedImage[] readFaces(Path dir) throws Exception {
-		BufferedImage[] faces = new BufferedImage[6];
+	// Minecraft writes the faces asynchronously: each is read back once it is
+	// complete, then goes into the zip as a JPEG, one at a time (64 MB each).
+	static void packFaces(Path dir, File zip) throws Exception {
 		long deadline = System.currentTimeMillis() + 60_000;
-		for (int i = 0; i < 6; i++) {
-			File f = dir.resolve("panorama_" + i + ".png").toFile();
-			while (true) {
-				try {
-					if (f.isFile()) faces[i] = ImageIO.read(f);
-				} catch (IOException ignored) {
-					// still being written
+		try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip.toPath()))) {
+			out.setLevel(0); // JPEGs do not compress further
+			for (int i = 0; i < 6; i++) {
+				File f = dir.resolve("panorama_" + i + ".png").toFile();
+				BufferedImage face = null;
+				while (face == null) {
+					try {
+						if (f.isFile()) face = ImageIO.read(f);
+					} catch (IOException ignored) {
+						// still being written
+					}
+					if (face != null) break;
+					if (System.currentTimeMillis() > deadline) throw new IOException("face " + i + " missing");
+					Thread.sleep(200);
 				}
-				if (faces[i] != null) break;
-				if (System.currentTimeMillis() > deadline) throw new IOException("face " + i + " missing");
-				Thread.sleep(200);
+				out.putNextEntry(new ZipEntry(FACE_LETTERS[i] + ".jpg"));
+				writeJpeg(face, out);
+				out.closeEntry();
 			}
 		}
-		return faces;
-	}
-
-	// Face order is Minecraft's: front (north here), +90° (east), +180° (south),
-	// -90° (west), up, down. Vectors are (east, up, north).
-	static final double[][][] FACES = {
-		{{0, 0, 1}, {1, 0, 0}, {0, 1, 0}},
-		{{1, 0, 0}, {0, 0, -1}, {0, 1, 0}},
-		{{0, 0, -1}, {-1, 0, 0}, {0, 1, 0}},
-		{{-1, 0, 0}, {0, 0, 1}, {0, 1, 0}},
-		{{0, 1, 0}, {1, 0, 0}, {0, 0, -1}},
-		{{0, -1, 0}, {1, 0, 0}, {0, 0, 1}},
-	}; // {forward, right, screen up}
-
-	static BufferedImage stitch(BufferedImage[] faces) {
-		int size = faces[0].getWidth();
-		int[][] px = new int[6][];
-		for (int i = 0; i < 6; i++) px[i] = faces[i].getRGB(0, 0, size, size, null, 0, size);
-
-		BufferedImage img = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
-		int[] row = new int[WIDTH];
-		for (int v = 0; v < HEIGHT; v++) {
-			double lat = (0.5 - (v + 0.5) / HEIGHT) * Math.PI;
-			for (int u = 0; u < WIDTH; u++) {
-				double lon = ((u + 0.5) / WIDTH - 0.5) * 2 * Math.PI;
-				double[] d = {Math.cos(lat) * Math.sin(lon), Math.sin(lat), Math.cos(lat) * Math.cos(lon)};
-				int best = 0;
-				double bestDot = -2;
-				for (int f = 0; f < 6; f++) {
-					double dot = dot(FACES[f][0], d);
-					if (dot > bestDot) { bestDot = dot; best = f; }
-				}
-				double sx = dot(FACES[best][1], d) / bestDot, sy = -dot(FACES[best][2], d) / bestDot;
-				row[u] = bilinear(px[best], size, (sx + 1) / 2 * size - 0.5, (sy + 1) / 2 * size - 0.5);
-			}
-			img.setRGB(0, v, WIDTH, 1, row, 0, WIDTH);
-		}
-		return img;
-	}
-
-	static double dot(double[] a, double[] b) {
-		return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-	}
-
-	static int bilinear(int[] px, int size, double x, double y) {
-		x = Math.max(0, Math.min(size - 1, x));
-		y = Math.max(0, Math.min(size - 1, y));
-		int x0 = (int) x, y0 = (int) y, x1 = Math.min(x0 + 1, size - 1), y1 = Math.min(y0 + 1, size - 1);
-		double fx = x - x0, fy = y - y0;
-		int a = px[y0 * size + x0], b = px[y0 * size + x1], c = px[y1 * size + x0], e = px[y1 * size + x1];
-		int rgb = 0;
-		for (int s = 16; s >= 0; s -= 8) {
-			double top = ((a >> s) & 255) * (1 - fx) + ((b >> s) & 255) * fx;
-			double bot = ((c >> s) & 255) * (1 - fx) + ((e >> s) & 255) * fx;
-			rgb |= ((int) Math.round(top * (1 - fy) + bot * fy)) << s;
-		}
-		return rgb;
 	}
 
 	static File freeName(Path dir, String base) throws IOException {
 		Files.createDirectories(dir);
-		File f = dir.resolve(base + ".jpg").toFile();
-		for (int n = 2; f.exists(); n++) f = dir.resolve(base + "_" + n + ".jpg").toFile();
+		File f = dir.resolve(base + ".zip").toFile();
+		for (int n = 2; f.exists(); n++) f = dir.resolve(base + "_" + n + ".zip").toFile();
 		return f;
 	}
 
-	static void writeJpeg(BufferedImage img, File file) throws IOException {
+	static void writeJpeg(BufferedImage img, java.io.OutputStream to) throws IOException {
 		ImageWriter w = ImageIO.getImageWritersByFormatName("jpg").next();
 		ImageWriteParam param = w.getDefaultWriteParam();
 		param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
 		param.setCompressionQuality(0.95f);
-		try (ImageOutputStream os = ImageIO.createImageOutputStream(file)) {
+		// the stream must stay open: the zip goes on after this face
+		ImageOutputStream os = ImageIO.createImageOutputStream(new java.io.FilterOutputStream(to) {
+			@Override public void write(byte[] b, int off, int len) throws IOException { out.write(b, off, len); }
+			@Override public void close() throws IOException { flush(); }
+		});
+		try {
 			w.setOutput(os);
 			w.write(null, new IIOImage(img, null, null), param);
 		} finally {
+			os.close();
 			w.dispose();
 		}
 	}

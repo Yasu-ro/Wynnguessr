@@ -8,6 +8,9 @@ import json
 import math
 import secrets
 import subprocess
+import shutil
+import zipfile
+import io
 import time
 from datetime import date
 import urllib.request
@@ -825,6 +828,8 @@ def room_again(code):
 # capture_key file exists (the beta).
 CAPTURE_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'capture_key')
 CAPTURE_DIR = os.path.join(app.static_folder, 'captures')
+TILES_DIR = os.path.join(app.static_folder, 'tiles')   # a link to /data: big
+CUBE, TILE = 4096, 512   # multires: same numbers in panoramaConfig() (game, room, review)
 COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
 REVIEWER = 'Yasuro'
 DIFFICULTIES = ['easy', 'medium', 'hard']
@@ -867,32 +872,67 @@ def capture():
     except (KeyError, ValueError):
         return jsonify({"success": False}), 400
     data = request.get_data()
-    if not data.startswith(b'\xff\xd8') or len(data) > 40_000_000:
+    if len(data) > 100_000_000:
         return jsonify({"success": False}), 400
-    os.makedirs(CAPTURE_DIR, exist_ok=True)
     name = f"{int(x)}_{int(z)}_{int(time.time() * 1000)}"
-    jpg, webp = os.path.join(CAPTURE_DIR, name + '.jpg'), os.path.join(CAPTURE_DIR, name + '.webp')
-    with open(jpg, 'wb') as f:
-        f.write(data)
-    try:
-        # same quality as the original images: about 1.4 MB for 8192x4096
-        subprocess.run(['cwebp', '-quiet', '-q', '85', jpg, '-o', webp], check=True, timeout=120)
-    except (subprocess.SubprocessError, OSError):
-        return jsonify({"success": False}), 500
-    finally:
-        os.remove(jpg)
+    if data.startswith(b'PK'):
+        # mod 1.6+: the six cube faces in a zip, cut into tiles
+        try:
+            url = make_tiles(data, name)
+        except Exception:
+            return jsonify({"success": False}), 400
+    elif data.startswith(b'\xff\xd8'):
+        # one equirectangular JPEG (older mod)
+        os.makedirs(CAPTURE_DIR, exist_ok=True)
+        jpg, webp = os.path.join(CAPTURE_DIR, name + '.jpg'), os.path.join(CAPTURE_DIR, name + '.webp')
+        with open(jpg, 'wb') as f:
+            f.write(data)
+        try:
+            # same quality as the original images: about 1.4 MB for 8192x4096
+            subprocess.run(['cwebp', '-quiet', '-q', '85', jpg, '-o', webp], check=True, timeout=120)
+        except (subprocess.SubprocessError, OSError):
+            return jsonify({"success": False}), 500
+        finally:
+            os.remove(jpg)
+        url = 'static/captures/' + name + '.webp'
+    else:
+        return jsonify({"success": False}), 400
     with connect() as c:
         planned = c.execute("SELECT location_id FROM locations WHERE location_id = ? AND review = 'planned'",
                             (request.args.get('planned', ''),)).fetchone()
         if planned:
             # a spot planned on the map, now taken: it keeps its place and province
             lid = planned[0]
-            c.execute("UPDATE locations SET image_url = ?, review = 'new' WHERE location_id = ?",
-                      ('static/captures/' + name + '.webp', lid))
+            c.execute("UPDATE locations SET image_url = ?, review = 'new' WHERE location_id = ?", (url, lid))
         else:
             lid = c.execute("INSERT INTO locations (x_position, z_position, image_url, province, review) VALUES (?, ?, ?, ?, 'new')",
-                            (x, z, 'static/captures/' + name + '.webp', guess_province(c, x, z))).lastrowid
+                            (x, z, url, guess_province(c, x, z))).lastrowid
     return jsonify({"success": True, "id": lid})
+
+def make_tiles(data, name):
+    # Pannellum "multires": each face cut in 512 px tiles at 4096, 2048, 1024
+    # and 512 (levels 4 to 1), like Street View; the browser only loads what
+    # it shows. The URL of such a location ends with "/".
+    from PIL import Image
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        faces = {l: Image.open(io.BytesIO(z.read(l + '.jpg'))).convert('RGB') for l in 'fbudlr'}
+    if any(f.size != (CUBE, CUBE) for f in faces.values()):
+        raise ValueError('faces must be %d px' % CUBE)
+    levels = int(math.log2(CUBE // TILE)) + 1
+    tmp = os.path.join(TILES_DIR, '.' + name)
+    for letter, face in faces.items():
+        for level in range(levels, 0, -1):
+            size = CUBE >> (levels - level)
+            img = face if size == CUBE else face.resize((size, size), Image.Resampling.LANCZOS)
+            os.makedirs(os.path.join(tmp, str(level)), exist_ok=True)
+            for i in range(size // TILE):
+                for j in range(size // TILE):
+                    img.crop((j * TILE, i * TILE, (j + 1) * TILE, (i + 1) * TILE)).save(
+                        os.path.join(tmp, str(level), f'{letter}{i}_{j}.jpg'), quality=90)
+        os.makedirs(os.path.join(tmp, 'fallback'), exist_ok=True)
+        face.resize((1024, 1024), Image.Resampling.LANCZOS).save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
+    os.rename(tmp, os.path.join(TILES_DIR, name))
+    return 'static/tiles/' + name + '/'
 
 @app.route("/api/capture/planned")
 def capture_planned():
@@ -973,8 +1013,9 @@ def review_one(lid):
                 # never played anywhere: nothing refers to it, it can go for good
                 c.execute("DELETE FROM locations WHERE location_id = ?", (lid,))
                 if loc['image_url']:
+                    path = os.path.join(app.static_folder, loc['image_url'][len('static/'):])
                     try:
-                        os.remove(os.path.join(app.static_folder, loc['image_url'][len('static/'):]))
+                        shutil.rmtree(path) if path.endswith('/') else os.remove(path)
                     except OSError:
                         pass
             else:

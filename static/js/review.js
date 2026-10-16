@@ -165,7 +165,7 @@ function open(loc) {
     if (viewer) { viewer.destroy(); viewer = null; }
     if (loc.review != 'planned') {
         viewer = pannellum.viewer(focusOn ? 'focus-panorama' : 'review-panorama',
-            {type: 'equirectangular', panorama: loc.url, autoLoad: true});
+            panoramaConfig(loc.url, {autoLoad: true}));
     }
     if (focusOn) {
         focusDot.setLatLng([-loc.Z, loc.X]);
@@ -243,3 +243,14 @@ document.addEventListener('keydown', function (e) { if (e.key == 'Escape' && foc
 
 load();
 setInterval(load, 10000);
+
+// a location is one equirectangular image, or (URL ending with "/") a folder
+// of multires tiles cut by the server (see make_tiles in app.py)
+function panoramaConfig(url, options) {
+    var config = url.slice(-1) == '/'
+        ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
+            extension: 'jpg', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
+        : {type: 'equirectangular', panorama: url};
+    for (var k in options) config[k] = options[k];
+    return config;
+}

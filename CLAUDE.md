@@ -130,8 +130,23 @@ répondent 404/403.
 - Delete : une capture `new` est effacée (ligne + fichier, jamais jouée) ; tout
   autre lieu passe en `deleted` sans être effacé, car un salon terminé peut
   encore le rejouer par son id.
-- Captures converties en webp q85 (comme les images d'origine, ~1,3 Mo en
-  8192×4096) dans `static/captures/`, **hors git**. Originaux JPEG de Yasuro
+- **Multirésolution** (mod 1.6.0, demande de Yasuro : « les panoramas sont
+  un peu flous ») : le mod envoie un **zip des 6 faces en 4096** (JPEG 95,
+  ~13 Mo), `make_tiles()` les découpe en tuiles Pannellum 512 px sur 4
+  niveaux + `fallback/` (~16 Mo, ~516 fichiers par lieu), dans
+  `static/tiles/<nom>/` = **lien vers `/data/wynnguessr-tiles`** (hors git).
+  Une URL de lieu qui finit par `/` = tuiles ; `panoramaConfig()` (game.js,
+  room.js, review.js) choisit le mode, avec `CUBE`/`TILE` d'`app.py` recopiés
+  en dur. Correspondance des faces vérifiée en comparant, sous 6 angles, une
+  image découpée à la manière de Minecraft et l'originale : Minecraft
+  0..5 = Pannellum `f r b l u d`. La netteté venait du manque de pixels (faces
+  2048, rééchantillonnées en équirectangulaire), pas du webp (−1 % mesuré).
+  **Piège payé** : en multires, Pannellum émet `load` pendant la construction
+  du viewer, avant tout `on('load')` : le chrono de `game.js` ne démarrait
+  plus. D'où `if (viewer.isLoaded()) clock()`.
+  Pillow ajouté au `.venv` (partagé avec la prod) pour ce découpage.
+- Captures des mods < 1.6 : webp q85 dans `static/captures/`, **hors git** ;
+  toujours acceptées par `/api/capture` (JPEG). Originaux JPEG de Yasuro
   dans `~/wynndle-captures/`.
 - `fruma` est une province de tri, **pas encore jouable** (absente de
   `PROVINCES` et des réglages de partie).
@@ -282,10 +297,10 @@ l'origine datent d'août 2024). Touche **Maj droite** (réglable, catégorie Div
 touches F) :
 appelle le panorama intégré de Minecraft (`grabPanoramixScreenshot` : 6 faces
 rendues en 4096, monde seul, sans interface ni main ; enregistrées réduites ×4
-d'origine, ×2 via `PanoramaDownscaleMixin` → 2048), assemble les faces en
-équirectangulaire **8192×4096** (Yasuro trouvait 4096×2048, le format des
-images d'origine, trop flou), centre = **nord**, et écrit `.minecraft/wynndle/<X>_<Z>.jpg`
-(`_2`… si le nom existe déjà). La province n'est pas dans le nom : à déduire
+d'origine ; `PanoramaDownscaleMixin` force ×1 → **4096** depuis la 1.6.0),
+centre = **nord**, et écrit les faces dans `.minecraft/wynndle/<X>_<Z>.zip`
+(`_2`… si le nom existe déjà). Jusqu'à la 1.5 il les assemblait en
+équirectangulaire 8192×4096 (4096×2048 avant la 1.1, jugé trop flou). La province n'est pas dans le nom : à déduire
 de la position à l'import.
 **Envoi automatique** (1.2.0) : si `config/wynndle-panorama.json` (créé vide au
 premier lancement, lu au démarrage du jeu) contient une `key`, chaque photo est

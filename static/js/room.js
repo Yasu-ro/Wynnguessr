@@ -485,16 +485,14 @@ function guess() {
             viewer.destroy();
         }
         var locked = s.settings.look;
-        viewer = pannellum.viewer('room-panorama', {
-            "type": "equirectangular",
-            "panorama": s.url,
+        viewer = pannellum.viewer('room-panorama', panoramaConfig(s.url, {
             "autoLoad": true,
             "draggable": !locked,
             "mouseZoom": !locked,
             "keyboardZoom": !locked,
             "disableKeyboardCtrl": locked,
             "showControls": !locked
-        });
+        }));
         $('#guess-button').prop('disabled', false).removeClass('room-warn').text('Guess!');
         heard = null;
         lastSecond = null;
@@ -803,4 +801,15 @@ $('#again-button').on('click', function () {
 function crisp(m) {
     m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
     m.getContainer().classList.toggle('crisp', m.getZoom() > 0);
+}
+
+// a location is one equirectangular image, or (URL ending with "/") a folder
+// of multires tiles cut by the server (see make_tiles in app.py)
+function panoramaConfig(url, options) {
+    var config = url.slice(-1) == '/'
+        ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
+            extension: 'jpg', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
+        : {type: 'equirectangular', panorama: url};
+    for (var k in options) config[k] = options[k];
+    return config;
 }
