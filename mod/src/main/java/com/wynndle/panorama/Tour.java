@@ -143,13 +143,16 @@ public class Tour {
 					fetch();
 					return;
 				}
-				if (!mc.level.hasChunk(x >> 4, z >> 4) || ticks < 5) return;
-				p.connection.sendCommand("tp @s " + (x + 0.5) + " " + ground(mc) + " " + (z + 0.5) + " 180 0");
+				// a chunk can be there before its blocks: no ground yet = not ready
+				if (!mc.level.hasChunk(x >> 4, z >> 4) || ticks < 20) return;
+				int y = ground(mc);
+				if (y == NO_GROUND) return;
+				p.connection.sendCommand("tp @s " + (x + 0.5) + " " + y + " " + (z + 0.5) + " 180 0");
 				step = Step.LANDING;
 				ticks = 0;
 			}
 			case LANDING -> {
-				if (++ticks >= 5) { step = Step.SPINNING; ticks = 0; }
+				if (++ticks >= 10) { step = Step.SPINNING; ticks = 0; }
 			}
 			case SPINNING -> {
 				ticks++;
@@ -173,6 +176,8 @@ public class Tour {
 	// Feet height on the column: the first block from the top that stops a
 	// player and can be seen (Wynncraft caps areas with invisible barriers),
 	// leaves excepted (under a tree, not on it); water counts as ground.
+	static final int NO_GROUND = Integer.MIN_VALUE;
+
 	static int ground(Minecraft mc) {
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, mc.level.getMaxY(), z);
 		for (int y = mc.level.getMaxY(); y > mc.level.getMinY(); y--) {
@@ -181,7 +186,7 @@ public class Tour {
 			if (!s.getFluidState().isEmpty()) return y + 1;
 			if (s.blocksMotion() && s.getRenderShape() != RenderShape.INVISIBLE && !s.is(BlockTags.LEAVES)) return y + 1;
 		}
-		return mc.level.getMaxY() - 2;
+		return NO_GROUND;
 	}
 
 	// Region files start with 1024 offsets, one per chunk: not zero = saved.

@@ -300,8 +300,14 @@ Yasuro atterrissait dessus dans le ciel —, feuilles exclues, eau comprise), to
 charge que ce qui est regardé), courte attente, photo, point suivant **sans
 attendre l'envoi** (1.5.0 : assemblage, sauvegarde et envoi passent dans une
 file à un seul fil, `WORKER`). Durées réglables dans
-`config/wynndle-panorama.json` : `spinSeconds` (2 par défaut, 4 avant la
-1.5.0) et `waitSeconds` (1, 5 avant) ; Yasuro a accéléré DH. Un point est
+`config/wynndle-panorama.json` : `spinSeconds` et `waitSeconds`, **4 s et 3 s
+par défaut** (1.5.1 ; la 1.5.0 était passée à 2 et 1, trop court pour DH
+selon Yasuro).
+**Piège payé (1.5.0)** : en raccourcissant les attentes, le sol était cherché
+avant l'arrivée des blocs du chunk ; faute de sol, le mod laissait le joueur
+en haut de la colonne, dans les plafonds de barrières de Wynncraft (« on
+spawn en l'air, bloqué par des barrières »). Depuis la 1.5.1, pas de sol
+trouvé = on attend encore (jusqu'à l'abandon à 15 s), jamais de repli en haut. Un point est
 fait une fois par tournée : jamais chargé (15 s) il est sauté, et un envoi
 raté le laisse bleu pour la tournée suivante.
 La province d'un point est **déjà devinée** (règle Fruma, sinon lieu
@@ -316,7 +322,10 @@ il invente du terrain là où rien n'est téléchargé.
 premières tournées, la face nord (centre de l'image, rendue en premier)
 n'avait ni paysage lointain Distant Horizons ni nuages. DH a une image de
 retard après le changement de caméra : `PanoramaWarmupMixin` dessine chaque
-face deux fois et garde la seconde.
+face deux fois et garde la seconde. **Insuffisant** : le nord manquait encore
+par endroits. Réglage DH conseillé à Yasuro : Advanced options → Graphics →
+Culling → **Disable Frustum Culling = True** (DH dessine alors aussi ce qui
+est hors de sa dernière caméra connue). Non confirmé à ce jour.
 **Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
 (`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
 (mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire

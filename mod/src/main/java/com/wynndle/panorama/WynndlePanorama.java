@@ -46,8 +46,8 @@ public class WynndlePanorama implements ClientModInitializer {
 	static class Config {
 		String url = "https://beta.wynndle.com";
 		String key = "";
-		double spinSeconds = 2;  // tour: one full turn before the picture (Distant Horizons)
-		double waitSeconds = 1;  // tour: then this long still
+		double spinSeconds = 4;  // tour: one full turn before the picture (Distant Horizons)
+		double waitSeconds = 3;  // tour: then this long still
 	}
 
 	static KeyMapping key, tourKey;
