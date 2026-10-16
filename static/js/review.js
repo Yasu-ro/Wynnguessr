@@ -18,6 +18,7 @@ var viewer = null;
 var choice = {};    // province and difficulty picked in the panel
 var have = null;    // chunks of the downloaded world: Uint8Array, 1 = there
 var veil = null, veilData = '';
+var rings = [];     // one circle per group of holes, visible at any zoom
 
 function style(loc) {
     var on = current && current.id == loc.id;
@@ -56,6 +57,8 @@ function load() {
 
 function drawVeil(regions) {
     if (veil) { map.removeLayer(veil); veil = null; }
+    rings.forEach(function (r) { map.removeLayer(r); });
+    rings = [];
     if (!regions) { have = null; return; }
     have = new Uint8Array(CHUNKS_X * CHUNKS_Z);
     for (var key in regions) {
@@ -67,13 +70,49 @@ function drawVeil(regions) {
             if (cx >= 0 && cx < CHUNKS_X && cz >= 0 && cz < CHUNKS_Z) have[cz * CHUNKS_X + cx] = 1;
         }
     }
+    // holes: missing chunks walled in by downloaded ones, i.e. not reachable
+    // from the edge of the map through other missing chunks
+    var outside = new Uint8Array(have.length), todo = [];
+    for (var x = 0; x < CHUNKS_X; x++) todo.push(x, (CHUNKS_Z - 1) * CHUNKS_X + x);
+    for (var z = 0; z < CHUNKS_Z; z++) todo.push(z * CHUNKS_X, z * CHUNKS_X + CHUNKS_X - 1);
+    while (todo.length) {
+        var c = todo.pop();
+        if (have[c] || outside[c]) continue;
+        outside[c] = 1;
+        var cx = c % CHUNKS_X;
+        if (cx > 0) todo.push(c - 1);
+        if (cx < CHUNKS_X - 1) todo.push(c + 1);
+        if (c >= CHUNKS_X) todo.push(c - CHUNKS_X);
+        if (c < have.length - CHUNKS_X) todo.push(c + CHUNKS_X);
+    }
     var canvas = document.createElement('canvas');
     canvas.width = CHUNKS_X; canvas.height = CHUNKS_Z;
     var ctx = canvas.getContext('2d'), img = ctx.createImageData(CHUNKS_X, CHUNKS_Z);
     for (var j = 0; j < have.length; j++) {
-        if (!have[j]) img.data[j * 4 + 3] = 140;   // black at 55%: not downloaded
+        if (have[j]) continue;
+        if (outside[j]) {
+            img.data[j * 4 + 3] = 140;   // black at 55%: not downloaded
+        } else {
+            img.data[j * 4] = 255; img.data[j * 4 + 2] = 255; img.data[j * 4 + 3] = 230;   // magenta: a hole
+        }
     }
     ctx.putImageData(img, 0, 0);
+    // a hole is a chunk or two: too small to see from far, so circle each group
+    var seen = new Uint8Array(have.length);
+    for (var h = 0; h < have.length; h++) {
+        if (have[h] || outside[h] || seen[h]) continue;
+        var group = [h], sx = 0, sz = 0, n = 0;
+        seen[h] = 1;
+        while (group.length) {
+            var g = group.pop(), gx = g % CHUNKS_X;
+            sx += gx; sz += (g - gx) / CHUNKS_X; n++;
+            [gx > 0 ? g - 1 : -1, gx < CHUNKS_X - 1 ? g + 1 : -1, g - CHUNKS_X, g + CHUNKS_X].forEach(function (q) {
+                if (q >= 0 && q < have.length && !have[q] && !outside[q] && !seen[q]) { seen[q] = 1; group.push(q); }
+            });
+        }
+        var bx = (sx / n - 160 + 0.5) * 16, bz = (sz / n - 384 + 0.5) * 16;
+        rings.push(L.circleMarker([-bz, bx], {radius: 12, color: '#ff00ff', weight: 3, fill: false, interactive: false}).addTo(map));
+    }
     veil = L.imageOverlay(canvas.toDataURL(), bounds, {className: 'review-veil'}).addTo(map);
 }
 

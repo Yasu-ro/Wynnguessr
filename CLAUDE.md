@@ -101,6 +101,10 @@ répondent 404/403.
   et les **622 lieux d'origine sont passés en `deleted` dans la base de la
   bêta** (pris sur l'ancienne carte, tous à refaire). La bêta n'a donc aucun
   lieu jouable tant que rien n'est gardé. La prod n'est pas touchée.
+- **Trous** (demande de Yasuro : « pas faciles à voir ») : un chunk manquant
+  qu'on ne peut pas relier au bord de la carte par d'autres chunks manquants
+  est en **magenta**, et chaque groupe est entouré d'un cercle magenta de
+  taille fixe (un chunk ne fait qu'un pixel vu de loin).
 - Clic sur la carte = point `planned` (`POST api/review/plan`), refusé dans
   une zone grise. Le mod (`Tour`) lit `GET api/capture/planned` et renvoie la
   photo avec `&planned=<id>` : la ligne garde sa place et passe en `new`.
