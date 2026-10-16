@@ -46,6 +46,38 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   sans ça, les joueurs gardent l'ancien script (bug « on ne voit pas les PV »).
 - Pas de flash blanc : chaque `<head>` pose `background-color: #6b5236` d'emblée.
 
+## Bêta (`beta.wynndle.com`)
+
+Demande de Yasuro : tester et déboguer avant de toucher au vrai site.
+
+- **Worktree git** `~/Wynnguessr-beta` sur la branche **`beta`** (poussée sur
+  le fork). Service `wynnguessr-beta`, port **8791**, même `.venv` que la prod.
+  Exposée par le même tunnel Cloudflare (règle `beta.wynndle.com` dans
+  `config.yml`).
+- **Sa propre base** : copie de la base de prod du 2026-10-16 (faite avec
+  `sqlite3.backup`, pas `cp`, la base étant vivante). Ce qui s'y joue n'atteint
+  jamais le vrai classement. Sa propre `secret_key` (donc sessions séparées).
+  Pas de `wynncraft_oauth.json` : la redirect URI enregistrée chez Wynncraft
+  est celle de wynndle.com, donc pas de bouton Wynncraft en bêta.
+- Travail : on modifie et on commite dans `~/Wynnguessr-beta`. Mise en prod,
+  après accord de Yasuro : `git merge beta` dans `~/Wynnguessr`, puis pousser,
+  puis `systemctl --user restart wynnguessr` si `app.py` ou un template a changé.
+- **`database.db` est suivi par git** : ne jamais le commiter depuis la bêta,
+  sinon la fusion écraserait la base de prod par celle de la bêta.
+
+## Carte
+
+`static/map-2026.webp` : carte principale Wynntils (18 tuiles « Main » de
+`Wynntils/Static-Storage/Reference/maps.json`, X −2560…2047, Z −6144…−1),
+1 px = 1 bloc, webp sans perte (8,7 Mo ; le PNG faisait 30 Mo). Bornes Leaflet
+`[[0, -2560], [6144, 2048]]` (lat = −Z, lng = X), écrites dans `game.js` (×3)
+et `room.js`. Pour la refaire : réassembler les tuiles à
+`(x1 + 2560, z1 + 6144)` et vérifier les md5 du JSON. **Changer de nom de
+fichier à chaque nouvelle carte** : l'URL vient du JS, sans `asset()`, et
+Cloudflare garderait 4 h l'ancienne image avec les nouvelles bornes.
+Fruma (en bas à gauche) est sur la carte mais n'a encore aucun lieu ni
+province.
+
 ## Base de données (SQLite, `database.db`)
 
 Une connexion **par requête** (`connect()`) ; l'origine partageait un curseur
