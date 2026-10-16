@@ -67,7 +67,7 @@ Demande de Yasuro : tester et déboguer avant de toucher au vrai site.
 
 ## Carte
 
-`static/map-2026.webp` : carte principale Wynntils (18 tuiles « Main » de
+`static/map-2026.webp` (en bêta tant que non fusionnée) : carte principale Wynntils (18 tuiles « Main » de
 `Wynntils/Static-Storage/Reference/maps.json`, X −2560…2047, Z −6144…−1),
 1 px = 1 bloc, webp sans perte (8,7 Mo ; le PNG faisait 30 Mo). Bornes Leaflet
 `[[0, -2560], [6144, 2048]]` (lat = −Z, lng = X), écrites dans `game.js` (×3)
