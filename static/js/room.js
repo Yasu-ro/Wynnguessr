@@ -4,7 +4,7 @@
 var code = $('#room').attr('data-code');
 var COLORS = ['#e6194b', '#4363d8', '#ffe119', '#911eb4', '#f58231', '#42d4f4', '#f032e6', '#9a6324'];
 var ANSWER = '#3cb44b';
-var bounds = [[159, -2383], [6573, 1651]]; // Map bounds
+var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
 var s = null;            // last state received
 var view = '';           // screen on display, e.g. "guess3"
 var cur = 0;             // round shown to a player who is not playing live
@@ -166,8 +166,8 @@ function pin(fill, star) {
 
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
-    L.imageOverlay('static/Wynncraft Map.png', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
-    m.setView([3000, -500], zoom);
+    L.imageOverlay('static/map-2026.webp', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
+    m.setView([3072, -256], zoom);
     return m;
 }
 

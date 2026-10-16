@@ -80,9 +80,9 @@ function showScoreScreen() {
         maxZoom: 5,
         attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'
     }).setView([0, 0], 0);
-    var bounds = [[159, -2383], [6573, 1651]]; // Map bounds
-    L.imageOverlay('static/Wynncraft Map.png', bounds).addTo(scoreMap);
-    scoreMap.setView([3000, -500], -1);
+    var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
+    L.imageOverlay('static/map-2026.webp', bounds).addTo(scoreMap);
+    scoreMap.setView([3072, -256], -1);
     scoreMap.on('click', onMapClick);
 
     var xActual = images[round - 1]['X'];
@@ -161,9 +161,9 @@ function showNextLocation() {
         attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'
     }).setView([0, 0], 0);
 
-    var bounds = [[159, -2383], [6573, 1651]]; // Map bounds
-    L.imageOverlay('static/Wynncraft Map.png', bounds).addTo(map);
-    map.setView([3000, -500], -2);
+    var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
+    L.imageOverlay('static/map-2026.webp', bounds).addTo(map);
+    map.setView([3072, -256], -2);
     map.on('click', onMapClick);
 
     // Selects a random location from the list of locations and removes it to prevent duplicates
@@ -293,9 +293,9 @@ function finalScore() {
         attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'
         //renderer: L.canvas({ padding: 10 })
     }).setView([0, 0], 0);
-    var bounds = [[159, -2383], [6573, 1651]]; // Map bounds
-    L.imageOverlay('static/Wynncraft Map.png', bounds).addTo(scoreMap);
-    scoreMap.setView([3000, -500], -1);
+    var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
+    L.imageOverlay('static/map-2026.webp', bounds).addTo(scoreMap);
+    scoreMap.setView([3072, -256], -1);
     scoreMap.on('click', onMapClick);
     
     var featureGroup = [];
