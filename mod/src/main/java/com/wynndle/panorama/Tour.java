@@ -10,6 +10,7 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 
@@ -161,13 +162,15 @@ public class Tour {
 	}
 
 	// Feet height on the column: the first block from the top that stops a
-	// player, leaves excepted (under a tree, not on it); water counts as ground.
+	// player and can be seen (Wynncraft caps areas with invisible barriers),
+	// leaves excepted (under a tree, not on it); water counts as ground.
 	static int ground(Minecraft mc) {
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, mc.level.getMaxY(), z);
 		for (int y = mc.level.getMaxY(); y > mc.level.getMinY(); y--) {
 			pos.setY(y);
 			BlockState s = mc.level.getBlockState(pos);
-			if (!s.getFluidState().isEmpty() || (s.blocksMotion() && !s.is(BlockTags.LEAVES))) return y + 1;
+			if (!s.getFluidState().isEmpty()) return y + 1;
+			if (s.blocksMotion() && s.getRenderShape() != RenderShape.INVISIBLE && !s.is(BlockTags.LEAVES)) return y + 1;
 		}
 		return mc.level.getMaxY() - 2;
 	}

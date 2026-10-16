@@ -274,8 +274,9 @@ JPEG). Le chat dit « sent », ou « saved, not sent (raison) » : la copie loca
 reste toujours.
 **Tournée** (1.4.0, touche **Ctrl droit**, solo seulement) : vers le point
 `planned` le plus proche, `tp` en haut de la colonne, attente du chunk, `tp`
-au sol (premier bloc qui arrête un joueur en partant du haut, feuilles
-exclues, eau comprise), **un tour complet sur soi en 4 s** (Yasuro : Distant
+au sol (premier bloc qui arrête un joueur **et qui se voit** en partant du
+haut — **piège payé** : Wynncraft coiffe des zones de barrières invisibles,
+Yasuro atterrissait dessus dans le ciel —, feuilles exclues, eau comprise), **un tour complet sur soi en 4 s** (Yasuro : Distant
 Horizons ne charge que ce qui est regardé), 5 s d'attente, photo, envoi, point
 suivant. Un point jamais chargé (15 s) ou dont l'envoi échoue est sauté pour
 la tournée en cours. Constantes en tête de `Tour.java`.
@@ -283,6 +284,11 @@ Téléchargement de la carte : Yasuro a choisi **Simple World Downloader**
 (Modrinth, 1.21.11), pour voler en créatif et choisir l'heure, usage
 personnel. Dans le monde solo, couper la « distant generation » de DH, sinon
 il invente du terrain là où rien n'est téléchargé.
+**Face avant incomplète** (corrigé en 1.4.1, non vérifié en jeu) : sur les
+premières tournées, la face nord (centre de l'image, rendue en premier)
+n'avait ni paysage lointain Distant Horizons ni nuages. DH a une image de
+retard après le changement de caméra : `PanoramaWarmupMixin` dessine chaque
+face deux fois et garde la seconde.
 **Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
 (`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
 (mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire
