@@ -89,12 +89,28 @@ que là où il y a un fichier **`capture_key`** (bêta seulement, 0600, hors git
 c'est la clé à mettre dans le mod). Ailleurs, `/review` et `/api/capture`
 répondent 404/403.
 
-- Colonnes `locations.review` (`old` = jeu d'origine, `new` = capture pas
-  encore vue, `kept`, `deleted`) et `locations.difficulty` (`easy`, `medium`,
+- Colonnes `locations.review` (`old` = jeu d'origine, `planned` = endroit
+  posé sur la carte, sans photo, `new` = capture pas encore vue, `kept`,
+  `deleted`) et `locations.difficulty` (`easy`, `medium`,
   `hard` : **simple étiquette pour l'instant**, choix de Yasuro). Le jeu ne tire
   que `old` et `kept` (`PLAYABLE`).
-- Points : rouge = `new`, orange = `old`, vert = `kept` ; la page se recharge
+- Points : bleu = `planned`, rouge = `new`, vert = `kept` ; la page se recharge
   toutes les 10 s, donc une photo prise apparaît seule.
+- **2026-10-16, décision de Yasuro : on repart de zéro.** Les 24 premières
+  captures ont été effacées (originaux JPEG gardés dans `~/wynndle-captures/`)
+  et les **622 lieux d'origine sont passés en `deleted` dans la base de la
+  bêta** (pris sur l'ancienne carte, tous à refaire). La bêta n'a donc aucun
+  lieu jouable tant que rien n'est gardé. La prod n'est pas touchée.
+- Clic sur la carte = point `planned` (`POST api/review/plan`), refusé dans
+  une zone grise. Le mod (`Tour`) lit `GET api/capture/planned` et renvoie la
+  photo avec `&planned=<id>` : la ligne garde sa place et passe en `new`.
+- **Voile gris** : le mod envoie à l'ouverture du monde solo
+  (`POST api/coverage`, `coverage.json` hors git) un bit par chunk, par région
+  (`"rx,rz"` → base64 de 128 octets, chunk `(x&31) + (z&31)*32`, bit de poids
+  faible d'abord), lu dans l'en-tête des `.mca` (1024 offsets, ≠ 0 = chunk
+  présent). Pourquoi refuser le gris : y téléporter le joueur ferait générer
+  du terrain Minecraft ordinaire dans la copie, que la couverture compterait
+  ensuite comme téléchargé.
 - Keep exige une difficulté ; la province est préremplie (Fruma si
   `x < -1000` et `z > -2000`, sinon celle du lieu le plus proche) et se corrige.
 - Delete : une capture `new` est effacée (ligne + fichier, jamais jouée) ; tout
@@ -256,6 +272,17 @@ premier lancement, lu au démarrage du jeu) contient une `key`, chaque photo est
 aussi envoyée à `POST <url>/api/capture?x=&z=` (en-tête `X-Wynndle-Key`, corps
 JPEG). Le chat dit « sent », ou « saved, not sent (raison) » : la copie locale
 reste toujours.
+**Tournée** (1.4.0, touche **Ctrl droit**, solo seulement) : vers le point
+`planned` le plus proche, `tp` en haut de la colonne, attente du chunk, `tp`
+au sol (premier bloc qui arrête un joueur en partant du haut, feuilles
+exclues, eau comprise), **un tour complet sur soi en 4 s** (Yasuro : Distant
+Horizons ne charge que ce qui est regardé), 5 s d'attente, photo, envoi, point
+suivant. Un point jamais chargé (15 s) ou dont l'envoi échoue est sauté pour
+la tournée en cours. Constantes en tête de `Tour.java`.
+Téléchargement de la carte : Yasuro a choisi **Simple World Downloader**
+(Modrinth, 1.21.11), pour voler en créatif et choisir l'heure, usage
+personnel. Dans le monde solo, couper la « distant generation » de DH, sinon
+il invente du terrain là où rien n'est téléchargé.
 **Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
 (`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
 (mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire

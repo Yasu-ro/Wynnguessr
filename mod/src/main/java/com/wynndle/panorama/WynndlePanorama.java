@@ -24,20 +24,19 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.Comparator;
 import java.util.stream.Stream;
 
 // One key: Minecraft's own panorama (6 cube faces, world only, no GUI),
 // stitched into an 8192x4096 equirectangular image for Pannellum on
 // wynndle.com. The file is named X_Z after the player's block, and sent to
-// the site's review page when config/wynndle-panorama.json has a key.
+// the site's review page when config/wynndle-panorama.json has a key. A
+// second key runs the tour of the spots planned on that page (see Tour).
 public class WynndlePanorama implements ClientModInitializer {
 	static final int WIDTH = 8192, HEIGHT = 4096;
 
@@ -46,8 +45,9 @@ public class WynndlePanorama implements ClientModInitializer {
 		String key = "";
 	}
 
-	static KeyMapping key;
+	static KeyMapping key, tourKey;
 	static volatile boolean busy;
+	static volatile boolean lastSent; // did the last panorama reach the site
 	public static boolean capturing; // read by the mixins: hide entities and names
 	static Config config = new Config();
 
@@ -56,14 +56,21 @@ public class WynndlePanorama implements ClientModInitializer {
 		loadConfig();
 		key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.wynndle-panorama.capture", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, KeyMapping.Category.MISC));
+		tourKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.wynndle-panorama.tour", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_CONTROL, KeyMapping.Category.MISC));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			while (key.consumeClick()) {
-				if (mc.player != null && mc.level != null && !busy) capture(mc);
+				if (mc.player != null && mc.level != null && !busy && Tour.step == Tour.Step.IDLE) capture(mc, -1);
 			}
+			while (tourKey.consumeClick()) {
+				if (mc.player != null && mc.level != null) Tour.toggle(mc);
+			}
+			Tour.tick(mc);
 		});
 	}
 
-	static void capture(Minecraft mc) {
+	// planned: id of the spot planned on the review page, or -1
+	static void capture(Minecraft mc, int planned) {
 		LocalPlayer p = mc.player;
 		int x = p.getBlockX(), z = p.getBlockZ();
 		Path out = FabricLoader.getInstance().getGameDir().resolve("wynndle");
@@ -87,6 +94,7 @@ public class WynndlePanorama implements ClientModInitializer {
 		}
 
 		busy = true;
+		lastSent = false;
 		say(mc, Component.literal("Wynndle: saving " + x + " " + z + "…").withStyle(ChatFormatting.GRAY));
 		Thread t = new Thread(() -> {
 			try {
@@ -96,7 +104,8 @@ public class WynndlePanorama implements ClientModInitializer {
 				if (config.key.isEmpty()) {
 					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
 				} else {
-					String error = upload(file, x, z);
+					String error = upload(file, x, z, planned);
+					lastSent = error == null;
 					say(mc, error == null
 						? Component.literal("Wynndle: " + file.getName() + " sent").withStyle(ChatFormatting.GREEN)
 						: Component.literal("Wynndle: " + file.getName() + " saved, not sent (" + error + ")").withStyle(ChatFormatting.GOLD));
@@ -133,13 +142,10 @@ public class WynndlePanorama implements ClientModInitializer {
 	}
 
 	// Returns null when the site has it, else why not (the file stays saved).
-	static String upload(File file, int x, int z) {
+	static String upload(File file, int x, int z, int planned) {
 		try {
-			HttpRequest req = HttpRequest.newBuilder(URI.create(config.url.replaceAll("/+$", "") + "/api/capture?x=" + x + "&z=" + z))
-				.timeout(Duration.ofSeconds(60))
-				.header("X-Wynndle-Key", config.key.trim())
+			HttpRequest req = Tour.request("/api/capture?x=" + x + "&z=" + z + (planned >= 0 ? "&planned=" + planned : ""))
 				.header("Content-Type", "image/jpeg")
-				.header("User-Agent", "WynndlePanorama/1.2")
 				.POST(HttpRequest.BodyPublishers.ofFile(file.toPath()))
 				.build();
 			HttpResponse<String> res = HttpClient.newHttpClient().send(req, HttpResponse.BodyHandlers.ofString());

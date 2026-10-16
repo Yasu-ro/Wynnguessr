@@ -1744,7 +1744,13 @@ h1.sign::after{
     border: 1px solid black;
 }
 .review-dot[data-review="new"]{ background-color: #e53935; }
-.review-dot[data-review="old"]{ background-color: #f39c12; }
+.review-dot[data-review="planned"]{ background-color: #1e88e5; }
+.review-veil{
+    image-rendering: pixelated;
+}
+#review-panel[data-review="planned"] .review-photo{
+    display: none;
+}
 .review-dot[data-review="kept"]{ background-color: #378537; }
 
 @media (max-width: 800px){

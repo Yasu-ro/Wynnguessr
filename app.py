@@ -818,10 +818,14 @@ def room_again(code):
 # ---------- Captures and review ----------
 # The Wynndle Panorama mod (mod/) sends each panorama here as it is taken; it
 # shows up as a 'new' location, not played until Yasuro reviews it on /review:
-# keep (with a difficulty) or delete. The original locations go through the
-# same review. Only works where a capture_key file exists (the beta).
+# keep (with a difficulty) or delete. A click on the review map plans a spot
+# ('planned'): in a downloaded copy of the world, the mod flies to each one,
+# takes it and sends it back as 'new'. The mod also sends which chunks the
+# copy holds, shown as a grey veil over the rest. Only works where a
+# capture_key file exists (the beta).
 CAPTURE_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'capture_key')
 CAPTURE_DIR = os.path.join(app.static_folder, 'captures')
+COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
 REVIEWER = 'Yasuro'
 DIFFICULTIES = ['easy', 'medium', 'hard']
 REVIEW_PROVINCES = PROVINCES + ['fruma']
@@ -833,6 +837,10 @@ def capture_key():
     except FileNotFoundError:
         return None
 
+def key_ok():
+    key = capture_key()
+    return bool(key) and secrets.compare_digest(request.headers.get('X-Wynndle-Key', ''), key)
+
 def is_reviewer():
     if not session.get('loggedin') or not capture_key():
         return False
@@ -841,18 +849,18 @@ def is_reviewer():
     return bool(me) and me['username'] == REVIEWER
 
 def guess_province(c, x, z):
-    # Fruma has no location yet to learn from; elsewhere, the nearest one decides
+    # Fruma has no location yet to learn from; elsewhere, the nearest one
+    # decides (deleted ones too: their province is still right)
     if x < -1000 and z > -2000:
         return 'fruma'
-    near = c.execute("""SELECT province FROM locations WHERE review IN ('old', 'kept')
+    near = c.execute("""SELECT province FROM locations WHERE review IN ('old', 'kept', 'deleted')
         ORDER BY (x_position - ?) * (x_position - ?) + (z_position - ?) * (z_position - ?) LIMIT 1""",
         (x, x, z, z)).fetchone()
     return near['province'] if near else 'wynn'
 
 @app.route("/api/capture", methods=['POST'])
 def capture():
-    key = capture_key()
-    if not key or not secrets.compare_digest(request.headers.get('X-Wynndle-Key', ''), key):
+    if not key_ok():
         return jsonify({"success": False}), 403
     try:
         x, z = float(request.args['x']), float(request.args['z'])
@@ -874,8 +882,60 @@ def capture():
     finally:
         os.remove(jpg)
     with connect() as c:
-        lid = c.execute("INSERT INTO locations (x_position, z_position, image_url, province, review) VALUES (?, ?, ?, ?, 'new')",
-                        (x, z, 'static/captures/' + name + '.webp', guess_province(c, x, z))).lastrowid
+        planned = c.execute("SELECT location_id FROM locations WHERE location_id = ? AND review = 'planned'",
+                            (request.args.get('planned', ''),)).fetchone()
+        if planned:
+            # a spot planned on the map, now taken: it keeps its place and province
+            lid = planned[0]
+            c.execute("UPDATE locations SET image_url = ?, review = 'new' WHERE location_id = ?",
+                      ('static/captures/' + name + '.webp', lid))
+        else:
+            lid = c.execute("INSERT INTO locations (x_position, z_position, image_url, province, review) VALUES (?, ?, ?, ?, 'new')",
+                            (x, z, 'static/captures/' + name + '.webp', guess_province(c, x, z))).lastrowid
+    return jsonify({"success": True, "id": lid})
+
+@app.route("/api/capture/planned")
+def capture_planned():
+    if not key_ok():
+        return jsonify({"success": False}), 403
+    with connect() as c:
+        rows = c.execute("SELECT location_id, x_position, z_position FROM locations WHERE review = 'planned'").fetchall()
+    return jsonify([{"id": r[0], "x": int(r[1]), "z": int(r[2])} for r in rows])
+
+@app.route("/api/coverage", methods=['POST'])
+def coverage_upload():
+    # {"x,z": base64 of the region's 1024 bits, one per chunk} from the mod
+    if not key_ok():
+        return jsonify({"success": False}), 403
+    regions = request.get_json(silent=True)
+    if not isinstance(regions, dict) or len(request.get_data()) > 5_000_000:
+        return jsonify({"success": False}), 400
+    with open(COVERAGE_FILE, 'w') as f:
+        json.dump(regions, f)
+    return jsonify({"success": True})
+
+@app.route("/api/review/coverage")
+def coverage():
+    if not is_reviewer():
+        return jsonify({"success": False}), 403
+    try:
+        with open(COVERAGE_FILE) as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify(None)
+
+@app.route("/api/review/plan", methods=['POST'])
+def review_plan():
+    if not is_reviewer():
+        return jsonify({"success": False}), 403
+    form = request.get_json(silent=True) or {}
+    try:
+        x, z = int(form['x']), int(form['z'])
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"success": False})
+    with connect() as c:
+        lid = c.execute("INSERT INTO locations (x_position, z_position, image_url, province, review) VALUES (?, ?, '', ?, 'planned')",
+                        (x, z, guess_province(c, x, z))).lastrowid
     return jsonify({"success": True, "id": lid})
 
 @app.route("/review")
@@ -903,18 +963,20 @@ def review_one(lid):
         if not loc:
             return jsonify({"success": False})
         if form.get('action') == 'keep':
-            if form.get('difficulty') not in DIFFICULTIES or form.get('province') not in REVIEW_PROVINCES:
+            if (form.get('difficulty') not in DIFFICULTIES or form.get('province') not in REVIEW_PROVINCES
+                    or loc['review'] == 'planned'):
                 return jsonify({"success": False})
             c.execute("UPDATE locations SET review = 'kept', difficulty = ?, province = ? WHERE location_id = ?",
                       (form['difficulty'], form['province'], lid))
         elif form.get('action') == 'delete':
-            if loc['review'] == 'new':
+            if loc['review'] in ('new', 'planned'):
                 # never played anywhere: nothing refers to it, it can go for good
                 c.execute("DELETE FROM locations WHERE location_id = ?", (lid,))
-                try:
-                    os.remove(os.path.join(app.static_folder, loc['image_url'][len('static/'):]))
-                except OSError:
-                    pass
+                if loc['image_url']:
+                    try:
+                        os.remove(os.path.join(app.static_folder, loc['image_url'][len('static/'):]))
+                    except OSError:
+                        pass
             else:
                 # a finished room may still replay it: hidden, not erased
                 c.execute("UPDATE locations SET review = 'deleted' WHERE location_id = ?", (lid,))

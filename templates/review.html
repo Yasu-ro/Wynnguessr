@@ -24,28 +24,28 @@
                     <i class="material-icons">home</i>Home
                 </div>
             </a>
+            <p class="review-count"><span class="review-dot" data-review="planned"></span>Planned: <b id="count-planned">0</b></p>
             <p class="review-count"><span class="review-dot" data-review="new"></span>New: <b id="count-new">0</b></p>
-            <p class="review-count"><span class="review-dot" data-review="old"></span>Old: <b id="count-old">0</b></p>
             <p class="review-count"><span class="review-dot" data-review="kept"></span>Kept: <b id="count-kept">0</b></p>
         </div>
     </nav>
     <div class="review-body">
         <div id="review-map"></div>
         <div id="review-panel" hidden>
-            <div id="review-panorama"></div>
+            <div id="review-panorama" class="review-photo"></div>
             <p id="review-coords"></p>
-            <div class="review-row">
+            <div class="review-row review-photo">
                 {% for p in provinces %}
                     <button class="review-choice" data-province="{{ p }}">{{ p.replace('-', ' ').title() }}</button>
                 {% endfor %}
             </div>
-            <div class="review-row">
+            <div class="review-row review-photo">
                 {% for d in difficulties %}
                     <button class="review-choice" data-difficulty="{{ d }}">{{ d.title() }}</button>
                 {% endfor %}
             </div>
             <div class="review-row">
-                <button id="review-keep" class="review-keep">Keep</button>
+                <button id="review-keep" class="review-keep review-photo">Keep</button>
                 <button id="review-delete" class="review-delete">Delete</button>
             </div>
         </div>
