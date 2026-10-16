@@ -110,6 +110,9 @@ répondent 404/403.
   coordonnées tombent au bon endroit), barre DA en bas. Keep/Delete passent
   au point rouge **le plus proche** (la revue avance sur la carte) ; Next
   saute ; Échap ferme.
+- **Delete sans confirmation** (demande de Yasuro : trop lent ; et après
+  « ne plus demander » dans Firefox, `confirm()` renvoyait toujours faux, la
+  suppression était devenue impossible). Ne pas remettre de `confirm()`.
 - Clic sur la carte = point `planned` (`POST api/review/plan`), refusé dans
   une zone grise. Le mod (`Tour`) lit `GET api/capture/planned` et renvoie la
   photo avec `&planned=<id>` : la ligne garde sa place et passe en `new`.

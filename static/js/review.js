@@ -234,7 +234,7 @@ document.querySelectorAll('[data-difficulty]').forEach(function (b) {
 });
 document.querySelectorAll('.review-keep').forEach(function (b) { b.onclick = function () { send('keep'); }; });
 document.querySelectorAll('.review-delete').forEach(function (b) {
-    b.onclick = function () { if (confirm('Delete this location?')) send('delete'); };
+    b.onclick = function () { send('delete'); };
 });
 document.getElementById('review-full').onclick = openFocus;
 document.getElementById('focus-next').onclick = next;
