@@ -185,9 +185,10 @@ Mod Fabric client **Wynndle Panorama**, pour refaire les images (les 622 de
 l'origine datent d'août 2024). Touche **Maj droite** (réglable, catégorie Divers ; Yasuro n'a pas de
 touches F) :
 appelle le panorama intégré de Minecraft (`grabPanoramixScreenshot` : 6 faces
-rendues en 4096 et enregistrées en 1024, monde seul, sans interface ni main),
-assemble les faces en équirectangulaire 4096×2048 (le format des images
-actuelles), centre = **nord**, et écrit `.minecraft/wynndle/<X>_<Z>.jpg`
+rendues en 4096, monde seul, sans interface ni main ; enregistrées réduites ×4
+d'origine, ×2 via `PanoramaDownscaleMixin` → 2048), assemble les faces en
+équirectangulaire **8192×4096** (Yasuro trouvait 4096×2048, le format des
+images d'origine, trop flou), centre = **nord**, et écrit `.minecraft/wynndle/<X>_<Z>.jpg`
 (`_2`… si le nom existe déjà). La province n'est pas dans le nom : à déduire
 de la position à l'import.
 

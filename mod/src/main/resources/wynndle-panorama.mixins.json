@@ -1,0 +1,9 @@
+{
+	"required": true,
+	"package": "com.wynndle.panorama.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": ["PanoramaDownscaleMixin"],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

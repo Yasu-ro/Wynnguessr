@@ -3,11 +3,12 @@
 	"id": "wynndle-panorama",
 	"version": "${version}",
 	"name": "Wynndle Panorama",
-	"description": "Takes 360° panoramas for wynndle.com, named after their coordinates.",
+	"description": "Takes 8192x4096 360° panoramas for wynndle.com, named after their coordinates.",
 	"environment": "client",
 	"entrypoints": {
 		"client": ["com.wynndle.panorama.WynndlePanorama"]
 	},
+	"mixins": ["wynndle-panorama.mixins.json"],
 	"depends": {
 		"fabricloader": ">=0.19.5",
 		"minecraft": "~1.21.11",

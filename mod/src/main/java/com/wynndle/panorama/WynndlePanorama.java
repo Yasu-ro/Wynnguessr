@@ -26,10 +26,10 @@ import java.util.Comparator;
 import java.util.stream.Stream;
 
 // One key: Minecraft's own panorama (6 cube faces, world only, no GUI),
-// stitched into a 4096x2048 equirectangular image, the format wynndle.com
-// shows with Pannellum. The file is named X_Z after the player's block.
+// stitched into an 8192x4096 equirectangular image for Pannellum on
+// wynndle.com. The file is named X_Z after the player's block.
 public class WynndlePanorama implements ClientModInitializer {
-	static final int WIDTH = 4096, HEIGHT = 2048;
+	static final int WIDTH = 8192, HEIGHT = 4096;
 
 	static KeyMapping key;
 	static volatile boolean busy;
