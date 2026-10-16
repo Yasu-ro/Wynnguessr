@@ -48,6 +48,7 @@ public class WynndlePanorama implements ClientModInitializer {
 
 	static KeyMapping key;
 	static volatile boolean busy;
+	public static boolean capturing; // read by the mixins: hide entities and names
 	static Config config = new Config();
 
 	@Override
@@ -74,11 +75,13 @@ public class WynndlePanorama implements ClientModInitializer {
 		p.yRotO = 180f;
 		try {
 			Files.createDirectories(tmp);
+			capturing = true;
 			mc.grabPanoramixScreenshot(tmp.toFile());
 		} catch (IOException e) {
 			say(mc, Component.literal("Wynndle: " + e.getMessage()).withStyle(ChatFormatting.RED));
 			return;
 		} finally {
+			capturing = false;
 			p.setYRot(yaw);
 			p.yRotO = yawO;
 		}

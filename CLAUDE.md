@@ -256,6 +256,13 @@ premier lancement, lu au démarrage du jeu) contient une `key`, chaque photo est
 aussi envoyée à `POST <url>/api/capture?x=&z=` (en-tête `X-Wynndle-Key`, corps
 JPEG). Le chat dit « sent », ou « saved, not sent (raison) » : la copie locale
 reste toujours.
+**Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
+(`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
+(mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire
+les noms au-dessus des entités. Les supports d'armure restent (Wynncraft en
+décore), seul leur nom part. Télécharger la carte (Chunky, world downloader) a
+été écarté : Chunky génère un monde côté serveur et ne copie rien de
+Wynncraft.
 
 - Cible : pack Modrinth **Wynncraft Plus** (Fabric, MC 1.21.11), celui de Yasuro.
   Il contient Iris, Distant Horizons, Sodium : leur effet sur la capture n'a
