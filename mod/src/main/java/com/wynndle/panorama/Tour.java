@@ -8,6 +8,10 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.RenderShape;
@@ -30,8 +34,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 // Singleplayer only, in a downloaded copy of the world:
-// - on joining, tells the site which chunks the copy holds (the grey veil on
-//   the review map covers the others);
+// - on joining, tells the site which chunks of the copy hold blocks (the grey
+//   veil on the review map covers the others);
 // - the tour key flies to every spot planned on the review map, one by one:
 //   teleport, turn around once (Distant Horizons loads what is looked at),
 //   wait, take the panorama, send it.
@@ -207,19 +211,44 @@ public class Tour {
 		t.start();
 	}
 
-	// One bit per chunk of the region, chunk (x & 31) + (z & 31) * 32, lowest bit first.
+	// One bit per chunk of the region, chunk (x & 31) + (z & 31) * 32, lowest
+	// bit first, set when the chunk holds anything but air. The downloaded
+	// world's generator is empty: a chunk the game made up itself (flying
+	// outside the download, Distant Horizons) is saved too, but only air.
 	static byte[] chunkBits(Path region) throws java.io.IOException {
-		byte[] header = new byte[4096];
-		try (InputStream in = Files.newInputStream(region)) {
-			if (in.readNBytes(header, 0, 4096) < 4096) return null;
-		}
+		byte[] file = Files.readAllBytes(region);
+		if (file.length < 4096) return null;
 		byte[] bits = new byte[128];
 		for (int i = 0; i < 1024; i++) {
-			if ((header[i * 4] | header[i * 4 + 1] | header[i * 4 + 2] | header[i * 4 + 3]) != 0) {
-				bits[i >> 3] |= (byte) (1 << (i & 7));
-			}
+			int offset = ((file[i * 4] & 0xff) << 16) | ((file[i * 4 + 1] & 0xff) << 8) | (file[i * 4 + 2] & 0xff);
+			if (offset != 0 && hasBlocks(file, offset * 4096)) bits[i >> 3] |= (byte) (1 << (i & 7));
 		}
 		return bits;
+	}
+
+	static boolean hasBlocks(byte[] file, int at) {
+		try {
+			int length = ((file[at] & 0xff) << 24) | ((file[at + 1] & 0xff) << 16) | ((file[at + 2] & 0xff) << 8) | (file[at + 3] & 0xff);
+			int type = file[at + 4];
+			InputStream raw = new java.io.ByteArrayInputStream(file, at + 5, length - 1);
+			InputStream in = switch (type) {
+				case 1 -> new java.util.zip.GZIPInputStream(raw);
+				case 2 -> new java.util.zip.InflaterInputStream(raw);
+				case 3 -> raw;
+				default -> null; // stored elsewhere or rare compression: count it
+			};
+			if (in == null) return true;
+			CompoundTag chunk = NbtIo.read(new java.io.DataInputStream(in), NbtAccounter.unlimitedHeap());
+			for (Tag section : chunk.getListOrEmpty("sections")) {
+				for (Tag state : ((CompoundTag) section).getCompoundOrEmpty("block_states").getListOrEmpty("palette")) {
+					String name = ((CompoundTag) state).getStringOr("Name", "minecraft:air");
+					if (!name.equals("minecraft:air") && !name.equals("minecraft:void_air") && !name.equals("minecraft:cave_air")) return true;
+				}
+			}
+			return false;
+		} catch (Exception e) {
+			return false;
+		}
 	}
 
 	static HttpRequest.Builder request(String path) {

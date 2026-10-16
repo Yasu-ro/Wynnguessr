@@ -107,8 +107,13 @@ répondent 404/403.
 - **Voile gris** : le mod envoie à l'ouverture du monde solo
   (`POST api/coverage`, `coverage.json` hors git) un bit par chunk, par région
   (`"rx,rz"` → base64 de 128 octets, chunk `(x&31) + (z&31)*32`, bit de poids
-  faible d'abord), lu dans l'en-tête des `.mca` (1024 offsets, ≠ 0 = chunk
-  présent). Pourquoi refuser le gris : y téléporter le joueur ferait générer
+  faible d'abord). **Un chunk ne compte que s'il contient un bloc autre que
+  de l'air** (palette des `block_states`, NBT lu dans le `.mca`). **Piège
+  payé** : la 1.4.0 ne lisait que l'en-tête (offset ≠ 0) et Yasuro voyait
+  « beaucoup plus de chargé que de téléchargé ». Simple World Downloader crée
+  ses mondes avec un générateur **plat sans couche** (vide) : chaque chunk que
+  le jeu fabrique lui-même (vol en solo hors zone, Distant Horizons) est
+  sauvé, vide, avec un offset. Pourquoi refuser le gris : y téléporter le joueur ferait générer
   du terrain Minecraft ordinaire dans la copie, que la couverture compterait
   ensuite comme téléchargé.
 - Keep exige une difficulté ; la province est préremplie (Fruma si
