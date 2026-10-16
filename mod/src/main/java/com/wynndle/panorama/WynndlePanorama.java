@@ -37,7 +37,7 @@ public class WynndlePanorama implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		key = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-			"key.wynndle-panorama.capture", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_F7, KeyMapping.Category.MISC));
+			"key.wynndle-panorama.capture", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, KeyMapping.Category.MISC));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			while (key.consumeClick()) {
 				if (mc.player != null && mc.level != null && !busy) capture(mc);

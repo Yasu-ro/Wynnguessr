@@ -182,7 +182,8 @@ Inspiré de wynncraft.com **sans rien en reprendre** (ni image ni logo).
 ## Mod de capture (`mod/`)
 
 Mod Fabric client **Wynndle Panorama**, pour refaire les images (les 622 de
-l'origine datent d'août 2024). Touche **F7** (réglable, catégorie Divers) :
+l'origine datent d'août 2024). Touche **Maj droite** (réglable, catégorie Divers ; Yasuro n'a pas de
+touches F) :
 appelle le panorama intégré de Minecraft (`grabPanoramixScreenshot` : 6 faces
 rendues en 4096 et enregistrées en 1024, monde seul, sans interface ni main),
 assemble les faces en équirectangulaire 4096×2048 (le format des images
