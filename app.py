@@ -7,6 +7,7 @@ import sqlite3
 import json
 import math
 import secrets
+import subprocess
 import time
 from datetime import date
 import urllib.request
@@ -20,6 +21,9 @@ bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 # other sites share this domain behind Tailscale Funnel
 app.config['SESSION_COOKIE_NAME'] = 'wynnguessr_session'
+
+# only these locations are played; 'new' ones wait for the review
+PLAYABLE = "('old', 'kept')"
 
 def connect():
     # one connection per request: a single shared one is not safe across threads
@@ -50,7 +54,7 @@ def get_locations():
         return jsonify({"success": False})
     provinces = session['provinces']
     placeholders = ', '.join('?' for _ in provinces)
-    query = f"SELECT * FROM locations WHERE province IN ({placeholders})"
+    query = f"SELECT * FROM locations WHERE province IN ({placeholders}) AND review IN {PLAYABLE}"
     with connect() as c:
         locations = c.execute(query, provinces).fetchall()
     locations_list = [{"id": location[0], "X" : location[1], "Z" : location[2], "url" : location[3]} for location in locations]
@@ -431,6 +435,11 @@ with connect() as c:
     if 'mc_uuid' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
         c.execute("ALTER TABLE users ADD COLUMN mc_uuid TEXT")
         c.execute("ALTER TABLE users ADD COLUMN mc_name TEXT")
+    # review of the locations (see /review): 'old' = from the original game,
+    # 'new' = a fresh capture not checked yet, 'kept', 'deleted'
+    if 'review' not in [col[1] for col in c.execute("PRAGMA table_info(locations)")]:
+        c.execute("ALTER TABLE locations ADD COLUMN review TEXT DEFAULT 'old'")
+        c.execute("ALTER TABLE locations ADD COLUMN difficulty TEXT")
 
 def room_tx():
     # room requests read then write: taking the write lock first means two
@@ -463,7 +472,7 @@ def room_settings(form):
 
 def pick_locations(c, s):
     ids = [r[0] for r in c.execute(
-        f"SELECT location_id FROM locations WHERE province IN ({', '.join('?' * len(s['provinces']))}) ORDER BY RANDOM() LIMIT ?",
+        f"SELECT location_id FROM locations WHERE province IN ({', '.join('?' * len(s['provinces']))}) AND review IN {PLAYABLE} ORDER BY RANDOM() LIMIT ?",
         (*s['provinces'], s['rounds']))]
     return json.dumps(ids) if len(ids) == s['rounds'] else None
 
@@ -805,6 +814,113 @@ def room_again(code):
                                               'rounds': r['rounds'], 'time_limit': r['time_limit'], 'look': r['look']})
             c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (nxt, r['code']))
     return jsonify({"success": bool(nxt), "code": nxt})
+
+# ---------- Captures and review ----------
+# The Wynndle Panorama mod (mod/) sends each panorama here as it is taken; it
+# shows up as a 'new' location, not played until Yasuro reviews it on /review:
+# keep (with a difficulty) or delete. The original locations go through the
+# same review. Only works where a capture_key file exists (the beta).
+CAPTURE_KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'capture_key')
+CAPTURE_DIR = os.path.join(app.static_folder, 'captures')
+REVIEWER = 'Yasuro'
+DIFFICULTIES = ['easy', 'medium', 'hard']
+REVIEW_PROVINCES = PROVINCES + ['fruma']
+
+def capture_key():
+    try:
+        with open(CAPTURE_KEY_FILE) as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        return None
+
+def is_reviewer():
+    if not session.get('loggedin') or not capture_key():
+        return False
+    with connect() as c:
+        me = c.execute("SELECT username FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
+    return bool(me) and me['username'] == REVIEWER
+
+def guess_province(c, x, z):
+    # Fruma has no location yet to learn from; elsewhere, the nearest one decides
+    if x < -1000 and z > -2000:
+        return 'fruma'
+    near = c.execute("""SELECT province FROM locations WHERE review IN ('old', 'kept')
+        ORDER BY (x_position - ?) * (x_position - ?) + (z_position - ?) * (z_position - ?) LIMIT 1""",
+        (x, x, z, z)).fetchone()
+    return near['province'] if near else 'wynn'
+
+@app.route("/api/capture", methods=['POST'])
+def capture():
+    key = capture_key()
+    if not key or not secrets.compare_digest(request.headers.get('X-Wynndle-Key', ''), key):
+        return jsonify({"success": False}), 403
+    try:
+        x, z = float(request.args['x']), float(request.args['z'])
+    except (KeyError, ValueError):
+        return jsonify({"success": False}), 400
+    data = request.get_data()
+    if not data.startswith(b'\xff\xd8') or len(data) > 40_000_000:
+        return jsonify({"success": False}), 400
+    os.makedirs(CAPTURE_DIR, exist_ok=True)
+    name = f"{int(x)}_{int(z)}_{int(time.time() * 1000)}"
+    jpg, webp = os.path.join(CAPTURE_DIR, name + '.jpg'), os.path.join(CAPTURE_DIR, name + '.webp')
+    with open(jpg, 'wb') as f:
+        f.write(data)
+    try:
+        # same quality as the original images: about 1.4 MB for 8192x4096
+        subprocess.run(['cwebp', '-quiet', '-q', '85', jpg, '-o', webp], check=True, timeout=120)
+    except (subprocess.SubprocessError, OSError):
+        return jsonify({"success": False}), 500
+    finally:
+        os.remove(jpg)
+    with connect() as c:
+        lid = c.execute("INSERT INTO locations (x_position, z_position, image_url, province, review) VALUES (?, ?, ?, ?, 'new')",
+                        (x, z, 'static/captures/' + name + '.webp', guess_province(c, x, z))).lastrowid
+    return jsonify({"success": True, "id": lid})
+
+@app.route("/review")
+def review():
+    if not is_reviewer():
+        return redirect('login?next=review') if not session.get('loggedin') else redirect('./')
+    return render_template('review.html', provinces = REVIEW_PROVINCES, difficulties = DIFFICULTIES)
+
+@app.route("/api/review")
+def review_list():
+    if not is_reviewer():
+        return jsonify({"success": False}), 403
+    with connect() as c:
+        rows = c.execute("""SELECT location_id, x_position, z_position, image_url, province, review, difficulty
+            FROM locations WHERE review != 'deleted'""").fetchall()
+    return jsonify([{"id": r[0], "X": r[1], "Z": r[2], "url": r[3], "province": r[4], "review": r[5], "difficulty": r[6]} for r in rows])
+
+@app.route("/api/review/<int:lid>", methods=['POST'])
+def review_one(lid):
+    if not is_reviewer():
+        return jsonify({"success": False}), 403
+    form = request.get_json(silent=True) or {}
+    with connect() as c:
+        loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (lid,)).fetchone()
+        if not loc:
+            return jsonify({"success": False})
+        if form.get('action') == 'keep':
+            if form.get('difficulty') not in DIFFICULTIES or form.get('province') not in REVIEW_PROVINCES:
+                return jsonify({"success": False})
+            c.execute("UPDATE locations SET review = 'kept', difficulty = ?, province = ? WHERE location_id = ?",
+                      (form['difficulty'], form['province'], lid))
+        elif form.get('action') == 'delete':
+            if loc['review'] == 'new':
+                # never played anywhere: nothing refers to it, it can go for good
+                c.execute("DELETE FROM locations WHERE location_id = ?", (lid,))
+                try:
+                    os.remove(os.path.join(app.static_folder, loc['image_url'][len('static/'):]))
+                except OSError:
+                    pass
+            else:
+                # a finished room may still replay it: hidden, not erased
+                c.execute("UPDATE locations SET review = 'deleted' WHERE location_id = ?", (lid,))
+        else:
+            return jsonify({"success": False})
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)

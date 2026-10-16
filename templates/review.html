@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+
+<head>
+    <!-- earth colour at once: no white flash before the stylesheets and the texture arrive -->
+    <style>html, body { background-color: #6b5236; }</style>
+    <title>WynnGuessr: Review</title>
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <link rel="icon" href="static/wynnlogo.png" type="image/x-icon">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Ubuntu:ital,wght@0,400;0,700;1,700&display=swap">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body class="review-page">
+    <nav class="navbar">
+        <div class="nav-container">
+            <a class="nav-icon" href="./">
+                <img src="static/wynnlogo.png" alt="logo" height=31.1>
+            </a>
+            <a href="./">
+                <div class="nav-link-left">
+                    <i class="material-icons">home</i>Home
+                </div>
+            </a>
+            <p class="review-count"><span class="review-dot" data-review="new"></span>New: <b id="count-new">0</b></p>
+            <p class="review-count"><span class="review-dot" data-review="old"></span>Old: <b id="count-old">0</b></p>
+            <p class="review-count"><span class="review-dot" data-review="kept"></span>Kept: <b id="count-kept">0</b></p>
+        </div>
+    </nav>
+    <div class="review-body">
+        <div id="review-map"></div>
+        <div id="review-panel" hidden>
+            <div id="review-panorama"></div>
+            <p id="review-coords"></p>
+            <div class="review-row">
+                {% for p in provinces %}
+                    <button class="review-choice" data-province="{{ p }}">{{ p.replace('-', ' ').title() }}</button>
+                {% endfor %}
+            </div>
+            <div class="review-row">
+                {% for d in difficulties %}
+                    <button class="review-choice" data-difficulty="{{ d }}">{{ d.title() }}</button>
+                {% endfor %}
+            </div>
+            <div class="review-row">
+                <button id="review-keep" class="review-keep">Keep</button>
+                <button id="review-delete" class="review-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    <script src="{{ asset('js/review.js') }}"></script>
+</body>

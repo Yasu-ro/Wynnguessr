@@ -1657,3 +1657,107 @@ h1.sign::after{
 .site-footer span{
     color: #5a4a3a;
 }
+
+/* review page: map on the left, the chosen location on the right */
+.review-body{
+    position: fixed;
+    top: calc(7vh + 3px);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+}
+#review-map{
+    flex: 1;
+    background-color: #6b5236;
+}
+#review-panel{
+    width: 460px;
+    overflow-y: auto;
+    background-color: #baaa80;
+    border-left: 3px solid #857361;
+    padding: 10px;
+}
+#review-panel[hidden]{
+    display: none;
+}
+#review-panorama{
+    width: 100%;
+    height: 300px;
+    border: 3px solid black;
+    border-radius: 10px;
+}
+#review-coords{
+    margin: 8px 0 0;
+    font-size: 18px;
+    color: #402523;
+    white-space: pre;
+}
+.review-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+.review-choice{
+    padding: 6px 10px;
+    font-size: 16px;
+    background-color: white;
+    border: 3px solid black;
+    border-radius: 10px;
+    cursor: pointer;
+}
+.review-choice.picked{
+    background-color: #378537;
+    color: white;
+}
+.review-keep, .review-delete{
+    flex: 1;
+    padding: 8px;
+    font-size: 20px;
+    border: 4px solid black;
+    border-radius: 12px;
+    cursor: pointer;
+}
+.review-keep{
+    background-color: #83C73C;
+}
+.review-keep:disabled{
+    opacity: 0.5;
+    cursor: default;
+}
+.review-delete{
+    background-color: #e53935;
+    color: white;
+}
+.review-count{
+    margin: 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.review-dot{
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid black;
+}
+.review-dot[data-review="new"]{ background-color: #e53935; }
+.review-dot[data-review="old"]{ background-color: #f39c12; }
+.review-dot[data-review="kept"]{ background-color: #378537; }
+
+@media (max-width: 800px){
+    .review-body{
+        flex-direction: column;
+    }
+    #review-panel{
+        width: auto;
+        max-height: 60%;
+        border-left: none;
+        border-top: 3px solid #857361;
+    }
+    #review-panorama{
+        height: 220px;
+    }
+}
