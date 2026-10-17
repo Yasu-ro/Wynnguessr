@@ -245,6 +245,16 @@ document.getElementById('review-full').onclick = openFocus;
 document.getElementById('focus-next').onclick = next;
 document.getElementById('focus-prev').onclick = previous;
 document.getElementById('focus-close').onclick = closeFocus;
+// the green dots, and only them, become the live site's locations
+var push = document.getElementById('review-push');
+if (push) push.onclick = function () {
+    push.disabled = true;
+    fetch('api/review/push', {method: 'POST'}).then(function (r) { return r.json(); }).then(function (res) {
+        push.textContent = res.success ? 'Pushed ' + res.count + ' spots' : 'Not pushed: ' + (res.error || 'error');
+    }).catch(function () { push.textContent = 'Not pushed: error'; }).finally(function () {
+        setTimeout(function () { push.disabled = false; push.textContent = 'Push to wynndle.com'; }, 4000);
+    });
+};
 // negative: Pannellum turns to the right; after a drag it starts again by itself
 document.getElementById('focus-spin').oninput = function () {
     spin = +this.value;

@@ -27,6 +27,7 @@
             <p class="review-count"><span class="review-dot" data-review="planned"></span>Planned: <b id="count-planned">0</b></p>
             <p class="review-count"><span class="review-dot" data-review="new"></span>New: <b id="count-new">0</b></p>
             <p class="review-count"><span class="review-dot" data-review="kept"></span>Kept: <b id="count-kept">0</b></p>
+            {% if can_push %}<button id="review-push" class="review-choice">Push to wynndle.com</button>{% endif %}
         </div>
     </nav>
     <div class="review-body">

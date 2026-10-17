@@ -844,6 +844,9 @@ TILES_DIR = os.path.join(app.static_folder, 'tiles')   # a link to /data: big
 CUBE, TILE = 4096, 512   # multires: same numbers in panoramaConfig() (game, room, review)
 COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
 REVIEWERS = ('Yasuro', 'kemmi')   # exact usernames
+PUBLISHER = ('Yasuro',)           # the only one who may push to the live site
+# the live site's database, next to this checkout: ~/Wynnguessr beside ~/Wynnguessr-beta
+LIVE_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Wynnguessr', 'database.db')
 REVIEW_PROVINCES = PROVINCES + ['fruma']
 
 def capture_key():
@@ -857,12 +860,12 @@ def key_ok():
     key = capture_key()
     return bool(key) and secrets.compare_digest(request.headers.get('X-Wynndle-Key', ''), key)
 
-def is_reviewer():
+def is_reviewer(only=REVIEWERS):
     if not session.get('loggedin') or not capture_key():
         return False
     with connect() as c:
         me = c.execute("SELECT username FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
-    return bool(me) and me['username'] in REVIEWERS
+    return bool(me) and me['username'] in only
 
 def guess_province(c, x, z):
     # Fruma has no location yet to learn from; elsewhere, the nearest one
@@ -994,7 +997,36 @@ def review_plan():
 def review():
     if not is_reviewer():
         return redirect('login?next=review') if not session.get('loggedin') else redirect('./')
-    return render_template('review.html', provinces = REVIEW_PROVINCES)
+    return render_template('review.html', provinces = REVIEW_PROVINCES, can_push = is_reviewer(PUBLISHER))
+
+# The green dots become the live site's locations, and nothing else: the
+# rest is hidden there, never erased (finished rooms replay their own). Ids
+# are the same on both sides, the beta started as a copy of the live database
+# and the live site never makes locations. The photos are shared: both sites'
+# static/tiles lead to the same folder on /data.
+@app.route("/api/review/push", methods=['POST'])
+def review_push():
+    if not is_reviewer(PUBLISHER):
+        return jsonify({"success": False}), 403
+    if os.path.samefile(LIVE_DB, 'database.db'):
+        return jsonify({"success": False, "error": "this is the live site"})
+    with connect() as c:
+        kept = c.execute("""SELECT location_id, x_position, z_position, image_url, province
+                            FROM locations WHERE review = 'kept'""").fetchall()
+    live = sqlite3.connect(LIVE_DB, timeout=10)
+    try:
+        if 'review' not in [r[1] for r in live.execute("PRAGMA table_info(locations)")]:
+            return jsonify({"success": False, "error": "the live site is not up to date yet"})
+        with live:
+            live.execute("UPDATE locations SET review = 'deleted'")
+            live.executemany("""INSERT INTO locations (location_id, x_position, z_position, image_url, province, review)
+                                VALUES (?, ?, ?, ?, ?, 'kept')
+                                ON CONFLICT(location_id) DO UPDATE SET x_position = excluded.x_position,
+                                    z_position = excluded.z_position, image_url = excluded.image_url,
+                                    province = excluded.province, review = 'kept'""", [tuple(r) for r in kept])
+    finally:
+        live.close()
+    return jsonify({"success": True, "count": len(kept)})
 
 @app.route("/api/review")
 def review_list():
