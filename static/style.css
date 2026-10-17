@@ -776,6 +776,33 @@ button, input {
     text-decoration: none;
     text-underline-offset: 3px;
 }
+/* level, picture and name stay on one line; a long name wraps on itself */
+.board-who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 4px;
+}
+.board-name {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.board-pic {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    margin-right: 9px;
+    vertical-align: middle;
+    object-fit: cover;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.board-pic.head {
+    image-rendering: pixelated;
+}
 .board-name:hover {
     color: var(--green-dark);
     text-decoration: underline;
@@ -1991,6 +2018,14 @@ body.room-playing {
     }
     .leaderboard-table td, .leaderboard-table th {
         padding: 8px 8px;
+    }
+    .board-table td:first-child, .board-table th:first-child {
+        width: 34px;
+    }
+    .board-pic {
+        width: 24px;
+        height: 24px;
+        margin-right: 7px;
     }
     .room-results {
         font-size: 16px;

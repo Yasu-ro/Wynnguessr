@@ -258,6 +258,10 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
   (`recover`).
 - **Classement** : le pseudo ouvre le profil du site (`player?id=`), la
   coche verte ouvre la page wynncraft.com. Les lignes sont identifiées par id.
+  Chaque pseudo a sa photo devant lui (demande de Yasuro : « on voit pas les
+  pfp dans le leaderboard ») ; `api/updaterank` envoie `pic` et `head`.
+  Niveau, photo et pseudo sont dans un bloc flex (`.board-who`) : sur
+  téléphone, ils se mettaient chacun sur leur ligne.
 - **Sécurité, passée en revue le même jour** : cookie `SameSite=Lax` +
   `Secure` (avant : aucune protection CSRF, un site tiers pouvait poster au
   nom d'un joueur, y compris le Push de `/review`) ; `X-Frame-Options: DENY`

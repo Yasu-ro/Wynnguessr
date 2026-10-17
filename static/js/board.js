@@ -37,7 +37,8 @@ $(function () {
     // the name opens the player's profile here; a name proven by Wynncraft
     // has a green badge that opens their Wynncraft profile
     function player(row) {
-        var name = "<a class='board-name' href='player?id=" + row.id + "'>" + esc(row.name) + "</a>";
+        var name = "<a class='board-name' href='player?id=" + row.id + "'><img class='board-pic" + (row.head ? ' head' : '') +
+            "' src='" + esc(row.pic) + "' alt='' width='28' height='28' loading='lazy'>" + esc(row.name) + "</a>";
         if (!row.mc) {
             return name;
         }
@@ -86,8 +87,8 @@ $(function () {
             var fire = row.streak >= 1 ? " <span class='board-fire' title='Wins in a row'>" +
                 "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
             return "<tr class='leaderboard-row" + (row.id == me ? ' you' : '') + "'><td>" + rank + "</td>" +
-                "<td>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
-                player(row) + fire + "</td>" + cells(row, mode).map(function (c, i) {
+                "<td><span class='board-who'>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
+                player(row) + fire + "</span></td>" + cells(row, mode).map(function (c, i) {
                     return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';
                 }).join('') + "</tr>";
         }).join(''));

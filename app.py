@@ -155,7 +155,7 @@ def adopt(c, uid):
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
     mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-    query = '''SELECT u.id, u.username AS name, u.mc_name AS mc, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
+    query = '''SELECT u.id, u.username AS name, u.mc_name AS mc, u.avatar, u.mc_uuid, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
         WHERE s.provinces = ? AND s.nolook = ? AND COALESCE(s.mode, 'classic') = ?'''
     params = [form.get('provinces', ''), form.get('nolook', 'No'), mode]
     if mode == 'classic':
@@ -170,10 +170,10 @@ def ladder(c, mode):
     # levels: the most XP first; wins (players who won at least once): the most
     # wins with friends first, then the longest streak, then the fewest games for them
     rows = []
-    for u in c.execute("SELECT id, username, mc_name FROM users WHERE COALESCE(guest, 0) = 0").fetchall():
+    for u in c.execute("SELECT id, username, mc_name, avatar, mc_uuid FROM users WHERE COALESCE(guest, 0) = 0").fetchall():
         p = progress(c, u['id'])
         if p['xp'] if mode == 'levels' else p['wins']:
-            rows.append({'id': u['id'], 'name': u['username'], 'mc': u['mc_name'],
+            rows.append({'id': u['id'], 'name': u['username'], 'mc': u['mc_name'], 'avatar': u['avatar'], 'mc_uuid': u['mc_uuid'],
                          **{k: p[k] for k in ('xp', 'level', 'games', 'played', 'wins', 'best', 'streak')}})
     if mode == 'levels':
         return sorted(rows, key = lambda r: -r['xp'])
@@ -196,7 +196,12 @@ def update_rank():
             for row in rows:
                 row['level'] = known.get(row['id'], {}).get('level', 1)
                 row['streak'] = known.get(row['id'], {}).get('streak', 0)
-    return jsonify({"rows": rows[:50], "me": session.get('user_id')})
+        rows = rows[:50]
+        # each player's picture; a Minecraft head is drawn sharp
+        for row in rows:
+            row['pic'], row['head'] = avatar_url(row), not row.pop('avatar')
+            row.pop('mc_uuid')
+    return jsonify({"rows": rows, "me": session.get('user_id')})
 
 @app.route("/")
 def index():
