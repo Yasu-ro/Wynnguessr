@@ -399,6 +399,11 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   téléphone, **sous la carte** sinon il cache « Guess! »), dans le panneau de
   droite en révélation (jamais sur la carte : il cachait la réponse), sous les
   résultats.
+  **Piège payé (2026-10-18)** : un élément déplacé (ou replié) perd son
+  défilement, le chat remontait tout en haut à chaque changement d'écran
+  (« super annoying in a big lobby »). `chatStick`/`chatTop` retiennent où
+  le joueur l'a laissé (en bas = suit les messages), `chatPlace()` le remet
+  après chaque déplacement, dépliage ou message.
 - Temps restant : boîte **statique sous le bandeau**, sans animation, rouge à
   10 s (Yasuro a refusé le gros chiffre au centre et les pulsations).
 - Sons : voir « Sons » plus bas.

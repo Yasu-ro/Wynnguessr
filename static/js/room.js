@@ -145,6 +145,7 @@ function show(id) {
         $('#room-chat').appendTo(slot).toggleClass('folded', id == 'guess-screen' && window.innerWidth <= 800);
     }
     $('#chat-slot-game').prop('hidden', id != 'guess-screen');
+    chatPlace();
     if (playing) {
         window.scrollTo(0, 0);
     }
@@ -240,9 +241,25 @@ $(document).on('click', '[data-copy]', function (e) {
 
 var chatId = 0;          // last message shown
 var unread = 0;          // messages that came while the chat was folded
+// where the player left the chat: following the newest message, or scrolled
+// up to read. Kept here because the chat moves from screen to screen, and a
+// moved (or folded) list forgets its scroll and jumps back to the top
+var chatStick = true, chatTop = 0;
+
+$('#chat-log').on('scroll', function () {
+    if (this.clientHeight) {
+        chatStick = this.scrollHeight - this.scrollTop - this.clientHeight < 30;
+        chatTop = this.scrollTop;
+    }
+});
+
+function chatPlace() {
+    var log = $('#chat-log')[0];
+    log.scrollTop = chatStick ? log.scrollHeight : chatTop;
+}
 
 function chat(messages) {
-    var log = $('#chat-log'), atBottom = log[0].scrollHeight - log.scrollTop() - log.innerHeight() < 30;
+    var log = $('#chat-log');
     (messages || []).forEach(function (m) {
         if (m.id <= chatId) {
             return;
@@ -255,9 +272,7 @@ function chat(messages) {
     });
     log.children().slice(0, -100).remove();
     // follow the conversation, unless the player scrolled up to read
-    if (atBottom) {
-        log.scrollTop(log[0].scrollHeight);
-    }
+    chatPlace();
     $('#chat-title').text(unread ? 'Chat (' + unread + ')' : 'Chat');
 }
 
@@ -281,6 +296,7 @@ $('.room-chat-head').on('click', function (e) {
         return;
     }
     $('#room-chat').toggleClass('folded');
+    chatPlace();
     unread = 0;
     $('#chat-title').text('Chat');
 });
