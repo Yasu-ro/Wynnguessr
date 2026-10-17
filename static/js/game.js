@@ -57,7 +57,15 @@ function onMapClick(e) {
     if (markers[round - 1] != undefined) {
         map.removeLayer(markers[round - 1]);
     }
-    markers[round - 1] = L.marker(e.latlng).addTo(map);
+    var b = blockAt(e.latlng);
+    markers[round - 1] = L.marker(blockSpot(b.x, b.z)).addTo(map);
+}
+
+// same formula as guess_score() in app.py: the right block, or within PERFECT
+// blocks of it, is a perfect 5,000
+var PERFECT = 2;
+function points(distance) {
+    return distance <= PERFECT ? 5000 : Math.max(0, Math.round(5200 / (1 + .002 * Math.E ** (.0042 * distance + 3)) + .822));
 }
 
 // Display the score screen
@@ -101,18 +109,16 @@ function showScoreScreen() {
         if (mode == 'survival') {
             document.getElementById('next-button').innerHTML = "See Results";
         }
-        L.marker([-zActual, xActual], { icon: greenIcon }).addTo(scoreMap);
-        scoreMap.fitBounds([[[-zActual, xActual], [-zActual, xActual]]]);
+        L.marker(blockSpot(xActual, zActual), { icon: greenIcon }).addTo(scoreMap);
+        scoreMap.fitBounds(L.latLngBounds([blockSpot(xActual, zActual)]));
         return;
     }
-    var xGuess = markers[round - 1].getLatLng().lng;
-    var zGuess = -markers[round - 1].getLatLng().lat;
+    var guess = blockAt(markers[round - 1].getLatLng());
+    var xGuess = guess.x;
+    var zGuess = guess.z;
 
     var distance = Math.sqrt(Math.pow(xActual - xGuess, 2) + Math.pow(zActual - zGuess, 2)).toFixed(2);
-    score = Math.round(5200/(1 + .002* Math.E ** (.0042*distance + 3)) + .822);
-    if (score < 0) {
-        score = 0;
-    }
+    score = points(Number(distance));
     totalScore += score;
 
     document.getElementById('distance').innerHTML = "Distance: " + distance + " blocks away!";
@@ -137,12 +143,12 @@ function showScoreScreen() {
     document.getElementById('next-button').onclick = function(){
         nextStep(survived);
     };
-    L.marker([-zActual, xActual], { icon: greenIcon }).addTo(scoreMap);
+    L.marker(blockSpot(xActual, zActual), { icon: greenIcon }).addTo(scoreMap);
     
-    L.marker([-zGuess, xGuess]).addTo(scoreMap);
+    L.marker(blockSpot(xGuess, zGuess)).addTo(scoreMap);
     
     //draws line between guess and actual location
-    polylines[round - 1] = L.polyline([[-zActual, xActual], [-zGuess, xGuess]], { color: 'red' }).addTo(scoreMap);
+    polylines[round - 1] = L.polyline([blockSpot(xActual, zActual), blockSpot(xGuess, zGuess)], { color: 'red' }).addTo(scoreMap);
     scoreMap.fitBounds(polylines[round - 1].getBounds());
 }
 
@@ -167,6 +173,7 @@ function showNextLocation() {
     var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
     L.imageOverlay('static/map-2026.webp', bounds).addTo(map);
     crisp(map);
+    blockCursor(map);
     map.setView([3072, -256], -2);
     map.on('click', onMapClick);
 
@@ -338,7 +345,7 @@ function finalScore() {
     var featureGroup = [];
     for(let i = 0; i < images.length; i++){
         
-        let answer = L.marker([-images[i]['Z'], images[i]['X']], { icon: greenIcon }).addTo(scoreMap);
+        let answer = L.marker(blockSpot(images[i]['X'], images[i]['Z']), { icon: greenIcon }).addTo(scoreMap);
         featureGroup.push(answer);
         if(markers[i] != undefined){
             L.marker(markers[i].getLatLng()).addTo(scoreMap);

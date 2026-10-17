@@ -606,10 +606,12 @@ def new_room(c, host, s):
     c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
     return code
 
+PERFECT = 2      # a guess this close (in blocks) is a perfect 5,000; game.js has the same
+
 def guess_score(x, z, loc):
     # same formula as game.js
     d = ((loc['x_position'] - x) ** 2 + (loc['z_position'] - z) ** 2) ** .5
-    return max(0, round(5200 / (1 + .002 * math.e ** (.0042 * d + 3)) + .822))
+    return 5000 if d <= PERFECT else max(0, round(5200 / (1 + .002 * math.e ** (.0042 * d + 3)) + .822))
 
 def round_deadline(c, r):
     # the time limit, cut short LAST_CALL seconds after the first guess;

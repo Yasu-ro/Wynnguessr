@@ -339,6 +339,15 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   terminé se rejoue en différé, même classement.
 - « Play Again » : nouveau salon (`next_code`), tout le monde suit.
 - Scores calculés **côté serveur** (`guess_score`, même formule que `game.js`).
+- **On devine un bloc** (2026-10-17, des joueurs n'arrivaient jamais à 5 000 :
+  la formule ne le donne qu'à moins d'un demi-bloc, donc au hasard du clic).
+  Les photos sont aux coordonnées du bloc du joueur (`getBlockX`) et la carte
+  est à 1 px par bloc : `block.js` (`blockAt`, `blockSpot`, `blockCursor`)
+  fait du clic le bloc visé (coordonnées entières envoyées, épingle au centre
+  du bloc) et, à partir du zoom 2, encadre le bloc sous la souris. Vérifié :
+  le cadre tombe pile sur un pixel de la carte. **Tolérance `PERFECT` = 2
+  blocs** : à 2 blocs ou moins, 5 000 (dans `guess_score` et `points()` de
+  game.js). Réponses et guess sont dessinés au centre des blocs.
 - Couleur d'un joueur = son rang d'arrivée (`COLORS` dans `room.js`).
 - Chat : `room_chat`, 200 caractères, 0,7 s entre deux messages, livré par le
   poll (`chat=<dernier id>`). Un seul widget déplacé selon l'écran : sous les

@@ -499,6 +499,7 @@ function guess() {
             map.remove();
         }
         map = makeMap('map', -2);
+        blockCursor(map);
         map.on('click', function (e) {
             if (submitted || (s.live && !s.playing)) {
                 return;
@@ -506,7 +507,8 @@ function guess() {
             if (marker) {
                 map.removeLayer(marker);
             }
-            marker = L.marker(e.latlng, {icon: pin(color(me()))}).addTo(map);
+            var b = blockAt(e.latlng);
+            marker = L.marker(blockSpot(b.x, b.z), {icon: pin(color(me()))}).addTo(map);
             $('#guess-button').removeClass('room-warn').text('Guess!');
         });
 
@@ -584,8 +586,9 @@ function submit(auto) {
     submitted = true;
     var key = view, data = {round: s.round};
     if (marker) {
-        data.x = marker.getLatLng().lng;
-        data.z = -marker.getLatLng().lat;
+        var b = blockAt(marker.getLatLng());
+        data.x = b.x;
+        data.z = b.z;
     }
     if (!s.live) {
         data.time = ((Date.now() - shownAt) / 1000).toFixed(2);
@@ -649,14 +652,14 @@ function reveal() {
             revealMap.remove();
         }
         revealMap = makeMap('reveal-map', -1);
-        var answer = [-s.reveal.Z, s.reveal.X];
+        var answer = blockSpot(s.reveal.X, s.reveal.Z);
         var group = [L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(revealMap)];
         s.reveal.guesses.forEach(function (g) {
             var p = player(g.name);
             if (g.x === null || !p) {
                 return;
             }
-            var pos = [-g.z, g.x];
+            var pos = blockSpot(g.x, g.z);
             L.polyline([answer, pos], {color: color(p), weight: 3, dashArray: '8 6'}).addTo(revealMap);
             group.push(L.marker(pos, {icon: pin(color(p))}).addTo(revealMap)
                 .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip'}));
