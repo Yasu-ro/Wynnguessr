@@ -214,6 +214,16 @@ Avant toute migration à la main : copier `database.db` dans le scratchpad.
   ouvertes.
 - Pseudos : un invité ne peut pas prendre le nom d'un compte, ni celui d'un
   joueur du même salon ; une inscription ne peut pas prendre un `mc_name` vérifié.
+- **Rien n'est perdu en se connectant après coup** (2026-10-17, demande de
+  Yasuro) : sans compte, la partie solo finie est gardée dans la session
+  (`session['pending']`, vérifiée par `solo_game()`), et l'écran de fin dit
+  « Log in or make an account to save this score and earn XP » (retour sur le
+  profil). Un invité voit la même chose à la fin d'un salon (retour au salon).
+  `adopt()`, appelé par la connexion, l'inscription et Wynncraft, enregistre
+  la partie gardée et passe au compte les salons de l'invité (`room_players`,
+  `room_guesses`, `room_chat`, hôte), sauf ceux où le compte joue déjà ; un
+  salon Classic fini passe alors par `record()`, donc au classement.
+  L'invité reste dans `users`, vide.
 
 ### Login with Wynncraft (OAuth2, scope `identify`)
 

@@ -72,40 +72,71 @@ def get_locations():
     return jsonify(locations_list)
 
 
+def solo_game(form):
+    # a finished solo game sent by game.js, checked: the values of its scores
+    # row, or None if it does not hold up
+    score, mode = form.get('score', ''), form.get('mode', 'classic')
+    try:
+        total_time = float(form.get('totalTime', 0))
+    except ValueError:
+        return None
+    if not score.isnumeric():
+        return None
+    if mode == 'survival':
+        # the score is the number of locations found in a row
+        rounds = None
+        if int(score) > 1000:
+            return None
+    else:
+        mode = 'classic'
+        rounds = form.get('rounds')
+        if rounds not in ['3', '5', '10', '25'] or int(score) > int(rounds) * 5000:
+            return None
+        if int(rounds) * 5000 == int(score) and total_time < .5:
+            return None
+    return {'score': int(score), 'nolook': 'Yes' if form.get('look') == 'True' else 'No',
+            'provinces': form.get('provinces', ''), 'rounds': rounds, 'time': total_time, 'mode': mode}
+
+def save_solo(c, uid, g):
+    c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+              (uid, g['score'], date.today(), g['nolook'], g['provinces'], g['rounds'], g['time'], g['mode']))
+
 @app.route("/api/score", methods=['POST'])
 def post_score():
-    if request.method == 'POST':
-        if not session.get('loggedin'):
-            return jsonify({"success": False})
-        score = request.form['score']
-        look = request.form['look']
-        if look == 'True':
-            look = 'Yes'
-        else:
-            look = 'No'
-        provinces = request.form['provinces']
-        totalTime = request.form['totalTime']
-        mode = request.form.get('mode', 'classic')
-        if mode == 'survival':
-            # the score is the number of locations found in a row
-            rounds = None
-            if not score.isnumeric() or int(score) > 1000:
-                return jsonify({"success": False})
-        else:
-            mode = 'classic'
-            if request.form['rounds'] not in ['3', '5', '10', '25']:
-                return render_template('apology.html', message = "Invalid number of rounds")
-            rounds = request.form['rounds']
-            if(int(score) > int(rounds) * 5000):
-                return jsonify({"success": False})
-            if(int(rounds) * 5000 == int(score) and float(totalTime) < .5):
-                return jsonify({"success": False})
-        with connect() as c:
-            c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (session['user_id'], score, date.today(), look, provinces, rounds, totalTime, mode))
-            # for the end screen: the XP of this game, and the total it reaches
-            xp = progress(c, session['user_id'])['xp']
-        return jsonify({"success": True, "xp": xp, "gained": solo_xp(int(score), mode)})
-    return jsonify({"success": False})
+    game = solo_game(request.form)
+    if not game:
+        return jsonify({"success": False})
+    if not session.get('loggedin'):
+        # kept until the player logs in or makes an account (see adopt)
+        session['pending'] = game
+        return jsonify({"success": False, "pending": True})
+    with connect() as c:
+        save_solo(c, session['user_id'], game)
+        # for the end screen: the XP of this game, and the total it reaches
+        xp = progress(c, session['user_id'])['xp']
+    return jsonify({"success": True, "xp": xp, "gained": solo_xp(game['score'], game['mode'])})
+
+def adopt(c, uid):
+    # on logging in or making an account, what was just played becomes the
+    # account's: the solo game waiting in the session, and the rooms played as
+    # a guest (a finished classic one then lands on the leaderboard)
+    game = session.pop('pending', None)
+    if game:
+        save_solo(c, uid, game)
+    old = session.get('user_id')
+    if session.get('loggedin') or not old or old == uid:
+        return
+    if not c.execute("SELECT COALESCE(guest, 0) FROM users WHERE id = ?", (old,)).fetchone()[0]:
+        return
+    for p in c.execute("""SELECT * FROM room_players WHERE user_id = ?
+            AND code NOT IN (SELECT code FROM room_players WHERE user_id = ?)""", (old, uid)).fetchall():
+        for table in ('room_players', 'room_guesses', 'room_chat'):
+            c.execute(f"UPDATE {table} SET user_id = ? WHERE code = ? AND user_id = ?", (uid, p['code'], old))
+        c.execute("UPDATE rooms SET host_id = ? WHERE code = ? AND host_id = ?", (uid, p['code'], old))
+        r = find_room(c, p['code'])
+        done = c.execute("SELECT COUNT(*) FROM room_guesses WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()[0]
+        if r['state'] == 'finished' and r['mode'] == 'classic' and (p['live'] or done == r['rounds']):
+            record(c, r, uid)
 
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
@@ -217,6 +248,8 @@ def login():
         with connect() as c:
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
         if user and user[2] and bcrypt.check_password_hash(user[2], password):
+            with connect() as c:
+                adopt(c, user[0])
             session.permanent = True
             session['guest'] = False
             session['loggedin'] = True
@@ -248,6 +281,7 @@ def register():
                 hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
                 c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
                 user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
+                adopt(c, user[0])
                 session.permanent = True
                 session['guest'] = False
                 session['loggedin'] = True
@@ -452,6 +486,7 @@ def wynn_back():
             return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
+        adopt(c, uid)
     session.permanent = True
     session['guest'] = False
     session['loggedin'] = True

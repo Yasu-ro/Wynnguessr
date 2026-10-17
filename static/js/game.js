@@ -8,7 +8,7 @@ var score = 0;
 var totalScore = 0;
 var mode = $('#game-variables').attr('mode');
 var account = $('#game-variables').attr('account') == '1';
-var xpResult = null;     // what the saved game brought: {xp, gained}, 'pending' on its way
+var xpResult = null;     // what the saved game brought: {xp, gained}, or {pending} kept for a login; 'pending' on its way
 var SURVIVAL = 500; // survival: how close a guess must land to keep going, in blocks
 var streak = 0;
 var images = [];
@@ -266,24 +266,29 @@ function saveIfOver(survived) {
     xpResult = 'pending';
     $.ajax({url: 'api/score', data: game, type: 'post', dataType: 'json'})
         .done(function (r) {
-            xpResult = r.success ? r : null;
+            xpResult = r.success || r.pending ? r : null;
             showGain();
         })
         .fail(function (error) {
             xpResult = null;
             console.log(error);
+            showGain();
         });
 }
 
-// the end screen: the XP the game brought, or why there is none
+// the end screen: the XP the game brought; without an account, the game is
+// kept by the server and saved to the account the player logs in to
 function showGain() {
     var slot = document.getElementById('xp-slot');
-    if (!slot || slot.childNodes.length) {
+    if (!slot || slot.childNodes.length || xpResult == 'pending') {
         return;
     }
-    if (!account) {
+    if (xpResult && xpResult.pending) {
+        slot.innerHTML = "<p class='xp-note'><a href='login?next=profile'>Log in</a> or <a href='register?next=profile'>make an account</a> " +
+            "to save this score and earn XP.</p>";
+    } else if (!account) {
         slot.innerHTML = "<p class='xp-note'><a href='login?next=mode%3Fplay%3Dsolo'>Log in</a> to earn XP and level up.</p>";
-    } else if (xpResult && xpResult != 'pending') {
+    } else if (xpResult) {
         xpGain(slot, xpResult.xp, xpResult.gained);
     }
 }

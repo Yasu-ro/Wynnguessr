@@ -825,7 +825,10 @@ function gain() {
             }
             xpGain(slot, x.xp, x.gained, notes);
         } else if (x.guest) {
-            slot.innerHTML = "<p class='xp-note'><a href='register'>Make an account</a> to earn XP and level up.</p>";
+            // logging in from here makes this game, and the guest's other ones, the account's
+            var back = encodeURIComponent('room?code=' + code);
+            slot.innerHTML = "<p class='xp-note'><a href='login?next=" + back + "'>Log in</a> or <a href='register?next=" + back + "'>make an account</a> " +
+                "to save this game and earn XP.</p>";
         }
     });
 }
