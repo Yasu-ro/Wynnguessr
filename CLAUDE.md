@@ -406,3 +406,14 @@ fenêtre) : `static/tiles` n'existe que sur la bêta et le lieu peut être
 supprimé au tri. Pour en changer, remplacer le dossier entier par un **nouveau
 nom** : Cloudflare garde 4 h les fichiers statiques, et des tuiles neuves sous
 les mêmes noms se mélangeraient aux anciennes.
+
+### Aperçu des liens partagés (Discord…)
+
+2026-10-17, demande de Yasuro. Balises Open Graph dans `templates/share.html`,
+incluse par `index`, `layout` et `game` (pas `review`). L'image
+`static/banner.jpg` (1200×630) est tirée du même lieu que la photo d'accueil
+(rue vers le château de Wynn, face est) avec le logo et le titre. Son adresse
+doit être complète : le nom du site est celui de la requête quand il finit par
+`wynndle.com` (la bêta montre donc sa propre image), sinon `wynndle.com`.
+Couleur de la barre Discord = le vert du logo. Discord met l'aperçu en cache :
+un lien déjà partagé peut garder l'ancien.
