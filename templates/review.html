@@ -39,11 +39,6 @@
                     <button class="review-choice" data-province="{{ p }}">{{ p.replace('-', ' ').title() }}</button>
                 {% endfor %}
             </div>
-            <div class="review-row review-photo">
-                {% for d in difficulties %}
-                    <button class="review-choice" data-difficulty="{{ d }}">{{ d.title() }}</button>
-                {% endfor %}
-            </div>
             <div class="review-row">
                 <button class="review-keep review-photo">Keep</button>
                 <button class="review-delete">Delete</button>
@@ -60,10 +55,6 @@
             <span id="focus-coords"></span>
             {% for p in provinces %}
                 <button class="review-choice" data-province="{{ p }}">{{ p.replace('-', ' ').title() }}</button>
-            {% endfor %}
-            <span class="focus-gap"></span>
-            {% for d in difficulties %}
-                <button class="review-choice" data-difficulty="{{ d }}">{{ d.title() }}</button>
             {% endfor %}
             <span class="focus-gap"></span>
             <button class="review-keep">Keep</button>

@@ -1,6 +1,5 @@
 // Review of the locations: a dot per location (blue = planned, red = new
-// capture, green = kept), a click opens it; keep it with a difficulty, or
-// delete it. A click on the map plans a spot for the mod's tour. Captures
+// capture, green = kept), a click opens it; keep it or delete it. A click on the map plans a spot for the mod's tour. Captures
 // from the mod appear by themselves, and a grey veil covers the chunks the
 // downloaded world does not have. Full screen shows one photo at a time
 // with a small map of where it was taken, and goes on to the next red dot.
@@ -23,7 +22,7 @@ var dots = {};      // location id -> circle marker
 var places = {};    // location id -> location
 var current = null; // location shown in the panel
 var viewer = null;
-var choice = {};    // province and difficulty picked in the panel
+var choice = {};    // province picked in the panel
 var have = null;    // chunks of the downloaded world: Uint8Array, 1 = there
 var veil = null, veilData = '';
 var rings = [];     // one circle per group of holes, visible at any zoom
@@ -145,7 +144,6 @@ function pick(kind, value) {
     document.querySelectorAll('[data-' + kind + ']').forEach(function (b) {
         b.classList.toggle('picked', b.dataset[kind] == value);
     });
-    document.querySelectorAll('.review-keep').forEach(function (b) { b.disabled = !choice.difficulty; });
 }
 
 function open(loc) {
@@ -161,7 +159,6 @@ function open(loc) {
     document.getElementById('review-coords').textContent = coords;
     document.getElementById('focus-coords').textContent = coords;
     pick('province', loc.province);
-    pick('difficulty', loc.difficulty);
     if (viewer) { viewer.destroy(); viewer = null; }
     if (loc.review != 'planned') {
         viewer = pannellum.viewer(focusOn ? 'focus-panorama' : 'review-panorama',
@@ -209,7 +206,7 @@ function next() {
 function send(action) {
     var loc = current;
     fetch('api/review/' + loc.id, {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: action, province: choice.province, difficulty: choice.difficulty})})
+        body: JSON.stringify({action: action, province: choice.province})})
         .then(function (r) { return r.json(); }).then(function (res) {
             if (!res.success) return;
             if (focusOn) {
@@ -228,9 +225,6 @@ function send(action) {
 
 document.querySelectorAll('[data-province]').forEach(function (b) {
     b.onclick = function () { pick('province', b.dataset.province); };
-});
-document.querySelectorAll('[data-difficulty]').forEach(function (b) {
-    b.onclick = function () { pick('difficulty', b.dataset.difficulty); };
 });
 document.querySelectorAll('.review-keep').forEach(function (b) { b.onclick = function () { send('keep'); }; });
 document.querySelectorAll('.review-delete').forEach(function (b) {

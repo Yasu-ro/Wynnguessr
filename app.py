@@ -825,7 +825,7 @@ def room_again(code):
 # ---------- Captures and review ----------
 # The Wynndle Panorama mod (mod/) sends each panorama here as it is taken; it
 # shows up as a 'new' location, not played until Yasuro reviews it on /review:
-# keep (with a difficulty) or delete. A click on the review map plans a spot
+# keep or delete. A click on the review map plans a spot
 # ('planned'): in a downloaded copy of the world, the mod flies to each one,
 # takes it and sends it back as 'new'. The mod also sends which chunks the
 # copy holds, shown as a grey veil over the rest. Only works where a
@@ -836,7 +836,6 @@ TILES_DIR = os.path.join(app.static_folder, 'tiles')   # a link to /data: big
 CUBE, TILE = 4096, 512   # multires: same numbers in panoramaConfig() (game, room, review)
 COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
 REVIEWER = 'Yasuro'
-DIFFICULTIES = ['easy', 'medium', 'hard']
 REVIEW_PROVINCES = PROVINCES + ['fruma']
 
 def capture_key():
@@ -987,16 +986,16 @@ def review_plan():
 def review():
     if not is_reviewer():
         return redirect('login?next=review') if not session.get('loggedin') else redirect('./')
-    return render_template('review.html', provinces = REVIEW_PROVINCES, difficulties = DIFFICULTIES)
+    return render_template('review.html', provinces = REVIEW_PROVINCES)
 
 @app.route("/api/review")
 def review_list():
     if not is_reviewer():
         return jsonify({"success": False}), 403
     with connect() as c:
-        rows = c.execute("""SELECT location_id, x_position, z_position, image_url, province, review, difficulty
+        rows = c.execute("""SELECT location_id, x_position, z_position, image_url, province, review
             FROM locations WHERE review != 'deleted'""").fetchall()
-    return jsonify([{"id": r[0], "X": r[1], "Z": r[2], "url": r[3], "province": r[4], "review": r[5], "difficulty": r[6]} for r in rows])
+    return jsonify([{"id": r[0], "X": r[1], "Z": r[2], "url": r[3], "province": r[4], "review": r[5]} for r in rows])
 
 @app.route("/api/review/<int:lid>", methods=['POST'])
 def review_one(lid):
@@ -1008,11 +1007,9 @@ def review_one(lid):
         if not loc:
             return jsonify({"success": False})
         if form.get('action') == 'keep':
-            if (form.get('difficulty') not in DIFFICULTIES or form.get('province') not in REVIEW_PROVINCES
-                    or loc['review'] == 'planned'):
+            if form.get('province') not in REVIEW_PROVINCES or loc['review'] == 'planned':
                 return jsonify({"success": False})
-            c.execute("UPDATE locations SET review = 'kept', difficulty = ?, province = ? WHERE location_id = ?",
-                      (form['difficulty'], form['province'], lid))
+            c.execute("UPDATE locations SET review = 'kept', province = ? WHERE location_id = ?", (form['province'], lid))
         elif form.get('action') == 'delete':
             if loc['review'] in ('new', 'planned'):
                 # never played anywhere: nothing refers to it, it can go for good

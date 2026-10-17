@@ -91,8 +91,9 @@ répondent 404/403.
 
 - Colonnes `locations.review` (`old` = jeu d'origine, `planned` = endroit
   posé sur la carte, sans photo, `new` = capture pas encore vue, `kept`,
-  `deleted`) et `locations.difficulty` (`easy`, `medium`,
-  `hard` : **simple étiquette pour l'instant**, choix de Yasuro). Le jeu ne tire
+  `deleted`) et `locations.difficulty` (**plus utilisée** :
+  Yasuro a retiré Easy/Medium/Hard le 2026-10-17, « juste Keep ou Delete pour
+  l'instant » ; la colonne reste, vide). Le jeu ne tire
   que `old` et `kept` (`PLAYABLE`).
 - Points : bleu = `planned`, rouge = `new`, vert = `kept` ; la page se recharge
   toutes les 10 s, donc une photo prise apparaît seule.
@@ -128,7 +129,7 @@ répondent 404/403.
   sauvé, vide, avec un offset. Pourquoi refuser le gris : y téléporter le joueur ferait générer
   du terrain Minecraft ordinaire dans la copie, que la couverture compterait
   ensuite comme téléchargé.
-- Keep exige une difficulté ; la province est préremplie (Fruma si
+- Keep garde tel quel ; la province est préremplie (Fruma si
   `x < -1000` et `z > -2000`, sinon celle du lieu le plus proche) et se corrige.
 - Delete : une capture `new` est effacée (ligne + fichier, jamais jouée) ; tout
   autre lieu passe en `deleted` sans être effacé, car un salon terminé peut
