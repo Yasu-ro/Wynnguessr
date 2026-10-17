@@ -835,7 +835,7 @@ CAPTURE_DIR = os.path.join(app.static_folder, 'captures')
 TILES_DIR = os.path.join(app.static_folder, 'tiles')   # a link to /data: big
 CUBE, TILE = 4096, 512   # multires: same numbers in panoramaConfig() (game, room, review)
 COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
-REVIEWER = 'Yasuro'
+REVIEWERS = ('Yasuro', 'kemmi')   # exact usernames
 REVIEW_PROVINCES = PROVINCES + ['fruma']
 
 def capture_key():
@@ -854,7 +854,7 @@ def is_reviewer():
         return False
     with connect() as c:
         me = c.execute("SELECT username FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
-    return bool(me) and me['username'] == REVIEWER
+    return bool(me) and me['username'] in REVIEWERS
 
 def guess_province(c, x, z):
     # Fruma has no location yet to learn from; elsewhere, the nearest one

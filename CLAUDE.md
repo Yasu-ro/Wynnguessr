@@ -84,7 +84,8 @@ province.
 ## Tri des lieux (`/review`, bêta)
 
 Demande de Yasuro : voir sur la carte où il a déjà pris des photos, et trier
-quand il veut. Page réservée au compte **Yasuro** (`REVIEWER`), qui n'existe
+quand il veut. Page réservée aux comptes de `REVIEWERS` (**Yasuro**, et **kemmi** ajoutée
+le 2026-10-17 à sa demande pour l'aider à trier), qui n'existe
 que là où il y a un fichier **`capture_key`** (bêta seulement, 0600, hors git :
 c'est la clé à mettre dans le mod). Ailleurs, `/review` et `/api/capture`
 répondent 404/403.
