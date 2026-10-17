@@ -102,11 +102,16 @@ répondent 404/403.
   captures ont été effacées (originaux JPEG gardés dans `~/wynndle-captures/`)
   et les **622 lieux d'origine sont passés en `deleted` dans la base de la
   bêta** (pris sur l'ancienne carte, tous à refaire). La bêta n'a donc aucun
-  lieu jouable tant que rien n'est gardé. La prod n'est pas touchée.
+  lieu jouable tant que rien n'est gardé. (Depuis le premier Push du
+  2026-10-17, la prod a les mêmes : voir « Publication des lieux ».)
 - 2026-10-17, demande de Yasuro : **un point `planned` à chacun des 622
   lieux d'origine** (province d'origine reprise), sauf hors couverture (0) et
   à moins de 30 blocs d'un point existant (66) → 556 ajoutés, par script sur
   la base de la bêta.
+- Plein écran : curseur **Spin** (rotation automatique de Pannellum, 0 à
+  60 °/s, reprend 2 s après un glisser) et bouton **Previous** (pile des
+  photos vues, pour rattraper un Keep trop rapide ; un `kept` supprimé passe
+  en `deleted`, ses tuiles restent).
 - **Trous** (demande de Yasuro : « pas faciles à voir ») : un chunk manquant
   qu'on ne peut pas relier au bord de la carte par d'autres chunks manquants
   est en **magenta**, et chaque groupe est entouré d'un cercle magenta de
@@ -422,7 +427,8 @@ un lien déjà partagé peut garder l'ancien.
 
 - 2026-10-17 : Fruma figure dans les réglages de partie en **« Fruma (coming
   soon) », case désactivée et sans `name`** (rien n'est envoyé) tant que
-  Yasuro n'a pas de photos. Pour l'ouvrir : l'ajouter à `PROVINCES`, à
+  Yasuro n'a pas de photos. Le mod et la tournée savent déjà y aller : la
+  carte de couverture et la règle Fruma de `guess_province` sont en place. Pour l'ouvrir : l'ajouter à `PROVINCES`, à
   `mode.html`, au filtre de `board.html`, et rendre la case normale.
 - Seul `wynndle.com` doit être indexé : `after_request` envoie
   `X-Robots-Tag: noindex` pour tout autre nom (bêta, ancienne adresse ts.net).
@@ -452,3 +458,18 @@ un lien déjà partagé peut garder l'ancien.
   le sont) — sinon le vrai site perd la photo avant le prochain Push.
 - Première publication le 2026-10-17 : 671 lieux. Sauvegarde de la base du vrai
   site juste avant : `/data/wynnguessr-live-before-push-2026-10-17.db`.
+
+### Où on en est (2026-10-17, fin de session)
+
+- Bêta et prod au même commit, 671 lieux publiés. Flux : mod → tri sur la
+  bêta → Push. **Le classifieur de Claude Code refuse les mises en prod
+  (fusion, redémarrage, écriture dans la base du vrai site) tant que Yasuro
+  ne l'a pas dit explicitement dans le message même** (« push everything »
+  a suffi) : demander, ne pas contourner.
+- À faire côté Yasuro : Search Console (propriété « Domaine », TXT dans
+  Cloudflare, demande d'indexation), liens externes (r/WynnCraft, forums,
+  GitHub), photos de Fruma. Le 2026-10-17 le site n'apparaissait encore ni
+  pour « wynndle » ni pour « wynnguessr » : normal, jamais exploré ; rien ne
+  bloque (robots.txt de Cloudflare = commentaires seuls, Googlebot reçoit 200).
+- Proposé sans réponse : préchargement de l'image suivante en solo (le salon
+  l'a déjà).
