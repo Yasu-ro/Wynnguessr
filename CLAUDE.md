@@ -417,3 +417,14 @@ doit être complète : le nom du site est celui de la requête quand il finit pa
 `wynndle.com` (la bêta montre donc sa propre image), sinon `wynndle.com`.
 Couleur de la barre Discord = le vert du logo. Discord met l'aperçu en cache :
 un lien déjà partagé peut garder l'ancien.
+
+### Fruma et moteurs de recherche
+
+- 2026-10-17 : Fruma figure dans les réglages de partie en **« Fruma (coming
+  soon) », case désactivée et sans `name`** (rien n'est envoyé) tant que
+  Yasuro n'a pas de photos. Pour l'ouvrir : l'ajouter à `PROVINCES`, à
+  `mode.html`, au filtre de `board.html`, et rendre la case normale.
+- Seul `wynndle.com` doit être indexé : `after_request` envoie
+  `X-Robots-Tag: noindex` pour tout autre nom (bêta, ancienne adresse ts.net).
+  cloudflared transmet bien le `Host` d'origine (vérifié). Search Console et
+  les liens externes sont l'affaire de Yasuro.

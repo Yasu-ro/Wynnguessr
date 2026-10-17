@@ -45,6 +45,14 @@ def assets():
             return 'static/' + path
     return {'asset': asset}
 
+@app.after_request
+def only_one_site_in_search(response):
+    # beta.wynndle.com and the old ts.net address are the same site: kept out
+    # of search engines, so Google only lists wynndle.com
+    if request.host != 'wynndle.com':
+        response.headers['X-Robots-Tag'] = 'noindex'
+    return response
+
 def next_page():
     # where to go after logging in: only a page of this site, e.g. "room?code=ABC234"
     page = request.args.get('next', '')

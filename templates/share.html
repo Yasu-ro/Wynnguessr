@@ -1,5 +1,6 @@
     {# the card Discord, WhatsApp, Twitter… show under a shared link; the image needs a full address #}
     {% set site = 'https://' ~ (request.host if request.host.endswith('wynndle.com') else 'wynndle.com') %}
+    <meta name="description" content="Guess where you are in Wynncraft from a 360° photo. Solo or with friends.">
     <meta property="og:title" content="WynnGuessr – the Wynncraft GeoGuessr">
     <meta property="og:description" content="Guess where you are in Wynncraft from a 360° photo. Solo or with friends.">
     <meta property="og:image" content="{{ site }}/static/banner.jpg">

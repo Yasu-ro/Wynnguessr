@@ -299,6 +299,10 @@ body h1, body h2{
 .form-check-input{
     display: none;
 }
+.form-check-input:disabled + .mode-select-option{
+    cursor: default;
+    opacity: .6;
+}
 .login-input{
     border-radius: 8px;
     border: 3px solid black;
