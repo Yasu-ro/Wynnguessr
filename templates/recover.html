@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %}: Forgot Password{% endblock %}
+
+{% block content %}
+    <h1 class="sign">Forgot Password</h1>
+    <div class="panel narrow">
+        <form class="stack" action="recover" method="post">
+            <input class="field" placeholder="Username" aria-label="Username" name="username" autocomplete="off">
+            <input class="field code" placeholder="Recovery code" aria-label="Recovery code" name="code" autocomplete="off">
+            <input class="field" placeholder="New password" aria-label="New password" type="password" name="password" autocomplete="new-password" minlength="8" maxlength="64">
+            <input class="field" placeholder="Confirm new password" aria-label="Confirm new password" type="password" name="confirmation" autocomplete="new-password" minlength="8" maxlength="64">
+            <button type="submit" class="btn wide">Save</button>
+        </form>
+        {% if wynn_login %}
+        <p class="hint">Linked to Wynncraft? Just <a href="auth/wynncraft?next=account">log in with Wynncraft</a>, then pick a new password.</p>
+        {% endif %}
+    </div>
+{% endblock %}

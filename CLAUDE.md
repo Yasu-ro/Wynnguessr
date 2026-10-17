@@ -231,6 +231,43 @@ Avant toute migration à la main : copier `database.db` dans le scratchpad.
   salon Classic fini passe alors par `record()`, donc au classement.
   L'invité reste dans `users`, vide.
 
+### Profil, pseudo, mot de passe, récupération (2026-10-17, bêta)
+
+Demande de Yasuro (« better profile »), choix faits avec lui :
+- **Photo** : par défaut la tête Minecraft du compte Wynncraft lié (skin lu
+  chez Mojang, visage + calque du chapeau, recalculé une fois par jour dans
+  `avatars/heads/`), sinon celle de **Steve** (texture officielle par défaut).
+  On peut envoyer sa propre image : recadrée en carré, **réencodée en webp
+  256 px côté serveur** (le fichier envoyé n'est jamais servi), 8 Mo max.
+  Dossier `avatars/` hors git, propre à chaque site. Route `avatar?id=&v=`.
+  Les comptes d'`ADMINS` (Yasuro, par id) ont un bouton « Remove picture »
+  sur le profil des autres.
+- **Pseudo** : changeable sur `account` ; bouton « Use my Minecraft name » si
+  lié. Unique **sans tenir compte de la casse** (avant, « yasuro » pouvait
+  s'inscrire à côté de « Yasuro »), jamais le `mc_name` vérifié d'un autre.
+  Conséquence : **`REVIEWERS`, `PUBLISHER`, `ADMINS` sont des ids**, sinon
+  quelqu'un pourrait prendre le nom libéré par Yasuro et ses droits.
+- **Mot de passe** : changement avec l'ancien, sauf si la session vient de
+  « Log in with Wynncraft » (`session['wynn']`) : c'est la récupération d'un
+  compte lié. 8 à 64 caractères pour tout nouveau mot de passe.
+  `session['stamp']` (empreinte du hash) : changer de mot de passe
+  **déconnecte les autres navigateurs**.
+- **Récupération** (pas d'e-mail, choix de Yasuro) : compte lié → Wynncraft ;
+  sinon un **code de secours** `XXXX-XXXX-XXXX` fait sur `account`, montré
+  une seule fois, seul son hash bcrypt est gardé, valable une fois
+  (`recover`).
+- **Classement** : le pseudo ouvre le profil du site (`player?id=`), la
+  coche verte ouvre la page wynncraft.com. Les lignes sont identifiées par id.
+- **Sécurité, passée en revue le même jour** : cookie `SameSite=Lax` +
+  `Secure` (avant : aucune protection CSRF, un site tiers pouvait poster au
+  nom d'un joueur, y compris le Push de `/review`) ; `X-Frame-Options: DENY`
+  et `nosniff` ; 10 essais ratés par compte et par adresse en 15 min (30 par
+  compte toutes adresses), sur la connexion, le code et l'ancien mot de passe
+  (mémoire du worker : un `HUP` remet à zéro). Laissés tels quels : CORS
+  ouvert de l'origine (sans cookies, donc sans danger), `logout` en GET,
+  message libre d'`apology?message=` (échappé, mais permet d'afficher un
+  texte trompeur).
+
 ### Login with Wynncraft (OAuth2, scope `identify`)
 
 - Application créée par Yasuro sur `wynncraft.com/account/dashboard?section=applications`,
@@ -436,8 +473,9 @@ fan, sans rien voler).
   (navigateur de Yasuro), ordinateur et 375 px. Puis copier, recharger la
   bêta, effacer les copies de base du scratchpad. Les réglages de test passent
   par un petit `dev_app.py` à côté (il importe `app`, fait
-  `is_reviewer.__defaults__ = (('zz_review',),)` et active le rechargement des
-  templates) : `app.py` reste identique à celui de la bêta et se recopie tel
+  `is_reviewer.__defaults__ = ((<id du compte de test>,),)` (des ids depuis que
+  les pseudos se changent), désactive `SESSION_COOKIE_SECURE` (copie en http)
+  et active le rechargement des templates) : `app.py` reste identique à celui de la bêta et se recopie tel
   quel. Une copie de la **vraie** base montre les niveaux réels des joueurs ;
   une session de test se signe avec la clé de la copie (cookie
   `wynnguessr_session`).

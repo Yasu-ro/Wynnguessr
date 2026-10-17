@@ -34,13 +34,15 @@ $(function () {
         return isNaN(d) ? iso : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
     }
 
-    // a name proven by Wynncraft links to the player's Wynncraft profile
+    // the name opens the player's profile here; a name proven by Wynncraft
+    // has a green badge that opens their Wynncraft profile
     function player(row) {
+        var name = "<a class='board-name' href='player?id=" + row.id + "'>" + esc(row.name) + "</a>";
         if (!row.mc) {
-            return esc(row.name);
+            return name;
         }
-        return "<a class='board-verified' href='https://wynncraft.com/stats/player/" + encodeURIComponent(row.mc) +
-            "' target='_blank' rel='noopener' title='Open their Wynncraft profile'>" + esc(row.name) +
+        return name + "<a class='board-verified' href='https://wynncraft.com/stats/player/" + encodeURIComponent(row.mc) +
+            "' target='_blank' rel='noopener' title='Wynncraft profile: " + esc(row.mc) + "'>" +
             "<i class='material-icons wynn-check'>verified</i><i class='material-icons'>open_in_new</i></a>";
     }
 
@@ -83,7 +85,7 @@ $(function () {
             // who is on a winning streak with friends right now, in every tab
             var fire = row.streak >= 1 ? " <span class='board-fire' title='Wins in a row'>" +
                 "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
-            return "<tr class='leaderboard-row" + (row.name == me ? ' you' : '') + "'><td>" + rank + "</td>" +
+            return "<tr class='leaderboard-row" + (row.id == me ? ' you' : '') + "'><td>" + rank + "</td>" +
                 "<td>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
                 player(row) + fire + "</td>" + cells(row, mode).map(function (c, i) {
                     return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';

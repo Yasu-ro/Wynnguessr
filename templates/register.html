@@ -8,8 +8,8 @@
     <div class="panel narrow">
         <form class="stack" action="register{{ next }}" method="post">
             <input class="field" placeholder="Username" aria-label="Username" name="username" autocomplete="off" maxlength="20">
-            <input class="field" placeholder="Password" aria-label="Password" type="password" name="password" autocomplete="off">
-            <input class="field" placeholder="Confirm Password" aria-label="Confirm Password" type="password" name="confirmation" autocomplete="off">
+            <input class="field" placeholder="Password" aria-label="Password" type="password" name="password" autocomplete="off" minlength="8" maxlength="64">
+            <input class="field" placeholder="Confirm Password" aria-label="Confirm Password" type="password" name="confirmation" autocomplete="off" minlength="8" maxlength="64">
             <button type="submit" class="btn wide">Register</button>
         </form>
         <p class="hint">Already have an account? <a href="login{{ next }}">Log in</a></p>

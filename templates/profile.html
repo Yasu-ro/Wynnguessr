@@ -1,17 +1,23 @@
 {% extends "layout.html" %}
 
-{% block title %}: Profile{% endblock %}
+{% block title %}: {{ 'Profile' if own else username }}{% endblock %}
 
 {% block content %}
 {% set names = {'classic': 'Classic', 'survival': 'Survival', 'duel': 'Duel', 'royale': 'Battle Royale'} %}
 <div class="profile">
     <h1 class="sign">{{ username }}</h1>
+    <img class="avatar{{ ' head' if not user.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
     <div class="profile-head">
         {% if mc_name %}
             <a class="pill" href="https://wynncraft.com/stats/player/{{ mc_name | urlencode }}" target="_blank" rel="noopener">
                 <i class="material-icons">verified</i><span>Wynncraft: {{ mc_name }}</span><i class="material-icons open">open_in_new</i></a>
-        {% elif wynn_login %}
+        {% elif wynn_login and own %}
             <a class="btn wynn-button" href="auth/wynncraft">Link my Wynncraft account</a>
+        {% endif %}
+        {% if own %}
+            <a class="btn wood" href="account">Edit profile</a>
+        {% elif admin and user.avatar %}
+            <form action="player?id={{ user.id }}" method="post"><button type="submit" class="btn red">Remove picture</button></form>
         {% endif %}
     </div>
 
@@ -20,7 +26,7 @@
         <b class="xp-level">{{ p.level }}</b>
     </div>
     <p class="xp-next">{{ '{:,}'.format(p.need - p.into) }} XP to level {{ p.level + 1 }}</p>
-    <p class="hint">1 XP for every 100 points you score, and 50 more when you beat your friends.</p>
+    {% if own %}<p class="hint">1 XP for every 100 points you score, and 50 more when you beat your friends.</p>{% endif %}
 
     <div class="profile-stats">
         <div class="profile-stat"><b>{{ p.played }}</b><span>Multiplayer games</span></div>

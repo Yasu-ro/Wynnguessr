@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block title %}: Edit Profile{% endblock %}
+
+{% block content %}
+{% macro note(name) %}
+    {% if section == name and error %}<p class="note bad">{{ error }}</p>
+    {% elif saved == name %}<p class="note">Saved!</p>{% endif %}
+{% endmacro %}
+    <h1 class="sign">Edit Profile</h1>
+    <a class="back" href="profile"><i class="material-icons">arrow_back</i>Back</a>
+    {% if saved == 'recovered' %}<p class="note">New password saved. Your recovery code is used up: make a new one below.</p>{% endif %}
+    <div class="account">
+        <section class="panel">
+            <h2>Picture</h2>
+            <div class="account-picture">
+                <img class="avatar{{ ' head' if not me.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
+                <div class="stack">
+                    <form action="account?do=picture" method="post" enctype="multipart/form-data">
+                        <input class="file-input" type="file" name="picture" id="picture" accept="image/png,image/jpeg,image/webp,image/gif" onchange="this.form.submit()">
+                        <label for="picture" class="btn wood wide">Upload a picture</label>
+                    </form>
+                    {% if me.avatar %}
+                    <form action="account?do=head" method="post"><button class="btn wide">Use my Minecraft head</button></form>
+                    {% endif %}
+                </div>
+            </div>
+            {% if not me.mc_uuid and not me.avatar %}<p class="hint">Link your Wynncraft account to get your own Minecraft head.</p>{% endif %}
+            {{ note('picture') }}{{ note('head') }}
+        </section>
+
+        <section class="panel">
+            <h2>Name</h2>
+            <form class="stack" action="account?do=name" method="post">
+                <input class="field" name="username" value="{{ me.username }}" aria-label="Name" maxlength="20" autocomplete="off">
+                <button type="submit" class="btn wide">Save</button>
+            </form>
+            {% if me.mc_name and me.mc_name != me.username %}
+            <form action="account?do=mc-name" method="post"><button type="submit" class="btn wood wide">Use my Minecraft name: {{ me.mc_name }}</button></form>
+            {% endif %}
+            {{ note('name') }}
+        </section>
+
+        <section class="panel">
+            <h2>{{ 'Password' if me.password else 'Set a Password' }}</h2>
+            <form class="stack" action="account?do=password" method="post">
+                {% if need_current %}
+                <input class="field" type="password" name="current" placeholder="Current password" aria-label="Current password" autocomplete="current-password">
+                {% endif %}
+                <input class="field" type="password" name="password" placeholder="New password" aria-label="New password" autocomplete="new-password" minlength="8" maxlength="64">
+                <input class="field" type="password" name="confirmation" placeholder="Confirm new password" aria-label="Confirm new password" autocomplete="new-password" minlength="8" maxlength="64">
+                <button type="submit" class="btn wide">Save</button>
+            </form>
+            {% if not me.password %}<p class="hint">Then you can also log in with your name and this password.</p>{% endif %}
+            {{ note('password') }}
+        </section>
+
+        {% if me.password %}
+        <section class="panel">
+            <h2>Recovery Code</h2>
+            {% if code %}
+            <p class="recovery-code">{{ code }}</p>
+            <p class="hint">Write it down somewhere safe: if you forget your password, it lets you make a new one. You won't see it again.</p>
+            {% else %}
+            <p class="hint">{{ 'You have a recovery code. A new one replaces it.' if me.recovery else 'If you forget your password, a recovery code lets you make a new one.' }}</p>
+            <form action="account?do=code" method="post"><button type="submit" class="btn wide{{ ' wood' if me.recovery }}">{{ 'Make a new code' if me.recovery else 'Make a recovery code' }}</button></form>
+            {% endif %}
+            {% if me.mc_uuid %}<p class="hint">You can also get back in with "Log in with Wynncraft".</p>{% endif %}
+        </section>
+        {% endif %}
+    </div>
+{% endblock %}

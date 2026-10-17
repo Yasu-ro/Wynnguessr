@@ -769,10 +769,20 @@ button, input {
 .board-table td:nth-child(n+3), .board-table th:nth-child(n+3) {
     text-align: right;
 }
+/* the name opens the profile here, the green badge the one on wynncraft.com */
+.board-name {
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration: none;
+    text-underline-offset: 3px;
+}
+.board-name:hover {
+    color: var(--green-dark);
+    text-decoration: underline;
+}
 .board-verified {
     color: var(--green-dark);
-    font-weight: 700;
-    text-underline-offset: 3px;
+    text-decoration: none;
 }
 .board-verified:hover {
     color: var(--ink);
@@ -790,8 +800,27 @@ button, input {
     margin: 0 auto;
 }
 .profile-head {
-    margin: -8px 0 10px;
-    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 10px;
+}
+/* a player's picture: their Minecraft head, or the one they sent, in a ring of wood */
+.avatar {
+    display: block;
+    flex: none;
+    width: 128px;
+    height: 128px;
+    margin: -6px auto 30px;
+    object-fit: cover;
+    background: var(--paper);
+    border-radius: 3px;
+    box-shadow: var(--frame-thin);
+}
+.avatar.head {
+    image-rendering: pixelated;
 }
 .profile-head .pill {
     padding-right: 6px;
@@ -863,6 +892,66 @@ button, input {
 }
 .result.loss {
     background-color: var(--red);
+}
+
+/* ---------- Edit profile ---------- */
+
+.account {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+    max-width: 520px;
+    margin: 0 auto;
+}
+.account-picture {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    padding: 8px 0 0 10px;
+}
+.account-picture .avatar {
+    width: 96px;
+    height: 96px;
+    margin: 0;
+}
+.account-picture .stack {
+    flex: 1;
+}
+.account form + form, .account .stack + form {
+    margin-top: 12px;
+}
+/* the real file field stays reachable by keyboard; its label is the button */
+.file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+.file-input:focus-visible + .btn {
+    outline: 3px solid var(--green-light);
+    outline-offset: 2px;
+}
+.note {
+    margin: 14px 0 0;
+    font-weight: 700;
+    text-align: center;
+    color: var(--green-dark);
+}
+.note.bad {
+    color: var(--red);
+}
+.page > .note {
+    margin: 0 0 24px;
+}
+.recovery-code {
+    padding: 12px;
+    font: 700 26px/1.2 var(--sans);
+    letter-spacing: .12em;
+    text-align: center;
+    background: var(--paper-light);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    user-select: all;
 }
 
 /* ---------- Levels ---------- */
@@ -1815,6 +1904,18 @@ body.room-playing {
 }
 
 @media (max-width: 600px) {
+    .account-picture {
+        flex-direction: column;
+        gap: 22px;
+        padding: 8px 0 0;
+    }
+    .account-picture .stack {
+        align-self: stretch;
+    }
+    .recovery-code {
+        font-size: 22px;
+        letter-spacing: .06em;
+    }
     body {
         font-size: 16px;
     }

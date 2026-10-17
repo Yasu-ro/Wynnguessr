@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, jsonify
+from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, send_file, jsonify
 from flask_session import Session
 from flask_cors import CORS
 import os
@@ -12,6 +12,8 @@ import shutil
 import zipfile
 import io
 import time
+import base64
+import hashlib
 from datetime import date
 import urllib.request
 from urllib.parse import quote, urlencode
@@ -24,6 +26,10 @@ bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 # other sites share this domain behind Tailscale Funnel
 app.config['SESSION_COOKIE_NAME'] = 'wynnguessr_session'
+# never sent with another site's forms (nobody can act for a player from
+# elsewhere), and only over https
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = True
 
 # only these locations are played; 'new' ones wait for the review
 PLAYABLE = "('old', 'kept')"
@@ -51,6 +57,14 @@ def only_one_site_in_search(response):
     # of search engines, so Google only lists wynndle.com
     if request.host != 'wynndle.com':
         response.headers['X-Robots-Tag'] = 'noindex'
+    return response
+
+@app.after_request
+def no_tricks(response):
+    # no page of this site inside another site's frame (fake buttons over
+    # real ones), and a file is only ever read as the type it is served as
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
 def next_page():
@@ -141,7 +155,7 @@ def adopt(c, uid):
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
     mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-    query = '''SELECT u.username AS name, u.mc_name AS mc, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
+    query = '''SELECT u.id, u.username AS name, u.mc_name AS mc, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
         WHERE s.provinces = ? AND s.nolook = ? AND COALESCE(s.mode, 'classic') = ?'''
     params = [form.get('provinces', ''), form.get('nolook', 'No'), mode]
     if mode == 'classic':
@@ -159,7 +173,7 @@ def ladder(c, mode):
     for u in c.execute("SELECT id, username, mc_name FROM users WHERE COALESCE(guest, 0) = 0").fetchall():
         p = progress(c, u['id'])
         if p['xp'] if mode == 'levels' else p['wins']:
-            rows.append({'name': u['username'], 'mc': u['mc_name'],
+            rows.append({'id': u['id'], 'name': u['username'], 'mc': u['mc_name'],
                          **{k: p[k] for k in ('xp', 'level', 'games', 'played', 'wins', 'best', 'streak')}})
     if mode == 'levels':
         return sorted(rows, key = lambda r: -r['xp'])
@@ -174,16 +188,15 @@ def update_rank():
         else:
             rows, seen = [], set()
             for row in board(c, request.form):
-                if row['name'] not in seen:
-                    seen.add(row['name'])
+                if row['id'] not in seen:
+                    seen.add(row['id'])
                     rows.append(row)
             # every leaderboard shows the players' levels and current win streaks
-            known = {r['name']: r for r in ladder(c, 'levels')}
+            known = {r['id']: r for r in ladder(c, 'levels')}
             for row in rows:
-                row['level'] = known.get(row['name'], {}).get('level', 1)
-                row['streak'] = known.get(row['name'], {}).get('streak', 0)
-        me = session.get('user_id') and c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
-    return jsonify({"rows": rows[:50], "me": me[0] if me else None})
+                row['level'] = known.get(row['id'], {}).get('level', 1)
+                row['streak'] = known.get(row['id'], {}).get('streak', 0)
+    return jsonify({"rows": rows[:50], "me": session.get('user_id')})
 
 @app.route("/")
 def index():
@@ -237,6 +250,81 @@ def game():
         return render_template('game.html', provinces = provinces, time_limit = time_limit, look = look, rounds = rounds, mode = mode)
     return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']", time_limit = -1, look = False, rounds = 5, mode = 'classic')
 
+# ---------- Accounts ----------
+
+TRIES = 10       # wrong passwords (or recovery codes) for one account from one place...
+WINDOW = 900     # ...in this many seconds, then it has to wait
+FAILS = {}       # (place, name) and name -> times of the recent failures (one worker: memory is enough)
+
+def place():
+    # behind Cloudflare or Funnel every request comes from 127.0.0.1: the
+    # real address is in their header
+    return request.headers.get('CF-Connecting-IP') or request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or request.remote_addr
+
+def too_many(name):
+    # also a cap per account whatever the place, a little higher
+    now, name = time.time(), name.lower()
+    if len(FAILS) > 10000:
+        FAILS.clear()
+    for k in ((place(), name), name):
+        FAILS[k] = [t for t in FAILS.get(k, ()) if now - t < WINDOW]
+    return len(FAILS[(place(), name)]) >= TRIES or len(FAILS[name]) >= 3 * TRIES
+
+def failed(name):
+    for k in ((place(), name.lower()), name.lower()):
+        FAILS.setdefault(k, []).append(time.time())
+
+def stamp(hashed):
+    # a trace of the password in the session: when it changes, every other
+    # browser logged in with the old one is logged out
+    return hashlib.sha256((hashed or '').encode()).hexdigest()[:16]
+
+@app.before_request
+def still_logged_in():
+    if request.endpoint == 'static' or not session.get('loggedin'):
+        return
+    with connect() as c:
+        me = c.execute("SELECT password FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
+    if me and session.setdefault('stamp', stamp(me[0])) == stamp(me[0]):
+        return
+    session.clear()
+
+def log_in(c, uid, wynn = False):
+    adopt(c, uid)
+    session.permanent = True
+    session['guest'] = False
+    session['loggedin'] = True
+    session['user_id'] = uid
+    # Wynncraft vouched for this login: a new password needs no old one
+    # (that is how a linked account gets back in)
+    session['wynn'] = wynn
+    session['stamp'] = stamp(c.execute("SELECT password FROM users WHERE id = ?", (uid,)).fetchone()[0])
+
+def clean_name(name):
+    return ' '.join(name.split())
+
+def name_problem(c, name, uid = None):
+    # the name everyone sees: one per player, whatever the case, and never
+    # the Minecraft name Wynncraft proved for someone else
+    if not 1 <= len(name) <= 20 or not name.isprintable():
+        return "Pick a name of 1 to 20 characters"
+    if c.execute("""SELECT 1 FROM users WHERE id IS NOT ? AND ((username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0)
+            OR mc_name = ? COLLATE NOCASE)""", (uid, name, name)).fetchone():
+        return "This name is taken"
+
+def password_problem(password, confirmation):
+    if not 8 <= len(password) <= 64:
+        return "Pick a password of 8 to 64 characters"
+    if password != confirmation:
+        return "Passwords do not match"
+
+def hashed(password):
+    return bcrypt.generate_password_hash(password).decode('utf-8')
+
+def plain_code(code):
+    # "abcd efgh-ijkl" and "ABCD-EFGH-IJKL" are the same code
+    return re.sub(r'[^A-Z0-9]', '', code.upper())
+
 @app.route("/login", methods=['POST', 'GET'])
 def login():
     if request.method == 'POST':#user login request
@@ -245,56 +333,58 @@ def login():
 
         if username == "" or password == "":
             return render_template('apology.html', message = "Please fill in all fields")
+        if too_many(username):
+            return render_template('apology.html', message = "Too many tries: wait a few minutes")
         with connect() as c:
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
-        if user and user[2] and bcrypt.check_password_hash(user[2], password):
-            with connect() as c:
-                adopt(c, user[0])
-            session.permanent = True
-            session['guest'] = False
-            session['loggedin'] = True
-            session['user_id'] = user[0]
-            return redirect(next_page())
-        else:
-            return render_template('apology.html', message = "Invalid username or password")
+            if user and user[2] and bcrypt.check_password_hash(user[2], password):
+                log_in(c, user[0])
+                return redirect(next_page())
+        failed(username)
+        return render_template('apology.html', message = "Invalid username or password")
     else:
         return render_template('login.html')
 
 @app.route("/register", methods=['POST', 'GET'])
 def register():
     if request.method == 'POST':
-        username = request.form['username'].strip()
+        username = clean_name(request.form['username'])
         password = request.form['password']
         confirmation = request.form['confirmation']
         with connect() as c:
-            if len(username) > 20:
-                return render_template('apology.html', message = "Username must be 20 characters or less")
-            if len(password) > 64:
-                return render_template('apology.html', message = "Password must be 64 characters or less")
-            if password != confirmation:
-                return render_template('apology.html', message = "Passwords do not match")
-            elif c.execute("SELECT * FROM users WHERE (username = ? AND COALESCE(guest, 0) = 0) OR mc_name = ? COLLATE NOCASE", (username, username)).fetchall():
-                return render_template('apology.html', message = "Username is already taken")
-            elif username == "" or password == "" or confirmation == "":
-                return render_template('apology.html', message = "Please fill in all fields")
-            else:
-                hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-                c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-                user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
-                adopt(c, user[0])
-                session.permanent = True
-                session['guest'] = False
-                session['loggedin'] = True
-                session['user_id'] = user[0]
-                return redirect(next_page())
+            problem = name_problem(c, username) or password_problem(password, confirmation)
+            if problem:
+                return render_template('apology.html', message = problem)
+            uid = c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed(password))).lastrowid
+            log_in(c, uid)
+            return redirect(next_page())
     else:
         return render_template('register.html')
 
+@app.route("/recover", methods=['POST', 'GET'])
+def recover():
+    # a forgotten password: the recovery code made on the account page sets a
+    # new one, once (a Wynncraft account just logs in with Wynncraft)
+    if request.method == 'GET':
+        return render_template('recover.html')
+    username = request.form.get('username', '')
+    if too_many(username):
+        return render_template('apology.html', message = "Too many tries: wait a few minutes")
+    problem = password_problem(request.form.get('password', ''), request.form.get('confirmation', ''))
+    if problem:
+        return render_template('apology.html', message = problem)
+    with connect() as c:
+        user = c.execute("SELECT id, recovery FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
+        if user and user['recovery'] and bcrypt.check_password_hash(user['recovery'], plain_code(request.form.get('code', ''))):
+            c.execute("UPDATE users SET password = ?, recovery = NULL WHERE id = ?", (hashed(request.form['password']), user['id']))
+            log_in(c, user['id'])
+            return redirect('account?saved=recovered')
+    failed(username)
+    return render_template('apology.html', message = "Wrong username or recovery code")
+
 @app.route("/logout")
 def logout():
-    session['loggedin'] = False
-    session['guest'] = False
-    session['user_id'] = None
+    session.clear()
     return redirect('./')
 
 @app.route("/guest", methods=['POST', 'GET'])
@@ -316,14 +406,180 @@ def guest():
     session['user_id'] = uid
     return redirect(next_page())
 
+ADMINS = (1,)    # user ids that may take down someone's picture: Yasuro
+AVATAR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'avatars')   # not in git
+PICTURE_MAX = 8 * 1024 * 1024
+STEVE = 'https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb'
+
+def avatar_url(user):
+    # the version changes with the picture, so a browser never shows an old one
+    return 'avatar?' + urlencode({'id': user['id'], 'v': user['avatar'] or (user['mc_uuid'] or 'steve')[:8]})
+
+def show_profile(uid):
+    with connect() as c:
+        user = c.execute("SELECT id, username, mc_name, mc_uuid, avatar FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (uid,)).fetchone()
+        if not user:
+            return render_template('apology.html', message = "This player does not exist"), 404
+        p = progress(c, uid)
+    return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'],
+                           avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
+                           admin = session.get('loggedin') and session.get('user_id') in ADMINS,
+                           games = p['history'][:30], p = p)
+
 @app.route("/profile")
 def profile():
     if not session.get('loggedin'):
         return redirect('login?next=profile')
+    return show_profile(session['user_id'])
+
+@app.route("/player", methods=['GET', 'POST'])
+def player():
+    # anyone's profile, opened from the leaderboard
+    uid = request.args.get('id', type = int)
+    if request.method == 'POST':
+        # an admin takes down a picture that should not be there
+        if not (session.get('loggedin') and session.get('user_id') in ADMINS):
+            return render_template('apology.html', message = "Not allowed"), 403
+        with connect() as c:
+            drop_picture(c, uid)
+        return redirect('player?id=' + str(uid))
+    return show_profile(uid)
+
+def fetch(url):
+    # Mojang's servers: a small answer, quickly, or nothing
+    req = urllib.request.Request(url, headers = {'User-Agent': 'WynnGuessr (+https://wynndle.com)'})
+    with urllib.request.urlopen(req, timeout = 5) as r:
+        return r.read(1_000_000)
+
+def head(uuid):
+    # the face of a Minecraft skin, its hat layer on top, fetched from Mojang
+    # at most once a day; Steve's without a linked account
+    from PIL import Image
+    name = re.sub(r'[^0-9a-f]', '', (uuid or '').lower()) or 'steve'
+    path = os.path.join(AVATAR_DIR, 'heads', name + '.png')
+    try:
+        if time.time() - os.path.getmtime(path) < 86400:
+            return path
+    except OSError:
+        pass
+    try:
+        url = STEVE
+        if name != 'steve':
+            profile = json.loads(fetch('https://sessionserver.mojang.com/session/minecraft/profile/' + name))
+            skin = json.loads(base64.b64decode(profile['properties'][0]['value']))['textures'].get('SKIN')
+            url = skin['url'] if skin else STEVE
+        if not re.fullmatch(r'https?://textures\.minecraft\.net/texture/[0-9a-f]+', url):
+            raise ValueError(url)
+        skin = Image.open(io.BytesIO(fetch(url.replace('http://', 'https://', 1)))).convert('RGBA')
+        if skin.width != 64 or skin.height not in (32, 64):
+            raise ValueError(skin.size)
+        face = skin.crop((8, 8, 16, 16))
+        face.alpha_composite(skin.crop((40, 8, 48, 16)))
+        os.makedirs(os.path.dirname(path), exist_ok = True)
+        face.resize((128, 128), Image.Resampling.NEAREST).save(path + '.part', 'PNG')
+        os.replace(path + '.part', path)
+    except Exception as e:
+        # Mojang down: yesterday's head, or Steve's
+        app.logger.warning("Minecraft head %s: %r", name, e)
+        if not os.path.exists(path):
+            return head(None) if name != 'steve' else None
+    return path
+
+@app.route("/avatar")
+def avatar():
+    # a player's picture: the one they sent, else their Minecraft head
     with connect() as c:
-        profile = c.execute("SELECT username, mc_name FROM users WHERE id = ?", (session['user_id'],)).fetchone()
-        p = progress(c, session['user_id'])
-    return render_template('profile.html', username = profile[0], mc_name = profile[1], games = p['history'][:30], p = p)
+        user = c.execute("SELECT avatar, mc_uuid FROM users WHERE id = ?", (request.args.get('id', type = int),)).fetchone()
+    if user and user['avatar']:
+        return send_from_directory(AVATAR_DIR, user['avatar'] + '.webp', max_age = 86400)
+    path = head(user['mc_uuid'] if user else None)
+    return send_file(path, max_age = 3600) if path else ('', 404)
+
+def save_picture(c, uid, upload):
+    # any picture becomes a 256 px square webp made here: the file sent is
+    # never served itself
+    from PIL import Image, ImageOps
+    try:
+        img = Image.open(upload.stream)
+        if img.format not in ('PNG', 'JPEG', 'WEBP', 'GIF') or img.width * img.height > 40_000_000:
+            raise ValueError(img.format)
+        img = ImageOps.exif_transpose(img).convert('RGBA')
+    except Exception:
+        return "This file is not a picture"
+    side = min(img.size)
+    left, top = (img.width - side) // 2, (img.height - side) // 2
+    # pixel art stays sharp
+    img = img.crop((left, top, left + side, top + side)).resize(
+        (256, 256), Image.Resampling.NEAREST if side < 128 else Image.Resampling.LANCZOS)
+    name = secrets.token_hex(10)
+    os.makedirs(AVATAR_DIR, exist_ok = True)
+    img.save(os.path.join(AVATAR_DIR, name + '.webp'), 'WEBP', quality = 85)
+    drop_picture(c, uid)
+    c.execute("UPDATE users SET avatar = ? WHERE id = ?", (name, uid))
+
+def drop_picture(c, uid):
+    # back to the Minecraft head
+    old = c.execute("SELECT avatar FROM users WHERE id = ?", (uid,)).fetchone()
+    if old and old[0]:
+        c.execute("UPDATE users SET avatar = NULL WHERE id = ?", (uid,))
+        try:
+            os.remove(os.path.join(AVATAR_DIR, old[0] + '.webp'))
+        except OSError:
+            pass
+
+@app.route("/account", methods=['GET', 'POST'])
+def account():
+    # one's own picture, name, password and recovery code
+    if not session.get('loggedin'):
+        return redirect('login?next=account')
+    uid = session['user_id']
+    what = request.args.get('do', '')
+    if what == 'picture' and (request.content_length or PICTURE_MAX + 1) > PICTURE_MAX:
+        return account_page(what, "Pick a picture under 8 MB")
+    if request.method == 'GET':
+        return account_page()
+    form = request.form
+    with connect() as c:
+        me = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if what == 'picture':
+            problem = save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture"
+        elif what == 'head':
+            problem = drop_picture(c, uid)
+        elif what in ('name', 'mc-name'):
+            name = me['mc_name'] if what == 'mc-name' else clean_name(form.get('username', ''))
+            problem = name_problem(c, name or '', uid)
+            if not problem:
+                c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
+            what = 'name'
+        elif what == 'password':
+            # the old password, unless there is none or Wynncraft vouched for this login
+            if me['password'] and not session.get('wynn'):
+                if too_many(me['username']):
+                    return account_page(what, "Too many tries: wait a few minutes")
+                if not bcrypt.check_password_hash(me['password'], form.get('current', '')):
+                    failed(me['username'])
+                    return account_page(what, "Wrong current password")
+            problem = password_problem(form.get('password', ''), form.get('confirmation', ''))
+            if not problem:
+                new = hashed(form['password'])
+                c.execute("UPDATE users SET password = ? WHERE id = ?", (new, uid))
+                session['stamp'] = stamp(new)   # this browser stays logged in, the others are out
+        elif what == 'code' and me['password']:
+            # shown once; only its hash is kept, and a new one replaces the old
+            raw = ''.join(secrets.choice(CODE_CHARS) for _ in range(12))
+            c.execute("UPDATE users SET recovery = ? WHERE id = ?", (hashed(raw), uid))
+            return account_page('code', code = '-'.join((raw[:4], raw[4:8], raw[8:])))
+        else:
+            return redirect('account')
+    if problem:
+        return account_page(what, problem)
+    return redirect('account?saved=' + what)
+
+def account_page(section = None, error = None, code = None):
+    with connect() as c:
+        me = c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+    return render_template('account.html', me = me, avatar = avatar_url(me), section = section, error = error,
+                           code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
 
 def history(c, uid):
     # the player's games, newest first: finished rooms with at least two
@@ -486,11 +742,7 @@ def wynn_back():
             return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
-        adopt(c, uid)
-    session.permanent = True
-    session['guest'] = False
-    session['loggedin'] = True
-    session['user_id'] = uid
+        log_in(c, uid, wynn = True)
     return redirect('../../' + session.pop('wynn_next', './'))
 
 @app.route("/apology")
@@ -552,6 +804,11 @@ with connect() as c:
     if 'mc_uuid' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
         c.execute("ALTER TABLE users ADD COLUMN mc_uuid TEXT")
         c.execute("ALTER TABLE users ADD COLUMN mc_name TEXT")
+    # the picture sent (a file in avatars/; none = the Minecraft head) and the
+    # hash of the recovery code (see /account)
+    if 'avatar' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN avatar TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN recovery TEXT")
     # review of the locations (see /review): 'old' = from the original game,
     # 'new' = a fresh capture not checked yet, 'kept', 'deleted'
     if 'review' not in [col[1] for col in c.execute("PRAGMA table_info(locations)")]:
@@ -968,8 +1225,8 @@ CAPTURE_DIR = os.path.join(app.static_folder, 'captures')
 TILES_DIR = os.path.join(app.static_folder, 'tiles')   # a link to /data: big
 CUBE, TILE = 4096, 512   # multires: same numbers in panoramaConfig() (game, room, review)
 COVERAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'coverage.json')
-REVIEWERS = ('Yasuro', 'kemmi')   # exact usernames
-PUBLISHER = ('Yasuro',)           # the only one who may push to the live site
+REVIEWERS = (1, 3)   # user ids (names can be changed): Yasuro, kemmi
+PUBLISHER = (1,)     # the only one who may push to the live site: Yasuro
 # the live site's database, next to this checkout: ~/Wynnguessr beside ~/Wynnguessr-beta
 LIVE_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Wynnguessr', 'database.db')
 REVIEW_PROVINCES = PROVINCES
@@ -986,11 +1243,7 @@ def key_ok():
     return bool(key) and secrets.compare_digest(request.headers.get('X-Wynndle-Key', ''), key)
 
 def is_reviewer(only=REVIEWERS):
-    if not session.get('loggedin') or not capture_key():
-        return False
-    with connect() as c:
-        me = c.execute("SELECT username FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
-    return bool(me) and me['username'] in only
+    return bool(session.get('loggedin') and capture_key()) and session.get('user_id') in only
 
 def guess_province(c, x, z):
     # Fruma has no location yet to learn from; elsewhere, the nearest one
