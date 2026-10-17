@@ -27,6 +27,7 @@ var have = null;    // chunks of the downloaded world: Uint8Array, 1 = there
 var veil = null, veilData = '';
 var rings = [];     // one circle per group of holes, visible at any zoom
 var focusOn = false, focusMap = null, focusDot = null;
+var spin = 0;       // full screen: degrees per second the view turns by itself, 0 = still
 
 function style(loc) {
     var on = current && current.id == loc.id;
@@ -162,7 +163,8 @@ function open(loc) {
     if (viewer) { viewer.destroy(); viewer = null; }
     if (loc.review != 'planned') {
         viewer = pannellum.viewer(focusOn ? 'focus-panorama' : 'review-panorama',
-            panoramaConfig(loc.url, {autoLoad: true}));
+            panoramaConfig(loc.url, {autoLoad: true, autoRotate: focusOn && spin ? -spin : false,
+                autoRotateInactivityDelay: 2000}));
     }
     if (focusOn) {
         focusDot.setLatLng([-loc.Z, loc.X]);
@@ -233,6 +235,12 @@ document.querySelectorAll('.review-delete').forEach(function (b) {
 document.getElementById('review-full').onclick = openFocus;
 document.getElementById('focus-next').onclick = next;
 document.getElementById('focus-close').onclick = closeFocus;
+// negative: Pannellum turns to the right; after a drag it starts again by itself
+document.getElementById('focus-spin').oninput = function () {
+    spin = +this.value;
+    if (!viewer || !focusOn) return;
+    if (spin) viewer.startAutoRotate(-spin); else viewer.stopAutoRotate();
+};
 document.addEventListener('keydown', function (e) { if (e.key == 'Escape' && focusOn) closeFocus(); });
 
 load();

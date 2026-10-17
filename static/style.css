@@ -1823,6 +1823,14 @@ h1.sign::after{
     white-space: pre;
     margin-right: 8px;
 }
+#focus-spin-label{
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #402523;
+    font-size: 18px;
+    margin-right: 8px;
+}
 .focus-gap{
     width: 14px;
 }
