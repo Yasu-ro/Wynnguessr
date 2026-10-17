@@ -169,6 +169,25 @@ body h1, body h2{
     transform: scale(1.1);
     color: white;
 }
+.pitch{
+    padding: 40px 15px 50px;
+    background-image: url("repeatable background.png");
+    background-size: contain;
+    border-bottom: 3px solid #857361;
+}
+.pitch-header{
+    margin: 0 0 25px;
+    text-align: center;
+    color: white;
+    font-size: 44px;
+    font-style: italic;
+    font-weight: bold;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, .45);
+}
+.pitch .play-card{
+    margin: 10px;
+    width: 320px;
+}
 .feature-container{
     overflow:hidden;
     top: 95%;
@@ -209,20 +228,20 @@ body h1, body h2{
     display: flex;
     flex-direction: row;
     width: 100%;
-    min-height: 600px;
+    height: 600px;
 }
 .demo-information-box{
     color: black;
     display: flex;
     margin-left: 10%;
-    margin-top: 50px;
+    margin-top: 100px;
     width: 25%;
     flex-direction: column;
     text-align: left;
 }
 #panorama{
     width: 70%;
-    height: 420px;
+    height: 70%;
     margin-top: 50px;
     margin-right: 100px;
     margin-left: 50px;
@@ -569,11 +588,10 @@ body h1, body h2{
     .demo-container{
         flex-direction: column;
         width: 100%;
-        min-height: 600px;
+        height: 600px;
     }
     #panorama{
         width: 80%;
-        height: 350px;
         margin-left: 10%;
         margin-bottom: 30px;
     }
