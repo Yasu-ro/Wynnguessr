@@ -428,3 +428,7 @@ un lien déjà partagé peut garder l'ancien.
   `X-Robots-Tag: noindex` pour tout autre nom (bêta, ancienne adresse ts.net).
   cloudflared transmet bien le `Host` d'origine (vérifié). Search Console et
   les liens externes sont l'affaire de Yasuro.
+- Texte d'accueil (2026-10-17, « sell it a bit more ») : annonce **« over 600
+  spots »** (671 lieux `kept` ce jour-là) et les modes réels (solo : Classic,
+  Survival ; salon : Classic, Duel, Battle Royale). À corriger si le nombre de
+  lieux ou les modes changent.
