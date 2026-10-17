@@ -2,26 +2,31 @@
 
 {% block title %}: Room {{ code }}{% endblock %}
 
+{% block head %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+{% endblock %}
+
+{% block page_class %} wide{% endblock %}
+
 {% block content %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <div id="room" data-code="{{ code }}">
 
     <section id="lobby" class="room-page" hidden>
         <h1 class="sign">Room {{ code }}</h1>
         <div class="room-columns">
             <div class="room-column">
-                <fieldset class="mode-select-box">
-                    <h3 class="mode-select-header">Invite Your Friends</h3>
-                    <div class="mode-select-option-box room-invite">
+                <div class="panel">
+                    <h2>Invite Your Friends</h2>
+                    <div class="room-invite">
                         <span class="room-code" title="Room code">{{ code }}</span>
-                        <button type="button" class="form-submit friends-button" data-copy>Copy Link</button>
+                        <button type="button" class="btn wood" data-copy>Copy Link</button>
                     </div>
-                </fieldset>
-                <fieldset class="mode-select-box">
-                    <h3 class="mode-select-header">Players</h3>
-                    <div class="mode-select-option-box" id="lobby-players"></div>
-                </fieldset>
+                </div>
+                <div class="panel">
+                    <h2>Players</h2>
+                    <div class="room-players" id="lobby-players"></div>
+                </div>
                 <div class="room-chat-slot" id="chat-slot-lobby">
                     <div id="room-chat" class="room-chat">
                         <div class="room-chat-head">
@@ -30,13 +35,13 @@
                         </div>
                         <div id="chat-log" class="room-chat-log"></div>
                         <form id="chat-form" class="room-chat-form" autocomplete="off">
-                            <input id="chat-input" maxlength="200" placeholder="Say something...">
+                            <input id="chat-input" maxlength="200" placeholder="Say something..." aria-label="Message">
                             <button type="submit" title="Send"><i class="material-icons">send</i></button>
                         </form>
                     </div>
                 </div>
             </div>
-            <form id="room-settings" class="room-column" onsubmit="return false">
+            <form id="room-settings" class="room-column panel settings" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
 {% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('royale', 'Battle Royale')] %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
@@ -44,7 +49,7 @@
                 <p id="settings-error" class="room-error"></p>
             </form>
         </div>
-        <button type="button" id="start-button" class="form-submit room-start" disabled>Start the Game</button>
+        <button type="button" id="start-button" class="btn big wide room-start" disabled>Start the Game</button>
     </section>
 
     <section id="guess-screen" class="room-screen" hidden>
@@ -85,10 +90,10 @@
             <tbody id="results-rows"></tbody>
         </table>
         <div class="room-actions">
-            <button type="button" id="again-button" class="form-submit room-action" hidden>Play Again</button>
-            <a href="mode" class="form-submit room-action room-leave">Back to Menu</a>
+            <button type="button" id="again-button" class="btn room-action" hidden>Play Again</button>
+            <a href="mode" class="btn wood room-action">Back to Menu</a>
         </div>
-        <p id="results-hint" class="friends-hint"></p>
+        <p id="results-hint" class="hint"></p>
         <div class="room-chat-slot room-chat-results" id="chat-slot-results"></div>
     </section>
 </div>

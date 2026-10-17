@@ -4,16 +4,16 @@
     'duel': "6,000 HP each. Worse guess, more damage. Damage grows every round. Last one alive wins.",
     'royale': "3 lives each. Worst guess loses a life. Perfect guess wins one back. Last one alive wins."
 } %}
-            <fieldset class="mode-select-box" id="game-mode">
-                <h3 class="mode-select-header">Game Mode</h3>
-                <div class="mode-select-option-box">
+            <fieldset class="setting" id="game-mode">
+                <h3 class="setting-name">Game Mode</h3>
+                <div class="chips">
                     {% for mode, name in modes %}
-                    <input class="form-check-input" type="radio" name="mode" id="mode-{{ mode }}" value="{{ mode }}"{% if loop.first %} checked{% endif %}>
-                    <label class="mode-select-option" for="mode-{{ mode }}">{{ name }}</label>
+                    <input type="radio" name="mode" id="mode-{{ mode }}" value="{{ mode }}"{% if loop.first %} checked{% endif %}>
+                    <label class="chip" for="mode-{{ mode }}">{{ name }}</label>
                     {% endfor %}
                 </div>
                 {% for mode, name in modes %}
-                <p class="friends-hint mode-rules" data-mode="{{ mode }}"{% if not loop.first %} hidden{% endif %}>{{ rules[mode] }}</p>
+                <p class="setting-note mode-rules" data-mode="{{ mode }}"{% if not loop.first %} hidden{% endif %}>{{ rules[mode] }}</p>
                 {% endfor %}
             </fieldset>
             <script>

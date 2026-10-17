@@ -47,7 +47,8 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
 - **Fichiers statiques versionnés** : `asset('js/room.js')` ajoute `?v=<mtime>`.
   Cloudflare impose 4 h de cache navigateur (il écrase le `no-cache` de Flask) :
   sans ça, les joueurs gardent l'ancien script (bug « on ne voit pas les PV »).
-- Pas de flash blanc : chaque `<head>` pose `background-color: #6b5236` d'emblée.
+- Pas de flash blanc : `head.html` (inclus partout) pose `background-color: #1d1c19`
+  (la pierre du fond) d'emblée.
 
 ## Bêta (`beta.wynndle.com`)
 
@@ -283,14 +284,50 @@ Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
 
 ## Pages et direction artistique
 
-**Tout doit respecter la DA, partout** (Yasuro y tient beaucoup) :
-beige `#baaa80`, bordure brune `#857361`, brun foncé `#402523`, boutons verts
-`#83C73C` à bordure noire, cases blanches à bordure noire, choix coché
-`#378537`. **Aucun panneau sombre** (le bleu nuit `#141323` de l'origine a été
-remplacé partout). Polices Ubuntu + Architects Daughter (menu), reliefs en
-`box-shadow` inset, titres `h1.sign` sur panneau suspendu (les cordes font
-200 px et passent sous la barre de menu), page courante en jaune dans le menu.
-Inspiré de wynncraft.com **sans rien en reprendre** (ni image ni logo).
+**Tout doit respecter la DA, partout** (Yasuro y tient beaucoup).
+**Refonte complète le 2026-10-17**, demande de Yasuro : l'interface faisait
+« clunky and cheap », il la voulait « really like wynncraft's site » (site de
+fan, sans rien voler).
+
+- **Palette** relevée dans le thème « journey » de wynncraft.com
+  (`cdn.wynncraft.com/nextgen/themes/journey/theme.css`) : variables en tête de
+  `style.css` — sable `--sand` (une page), papier `--paper` (un panneau), bois
+  `--wood`, encre `--ink`, vert `--green`, or `--gold`.
+- **Polices** : Ubuntu (texte) et Architects Daughter (menu, panneaux
+  suspendus, onglets, en-tête du chat), celles de wynncraft.com, libres.
+- **Leur technique, pas leurs fichiers** : aplats coupés de facettes dures
+  (`--facet`, `--facet-big` : blanc et noir translucides, valables sur toute
+  couleur), cadres en anneaux de bois faits de `box-shadow` empilés
+  (`--frame`, `--frame-thin`), titres de page sur panneau suspendu à deux
+  cordes (`.sign` ; cordes de 600 px qui passent sous le menu, et `.page` isole
+  son contexte d'empilement pour qu'elles passent devant le cadre). Aucun
+  dégradé décoratif, aucune ombre floue. **Aucune image ni aucun SVG de
+  wynncraft.com** : facettes, clous, pierres et textures sont dessinés pour
+  nous, lisibles dans `style.css` (seul `#` y est échappé en `%23`).
+- **Le décor est sombre, les panneaux restent clairs** (la règle « aucun
+  panneau sombre » tient) : fond de pierre partout, comme sur wynncraft.com ;
+  pages en sable, panneaux en papier.
+- **Accueil** : photo de la rue de Wynn (`hero.webp`, face est du lieu « Look
+  Around » en 2048 px, 150 Ko ; l'ancien fond PNG pesait 19,8 Mo, supprimé),
+  rangée de pierres en bas, puis deux bandes sur terre sombre (titre vert,
+  texte clair, image dans un cadre de bois) qui remplacent les trois cartes.
+  `hero.webp` est appelé par le CSS, sans `?v=` : changer de nom pour en
+  changer. `friends.webp` : vrai morceau de la carte Wynntils autour de Ragni
+  (1,5 px par bloc) avec les épingles de `room.js` (réponse et trois joueurs),
+  webp sans perte (le plus léger pour du pixel art).
+- Menu : page courante en **or** (comme l'onglet choisi du classement) ;
+  choix cochés en vert ; MAJUSCULES seulement sur les boutons, comme sur
+  wynncraft.com.
+- `<head>`, menu et pied de page partagés : `head.html`, `nav.html`,
+  `footer.html` (`game.html` et `review.html` gardent leur propre barre).
+  Bootstrap retiré : rien ne s'en servait.
+- Radios et cases à cocher masquées **mais focalisables** (`.chips > input`) :
+  les choix se font au clavier, ce que l'ancien `display: none` empêchait.
+- **Tics des sites générés par IA, évités exprès** (recherche du 2026-10-17) :
+  Inter/Roboto, dégradés violets, verre dépoli, rangées de trois cartes
+  identiques, ombres grises floues partout, apparitions animées au défilement,
+  petites étiquettes en majuscules au-dessus des titres, numéros 01/02/03,
+  émojis en guise d'icônes. Ne pas les réintroduire.
 
 - `mode` : choix **Solo / With Friends** d'abord (`?play=solo|friends`), puis
   réglages (`settings.html` + `modes.html`, partagés avec la salle d'attente).
@@ -299,8 +336,9 @@ Inspiré de wynncraft.com **sans rien en reprendre** (ni image ni logo).
   pour ne pas la compter deux fois). Volontairement différent du classement.
 - `leaderboard` : onglets Classic/Survival, filtres, meilleure partie par
   joueur ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
-- Pied de page hors jeu : Made by Ched3 · Hosted & modified by Yasuro ·
-  Wynncraft · Fan-made, not official.
+- Pied de page hors jeu (`footer.html`) : Made by Ched3, Hosted & modified
+  by Yasuro, Wynncraft, Fan-made, not official (séparés par l'espace, plus par
+  des points médians).
 
 ## Tester
 
@@ -434,12 +472,16 @@ un lien déjà partagé peut garder l'ancien.
   `X-Robots-Tag: noindex` pour tout autre nom (bêta, ancienne adresse ts.net).
   cloudflared transmet bien le `Host` d'origine (vérifié). Search Console et
   les liens externes sont l'affaire de Yasuro.
-- Texte d'accueil (2026-10-17, « sell it a bit more ») : section `.pitch` de
-  trois cartes entre la bannière et Look Around (Yasuro a refusé le texte
-  entassé dans la boîte Look Around : « horrible placement »). Elle annonce **« over 600
-  spots »** (671 lieux `kept` ce jour-là) et les modes réels (solo : Classic,
-  Survival ; salon : Classic, Duel, Battle Royale). À corriger si le nombre de
-  lieux ou les modes changent.
+- Texte d'accueil (2026-10-17, « sell it a bit more ») : d'abord trois cartes
+  entre la bannière et Look Around (Yasuro avait refusé le texte entassé dans
+  la boîte Look Around : « horrible placement »). Depuis la refonte du même
+  jour, le même texte est réparti dans deux bandes, chacune avec son image :
+  « Look Around » (**« Over 600 spots »**, 671 lieux `kept` ce jour-là, à côté
+  de la photo à faire tourner) et « Play With Friends » (salons, et les modes
+  réels : solo Classic, Survival ; salon Classic, Duel, Battle Royale). Le
+  titre de la bannière est devenu « WynnGuessr » + « The GeoGuessr of
+  Wynncraft » (ancien titre de la section des cartes) ; « Discover Wynncraft »
+  a disparu. À corriger si le nombre de lieux ou les modes changent.
 
 ### Publication des lieux (bouton Push)
 
@@ -461,8 +503,9 @@ un lien déjà partagé peut garder l'ancien.
 
 ### Où on en est (2026-10-17, fin de session)
 
-- Bêta et prod au même commit, 671 lieux publiés. Flux : mod → tri sur la
-  bêta → Push. **Le classifieur de Claude Code refuse les mises en prod
+- 671 lieux publiés. Flux : mod → tri sur la bêta → Push. **La bêta a
+  d'avance la refonte de la DA** (2026-10-17, voir « Pages et direction
+  artistique ») : pas encore fusionnée, en attente de l'accord de Yasuro. **Le classifieur de Claude Code refuse les mises en prod
   (fusion, redémarrage, écriture dans la base du vrai site) tant que Yasuro
   ne l'a pas dit explicitement dans le message même** (« push everything »
   a suffi) : demander, ne pas contourner.

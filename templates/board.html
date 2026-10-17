@@ -1,40 +1,42 @@
     <form class="board-filters" id="filter-options">
-        <div class="board-modes">
+        <div class="tabs">
             <input type="radio" name="mode" id="board-classic" value="classic" checked>
-            <label for="board-classic" class="board-mode">Classic</label>
+            <label for="board-classic" class="tab">Classic</label>
             <input type="radio" name="mode" id="board-survival" value="survival">
-            <label for="board-survival" class="board-mode">Survival</label>
+            <label for="board-survival" class="tab">Survival</label>
         </div>
-        <div class="board-group">
-            <span class="board-label">Provinces</span>
-            <input type="checkbox" name="province" id="board-wynn" value="wynn" checked>
-            <label for="board-wynn" class="filter-option">Wynn</label>
-            <input type="checkbox" name="province" id="board-gavel" value="gavel" checked>
-            <label for="board-gavel" class="filter-option">Gavel</label>
-            <input type="checkbox" name="province" id="board-corkus" value="corkus" checked>
-            <label for="board-corkus" class="filter-option">Corkus</label>
-            <input type="checkbox" name="province" id="board-ocean" value="ocean" checked>
-            <label for="board-ocean" class="filter-option">Ocean</label>
-            <input type="checkbox" name="province" id="board-silent-expanse" value="silent-expanse" checked>
-            <label for="board-silent-expanse" class="filter-option">Silent Expanse</label>
-        </div>
-        <div class="board-group" id="board-rounds">
-            <span class="board-label">Rounds</span>
-            <input type="radio" name="rounds" id="board-3" value="3">
-            <label for="board-3" class="filter-option">3</label>
-            <input type="radio" name="rounds" id="board-5" value="5" checked>
-            <label for="board-5" class="filter-option">5</label>
-            <input type="radio" name="rounds" id="board-10" value="10">
-            <label for="board-10" class="filter-option">10</label>
-            <input type="radio" name="rounds" id="board-25" value="25">
-            <label for="board-25" class="filter-option">25</label>
-        </div>
-        <div class="board-group">
-            <span class="board-label">View</span>
-            <input type="radio" name="nolook" id="board-free" value="No" checked>
-            <label for="board-free" class="filter-option">Free</label>
-            <input type="radio" name="nolook" id="board-locked" value="Yes">
-            <label for="board-locked" class="filter-option">Locked</label>
+        <div class="filters">
+            <div class="board-group chips">
+                <span class="board-label">Provinces</span>
+                <input type="checkbox" name="province" id="board-wynn" value="wynn" checked>
+                <label for="board-wynn" class="chip small">Wynn</label>
+                <input type="checkbox" name="province" id="board-gavel" value="gavel" checked>
+                <label for="board-gavel" class="chip small">Gavel</label>
+                <input type="checkbox" name="province" id="board-corkus" value="corkus" checked>
+                <label for="board-corkus" class="chip small">Corkus</label>
+                <input type="checkbox" name="province" id="board-ocean" value="ocean" checked>
+                <label for="board-ocean" class="chip small">Ocean</label>
+                <input type="checkbox" name="province" id="board-silent-expanse" value="silent-expanse" checked>
+                <label for="board-silent-expanse" class="chip small">Silent Expanse</label>
+            </div>
+            <div class="board-group chips" id="board-rounds">
+                <span class="board-label">Rounds</span>
+                <input type="radio" name="rounds" id="board-3" value="3">
+                <label for="board-3" class="chip small">3</label>
+                <input type="radio" name="rounds" id="board-5" value="5" checked>
+                <label for="board-5" class="chip small">5</label>
+                <input type="radio" name="rounds" id="board-10" value="10">
+                <label for="board-10" class="chip small">10</label>
+                <input type="radio" name="rounds" id="board-25" value="25">
+                <label for="board-25" class="chip small">25</label>
+            </div>
+            <div class="board-group chips">
+                <span class="board-label">View</span>
+                <input type="radio" name="nolook" id="board-free" value="No" checked>
+                <label for="board-free" class="chip small">Free</label>
+                <input type="radio" name="nolook" id="board-locked" value="Yes">
+                <label for="board-locked" class="chip small">Locked</label>
+            </div>
         </div>
     </form>
 
@@ -50,4 +52,4 @@
         </thead>
         <tbody id="table-body"></tbody>
     </table>
-    <p id="board-empty" class="friends-hint" hidden>No games yet.</p>
+    <p id="board-empty" class="hint" hidden>No games yet.</p>

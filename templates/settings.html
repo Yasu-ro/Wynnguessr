@@ -1,48 +1,45 @@
-            <fieldset class="mode-select-box" id="provinces">
-                <h3 class="mode-select-header">Provinces</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="checkbox" name="province" id="wynn-province" checked="true" value="wynn">
-                    <label class="mode-select-option" for="wynn-province">Wynn</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="gavel-province" checked="true" value="gavel">
-                    <label class="mode-select-option" for="gavel-province">Gavel</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="corkus-province" checked="true" value="corkus">
-                    <label class="mode-select-option" for="corkus-province">Corkus</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="ocean-province" checked="true" value="ocean">
-                    <label class="mode-select-option" for="ocean-province">Ocean</label>
-                    <input class="form-check-input" type="checkbox" name="province" id="silent-expanse-province" checked="true" value="silent-expanse">
-                    <label class="mode-select-option" for="silent-expanse-province">Silent Expanse</label>
-                    <input class="form-check-input" type="checkbox" id="fruma-province" disabled>
-                    <label class="mode-select-option" for="fruma-province">Fruma (coming soon)</label>
-                </div>
-
-            </fieldset>
-            <fieldset class="mode-select-box" id="timer">
-                <h3 class="mode-select-header">Time Limit</h3>
-                <div class="mode-select-option-box" >
-                    <input class="form-check-input" type="checkbox" id="time-limit-checkbox" name="time-limit-checkbox">
-                    <label class="mode-select-option" for="time-limit-checkbox">Timed</label>
-                    <input type="number" id="time-limit" name="time-limit" placeholder="Time Limit (s)" value="30" min="1" max="1800">
+            <fieldset class="setting" id="provinces">
+                <h3 class="setting-name">Provinces</h3>
+                <div class="chips">
+                    <input type="checkbox" name="province" id="wynn-province" checked="true" value="wynn">
+                    <label class="chip" for="wynn-province">Wynn</label>
+                    <input type="checkbox" name="province" id="gavel-province" checked="true" value="gavel">
+                    <label class="chip" for="gavel-province">Gavel</label>
+                    <input type="checkbox" name="province" id="corkus-province" checked="true" value="corkus">
+                    <label class="chip" for="corkus-province">Corkus</label>
+                    <input type="checkbox" name="province" id="ocean-province" checked="true" value="ocean">
+                    <label class="chip" for="ocean-province">Ocean</label>
+                    <input type="checkbox" name="province" id="silent-expanse-province" checked="true" value="silent-expanse">
+                    <label class="chip" for="silent-expanse-province">Silent Expanse</label>
+                    <input type="checkbox" id="fruma-province" disabled>
+                    <label class="chip" for="fruma-province">Fruma (coming soon)</label>
                 </div>
             </fieldset>
-
-            <fieldset class="mode-select-box" id="look">
-                <h3 class="mode-select-header">View</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="checkbox" id="no-look" name="look">
-                    <label class="mode-select-option" for="no-look">Locked</label>
+            <fieldset class="setting" id="timer">
+                <h3 class="setting-name">Time Limit</h3>
+                <div class="chips">
+                    <input type="checkbox" id="time-limit-checkbox" name="time-limit-checkbox">
+                    <label class="chip" for="time-limit-checkbox">Timed</label>
+                    <input class="field small" type="number" id="time-limit" name="time-limit" placeholder="Seconds" aria-label="Seconds" value="30" min="1" max="1800">
                 </div>
             </fieldset>
-
-            <fieldset class="mode-select-box" id="rounds">
-                <h3 class="mode-select-header">Rounds</h3>
-                <div class="mode-select-option-box">
-                    <input class="form-check-input" type="radio" id="three" name="rounds" value="3">
-                    <label class="mode-select-option" for="three">3 Rounds</label>
-                    <input class="form-check-input" type="radio" id="five" name="rounds" value="5" checked="true">
-                    <label class="mode-select-option" for="five">5 Rounds</label>
-                    <input class="form-check-input" type="radio" id="ten" name="rounds" value="10">
-                    <label class="mode-select-option" for="ten">10 Rounds</label>
-                    <input class="form-check-input" type="radio" id="twentyfive" name="rounds" value="25">
-                    <label class="mode-select-option" for="twentyfive">25 Rounds</label>
+            <fieldset class="setting" id="look">
+                <h3 class="setting-name">View</h3>
+                <div class="chips">
+                    <input type="checkbox" id="no-look" name="look">
+                    <label class="chip" for="no-look">Locked</label>
+                </div>
+            </fieldset>
+            <fieldset class="setting" id="rounds">
+                <h3 class="setting-name">Rounds</h3>
+                <div class="chips">
+                    <input type="radio" id="three" name="rounds" value="3">
+                    <label class="chip" for="three">3 Rounds</label>
+                    <input type="radio" id="five" name="rounds" value="5" checked="true">
+                    <label class="chip" for="five">5 Rounds</label>
+                    <input type="radio" id="ten" name="rounds" value="10">
+                    <label class="chip" for="ten">10 Rounds</label>
+                    <input type="radio" id="twentyfive" name="rounds" value="25">
+                    <label class="chip" for="twentyfive">25 Rounds</label>
                 </div>
             </fieldset>

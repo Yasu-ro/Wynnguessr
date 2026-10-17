@@ -4,7 +4,7 @@
 
 {% block content %}
     <h1 class="sign">Join the Game</h1>
-    <div class="play-choices">
+    <div class="duo one">
 {% with next = request.args.get('next', 'mode?play=friends') %}{% include "guest_card.html" %}{% endwith %}
     </div>
 {% endblock %}

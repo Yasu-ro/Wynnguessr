@@ -1,122 +1,43 @@
 <!DOCTYPE html>
-
+<html lang="en">
 <head>
-    <!-- earth colour at once: no white flash before the stylesheets and the texture arrive -->
-    <style>html, body { background-color: #6b5236; }</style>
-    <title>WynnGuessr – the Wynncraft GeoGuessr</title>
-    {% include "share.html" %}
+{% include "head.html" %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
     <link rel="stylesheet" href="{{ asset('style.css') }}">
-    <link rel="icon" href="static/wynnlogo.png" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Ubuntu:ital,wght@0,400;0,700;1,700&display=swap">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <title>WynnGuessr – the Wynncraft GeoGuessr</title>
+{% include "share.html" %}
 </head>
 
 <body>
-    <nav class="navbar">
-        <div class="nav-container">
-            <a class="nav-icon" href="./">
-                <img src="static/wynnlogo.png" alt="logo" height=31.1>
-            </a>
-            <a href="./">
-                <div data-here class="nav-link-left">
-                    <i class="material-icons">home</i>Home
-                </div>
-            </a>
-            <a href="mode">
-                <div  class="nav-link-left">
-                    <i class="material-icons">play_arrow</i>Play
-                </div>
-            </a>
-            <a href="leaderboard">
-                <div  class="nav-link-left" >
-                    <i class="material-icons">leaderboard</i>Leaderboard
-                </div>
-            </a>
-            
-        </div>
-        {% if session['loggedin'] %}
-            <div class="nav-container">
-                <a href="profile">
-                    <div class="nav-link-right">
-                        <i class="material-icons">account_circle</i>Profile
-                    </div>
-                </a>
-                <a href="logout">
-                    <div class="nav-link-right">
-                        <i class="material-icons">logout</i>Logout
-                    </div>
-                </a>
-            </div>
-        {% else %}
-        <div>
-            <a href="register">
-                <div class="nav-link-right">Register</div>
-            </a>
-            <a href="login">
-                <div class="nav-link-right">Login</div>
-            </a>
-        </div>
-        {% endif %}
-    </nav>
+{% include "nav.html" %}
+    <header class="hero">
+        <img class="hero-logo" src="static/wynnlogo.png" alt="" width="150" height="150">
+        <h1 class="hero-name">WynnGuessr</h1>
+        <p class="hero-tagline">The GeoGuessr of Wynncraft</p>
+        <p class="hero-text">Where in Wynncraft are you? Guess on the map.</p>
+        <a class="btn big" href="mode">Play</a>
+    </header>
 
-    <div class="homepage-background-image">
-        <div class="welcome-box">
-            <p class="welcome-header">Discover Wynncraft</p>
-            <p class="welcome-text">Where in Wynncraft are you? Guess on the map.</p>
-            <a href="mode">
-                <div class="play-button">
-                    Play
-                </div>
-            </a>
+    <section class="band">
+        <div class="band-text">
+            <h2>Look Around</h2>
+            <p>Over 600 spots, from Wynn to Gavel, Corkus, the Ocean and the Silent Expanse.</p>
+            <p>Drag the picture to look around, pin your guess on the map, and score more the closer you get.</p>
         </div>
-    </div>
-    
-    <section class="pitch">
-        <h2 class="pitch-header">The GeoGuessr of Wynncraft</h2>
-        <div class="play-modes">
-            <div class="play-card">
-                <i class="material-icons">place</i>
-                <h2>600+ Spots</h2>
-                <p>From Wynn to Gavel, Corkus, the Ocean and the Silent Expanse. Look around the 360° view, pin your guess on the map, and score more the closer you get.</p>
-            </div>
-            <div class="play-card">
-                <i class="material-icons">groups</i>
-                <h2>Multiplayer</h2>
-                <p>Open a room, share the code with your friends, and find out who really knows Wynncraft.</p>
-            </div>
-            <div class="play-card">
-                <i class="material-icons">sports_esports</i>
-                <h2>Game Modes</h2>
-                <p>Classic and Survival on your own. Classic, Duel and Battle Royale with friends.</p>
-            </div>
-        </div>
+        <div class="band-media" id="panorama"></div>
     </section>
 
-    <div class="feature-container">
-        <div class="feature-information-box">
-            <div class="demo-container">
-                <div class="demo-information-box">
-                    <h1>Look Around</h1>
-                    <p>Drag the picture to look around.</p>
-                </div>
-                <div id='panorama'></div>
-
-
-            </div>
+    <section class="band band-flip">
+        <div class="band-text">
+            <h2>Play With Friends</h2>
+            <p>Open a room, share the code with your friends, and find out who really knows Wynncraft.</p>
+            <p>Classic and Survival on your own. Classic, Duel and Battle Royale with friends.</p>
         </div>
-    </div>
-    
-    <footer class="site-footer">
-        <a href="https://github.com/Ched3/Wynnguessr" target="_blank" rel="noopener">Made by Ched3</a> ·
-        <a href="https://github.com/Yasu-ro/Wynnguessr" target="_blank" rel="noopener">Hosted &amp; modified by Yasuro</a> ·
-        <a href="https://wynncraft.com" target="_blank" rel="noopener">Wynncraft</a> ·
-        <span>Fan-made, not official</span>
-    </footer>
+        <img class="band-media" src="{{ asset('friends.webp') }}" alt="Three guesses and the answer on the map" width="960" height="600" loading="lazy">
+    </section>
+{% include "footer.html" %}
+
     <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
     <script>
         let viewer = pannellum.viewer('panorama', {
         "type": "multires",
@@ -126,3 +47,4 @@
         });
     </script>
 </body>
+</html>

@@ -1,76 +1,18 @@
 <!DOCTYPE html>
-
+<html lang="en">
 <head>
-    <!-- earth colour at once: no white flash before the stylesheets and the texture arrive -->
-    <style>html, body { background-color: #6b5236; }</style>
-    <title>WynnGuessr{% block title %}{% endblock %}</title>
-    {% include "share.html" %}
+{% include "head.html" %}
+{% block head %}{% endblock %}
     <link rel="stylesheet" href="{{ asset('style.css') }}">
-    <link rel="icon" href="static/wynnlogo.png" type="image/x-icon">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Ubuntu:ital,wght@0,400;0,700;1,700&display=swap">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WynnGuessr{% block title %}{% endblock %}</title>
+{% include "share.html" %}
 </head>
 
 <body>
-        <nav class="navbar">
-            <div class="nav-container">
-                <a class="nav-icon" href="./">
-                    <img src="static/wynnlogo.png" alt="logo" height=31.1>
-                </a>
-                <a href="./">
-                    <div {% if request.path == '/' %}data-here {% endif %}class="nav-link-left">
-                        <i class="material-icons">home</i>Home
-                    </div>
-                </a>
-                <a href="mode">
-                    <div {% if request.path == '/mode' %}data-here {% endif %} class="nav-link-left">
-                        <i class="material-icons">play_arrow</i>Play
-                    </div>
-                </a>
-                <a href="leaderboard">
-                    <div {% if request.path == '/leaderboard' %}data-here {% endif %} class="nav-link-left" >
-                        <i class="material-icons">leaderboard</i>Leaderboard
-                    </div>
-                </a>
-                
-            </div>
-            {% if session['loggedin'] %}
-                <div class="nav-container">
-                    <a href="profile">
-                        <div class="nav-link-right">
-                            <i class="material-icons">account_circle</i>Profile
-                        </div>
-                    </a>
-                    <a href="logout">
-                        <div class="nav-link-right">
-                            <i class="material-icons">logout</i>Logout
-                        </div>
-                    </a>
-                </div>
-            {% else %}
-            <div>
-                {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
-                <a href="register{{ next }}">
-                    <div class="nav-link-right">Register</div>
-                </a>
-                <a href="login{{ next }}">
-                    <div class="nav-link-right">Login</div>
-                </a>
-            </div>
-            {% endif %}
-        </nav>
-        <div class="repeatable-background-image">
-            {% block content %}{% endblock %}
-        </div>
-    <footer class="site-footer">
-        <a href="https://github.com/Ched3/Wynnguessr" target="_blank" rel="noopener">Made by Ched3</a> ·
-        <a href="https://github.com/Yasu-ro/Wynnguessr" target="_blank" rel="noopener">Hosted &amp; modified by Yasuro</a> ·
-        <a href="https://wynncraft.com" target="_blank" rel="noopener">Wynncraft</a> ·
-        <span>Fan-made, not official</span>
-    </footer>
-        
-
+{% include "nav.html" %}
+    <main class="page{% block page_class %}{% endblock %}">
+{% block content %}{% endblock %}
+    </main>
+{% include "footer.html" %}
 </body>
+</html>

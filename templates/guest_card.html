@@ -1,7 +1,6 @@
-        <form class="play-card" action="guest?next={{ next | urlencode }}" method="post">
-            <i class="material-icons">badge</i>
+        <form class="panel" action="guest?next={{ next | urlencode }}" method="post">
             <h2>Choose a Nickname</h2>
-            <input class="login-input guest-name" name="username" placeholder="Nickname" maxlength="20" autocomplete="off" required>
-            <button type="submit" class="form-submit play-go">Play</button>
-            <p>No account needed. <a href="login?next={{ next | urlencode }}">Log in</a> to save your scores.</p>
+            <input class="field" name="username" placeholder="Nickname" aria-label="Nickname" maxlength="20" autocomplete="off" required>
+            <button type="submit" class="btn wide">Play</button>
+            <p class="hint">No account needed. <a href="login?next={{ next | urlencode }}">Log in</a> to save your scores.</p>
         </form>

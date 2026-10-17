@@ -6,61 +6,55 @@
 {% set play = request.args.get('play') %}
 {% if play == 'solo' %}
     <h1 class="sign">Play Solo</h1>
-    <a class="play-back" href="mode">← Back</a>
-    <div>
-        <form action="game" class="mode-select-form" method="get">
+    <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
+    <form action="game" class="panel settings" method="get">
 {% with modes = [('classic', 'Classic'), ('survival', 'Survival')] %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
-            <button type="submit" class="form-submit" id="mode-submit-button">Play</button>
-        </form>
-    </div>
+        <button type="submit" class="btn big wide" id="mode-submit-button">Play</button>
+    </form>
     <script>showRules();</script>
 {% elif play == 'friends' %}
     <h1 class="sign">Play With Friends</h1>
-    <a class="play-back" href="mode">← Back</a>
+    <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     {% if session['user_id'] %}
-    <div class="play-choices">
-        <form class="play-card" action="room/create" method="post">
-            <i class="material-icons">add_circle</i>
+    <div class="duo">
+        <form class="panel" action="room/create" method="post">
             <h2>Create a Room</h2>
-            <div class="play-modes">
-                <input class="form-check-input" type="radio" name="mode" id="new-classic" value="classic" checked>
-                <label class="mode-select-option" for="new-classic">Classic</label>
-                <input class="form-check-input" type="radio" name="mode" id="new-duel" value="duel">
-                <label class="mode-select-option" for="new-duel">Duel</label>
-                <input class="form-check-input" type="radio" name="mode" id="new-royale" value="royale">
-                <label class="mode-select-option" for="new-royale">Battle Royale</label>
+            <div class="chips">
+                <input type="radio" name="mode" id="new-classic" value="classic" checked>
+                <label class="chip" for="new-classic">Classic</label>
+                <input type="radio" name="mode" id="new-duel" value="duel">
+                <label class="chip" for="new-duel">Duel</label>
+                <input type="radio" name="mode" id="new-royale" value="royale">
+                <label class="chip" for="new-royale">Battle Royale</label>
             </div>
             {% for p in ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse'] %}<input type="hidden" name="province" value="{{ p }}">{% endfor %}
             <input type="hidden" name="rounds" value="5">
-            <button type="submit" class="form-submit play-go">Create</button>
-
+            <button type="submit" class="btn wide">Create</button>
         </form>
-        <form class="play-card" action="room" method="get">
-            <i class="material-icons">login</i>
+        <form class="panel" action="room" method="get">
             <h2>Join a Room</h2>
-            <input class="login-input friends-code" name="code" placeholder="Room code" maxlength="8" autocomplete="off" required>
-            <button type="submit" class="form-submit play-go">Join</button>
-
+            <input class="field code" name="code" placeholder="Room code" aria-label="Room code" maxlength="8" autocomplete="off" required>
+            <button type="submit" class="btn wide">Join</button>
         </form>
     </div>
     {% else %}
-    <div class="play-choices">
+    <div class="duo one">
 {% with next = 'mode?play=friends' %}{% include "guest_card.html" %}{% endwith %}
     </div>
     {% endif %}
 {% else %}
     <h1 class="sign">How Do You Want to Play?</h1>
-    <div class="play-choices">
-        <a class="play-card" href="mode?play=solo">
+    <div class="duo">
+        <a class="pick" href="mode?play=solo">
             <i class="material-icons">person</i>
-            <h2>Solo</h2>
-            <p>Play alone.</p>
+            <b>Solo</b>
+            <span>Play alone.</span>
         </a>
-        <a class="play-card" href="mode?play=friends">
+        <a class="pick" href="mode?play=friends">
             <i class="material-icons">groups</i>
-            <h2>With Friends</h2>
-            <p>Play together.</p>
+            <b>With Friends</b>
+            <span>Play together.</span>
         </a>
     </div>
 {% endif %}

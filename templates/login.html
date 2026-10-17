@@ -4,22 +4,17 @@
 
 {% block content %}
     {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
-    <h1 class="sign"> Login</h1>
-    {% if wynn_login %}
-        <a class="form-submit wynn-button" href="auth/wynncraft{{ next }}">Log in with Wynncraft</a>
-        <p class="friends-hint">or</p>
-    {% endif %}
-    <form class="login-form" action="login{{ next }}" method="post">
-        <div>
-            <input placeholder="Username" class="login-input" name="username" autocomplete="off">
-        </div>
-        <div>
-            <input placeholder="Password" type="password" class="login-input" name="password" autocomplete="off">
-        </div>
-        <div>
-            <button type="submit" class="form-submit">Login</button>
-        </div>
-    </form>
-    <p class="friends-hint">No account yet? <a href="register{{ next }}">Register</a></p>
-
+    <h1 class="sign">Login</h1>
+    <div class="panel narrow">
+        {% if wynn_login %}
+        <a class="btn wide wynn-button" href="auth/wynncraft{{ next }}">Log in with Wynncraft</a>
+        <p class="or">or</p>
+        {% endif %}
+        <form class="stack" action="login{{ next }}" method="post">
+            <input class="field" placeholder="Username" aria-label="Username" name="username" autocomplete="off">
+            <input class="field" placeholder="Password" aria-label="Password" type="password" name="password" autocomplete="off">
+            <button type="submit" class="btn wide">Login</button>
+        </form>
+        <p class="hint">No account yet? <a href="register{{ next }}">Register</a></p>
+    </div>
 {% endblock %}

@@ -1,0 +1,15 @@
+    <nav class="navbar">
+        <a class="nav-logo" href="./" title="Home"><img src="static/wynnlogo.png" alt="WynnGuessr" width="40" height="40"></a>
+        <a class="nav-btn" href="./"{% if request.path == '/' %} aria-current="page"{% endif %}><i class="material-icons">home</i><span>Home</span></a>
+        <a class="nav-btn" href="mode"{% if request.path == '/mode' %} aria-current="page"{% endif %}><i class="material-icons">play_arrow</i><span>Play</span></a>
+        <a class="nav-btn" href="leaderboard"{% if request.path == '/leaderboard' %} aria-current="page"{% endif %}><i class="material-icons">leaderboard</i><span>Leaderboard</span></a>
+        <span class="nav-gap"></span>
+        {% if session['loggedin'] %}
+        <a class="pill" href="profile"{% if request.path == '/profile' %} aria-current="page"{% endif %}><i class="material-icons">account_circle</i><span>Profile</span></a>
+        <a class="nav-btn" href="logout"><i class="material-icons">logout</i><span>Logout</span></a>
+        {% else %}
+        {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
+        <a class="pill" href="login{{ next }}"><i class="material-icons">login</i><span>Login</span></a>
+        <a class="nav-btn" href="register{{ next }}"><i class="material-icons">person_add</i><span>Register</span></a>
+        {% endif %}
+    </nav>

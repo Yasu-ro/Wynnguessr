@@ -1,34 +1,21 @@
 <!DOCTYPE html>
-
+<html lang="en">
 <head>
-    <!-- earth colour at once: no white flash before the stylesheets and the texture arrive -->
-    <style>html, body { background-color: #6b5236; }</style>
-    <title>WynnGuessr: Review</title>
-    <link rel="stylesheet" href="{{ asset('style.css') }}">
-    <link rel="icon" href="static/wynnlogo.png" type="image/x-icon">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Ubuntu:ital,wght@0,400;0,700;1,700&display=swap">
+{% include "head.html" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ asset('style.css') }}">
+    <title>WynnGuessr: Review</title>
 </head>
 
 <body class="review-page">
     <nav class="navbar">
-        <div class="nav-container">
-            <a class="nav-icon" href="./">
-                <img src="static/wynnlogo.png" alt="logo" height=31.1>
-            </a>
-            <a href="./">
-                <div class="nav-link-left">
-                    <i class="material-icons">home</i>Home
-                </div>
-            </a>
-            <p class="review-count"><span class="review-dot" data-review="planned"></span>Planned: <b id="count-planned">0</b></p>
-            <p class="review-count"><span class="review-dot" data-review="new"></span>New: <b id="count-new">0</b></p>
-            <p class="review-count"><span class="review-dot" data-review="kept"></span>Kept: <b id="count-kept">0</b></p>
-            {% if can_push %}<button id="review-push" class="review-choice">Push to wynndle.com</button>{% endif %}
-        </div>
+        <a class="nav-logo" href="./" title="Home"><img src="static/wynnlogo.png" alt="WynnGuessr" width="40" height="40"></a>
+        <a class="nav-btn" href="./"><i class="material-icons">home</i><span>Home</span></a>
+        <p class="nav-stat review-count"><span class="review-dot" data-review="planned"></span>Planned: <b id="count-planned">0</b></p>
+        <p class="nav-stat review-count"><span class="review-dot" data-review="new"></span>New: <b id="count-new">0</b></p>
+        <p class="nav-stat review-count"><span class="review-dot" data-review="kept"></span>Kept: <b id="count-kept">0</b></p>
+        {% if can_push %}<button id="review-push" class="nav-btn">Push to wynndle.com</button>{% endif %}
     </nav>
     <div class="review-body">
         <div id="review-map"></div>
@@ -41,11 +28,11 @@
                 {% endfor %}
             </div>
             <div class="review-row">
-                <button class="review-keep review-photo">Keep</button>
-                <button class="review-delete">Delete</button>
+                <button class="btn review-keep review-photo">Keep</button>
+                <button class="btn red review-delete">Delete</button>
             </div>
             <div class="review-row">
-                <button id="review-full" class="review-choice review-photo">Full screen</button>
+                <button id="review-full" class="btn wood review-photo">Full screen</button>
             </div>
         </div>
     </div>
@@ -59,14 +46,15 @@
             {% endfor %}
             <span class="focus-gap"></span>
             <label id="focus-spin-label">Spin <input id="focus-spin" type="range" min="0" max="60" value="0"></label>
-            <button class="review-keep">Keep</button>
-            <button class="review-delete">Delete</button>
-            <button id="focus-prev" class="review-choice">Previous</button>
-            <button id="focus-next" class="review-choice">Next</button>
-            <button id="focus-close" class="review-choice">Close</button>
+            <button class="btn review-keep">Keep</button>
+            <button class="btn red review-delete">Delete</button>
+            <button id="focus-prev" class="btn wood">Previous</button>
+            <button id="focus-next" class="btn wood">Next</button>
+            <button id="focus-close" class="btn wood">Close</button>
         </div>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
     <script src="{{ asset('js/review.js') }}"></script>
 </body>
+</html>
