@@ -1,11 +1,24 @@
-// Leaderboard and profile: the games played with exactly the settings of the filters
+// Leaderboard: the best game of each player with exactly the settings of the
+// filters (classic, survival), or the levels, or the wins with friends
 $(function () {
     var board = $('.board'), form = $('#filter-options');
     var medals = ['#d4af37', '#c0c0c0', '#cd7f32'];
     var asked = 0;
 
+    // per tab: the columns after # and Player; the last one is left out on a phone
+    var columns = {
+        classic: ['Score', 'Time', 'Date'],
+        survival: ['Streak', 'Time', 'Date'],
+        levels: ['Level', 'XP', 'Games'],
+        wins: ['Wins', 'Games', 'Best streak']
+    };
+
     function esc(text) {
         return $('<div>').text(text).html();
+    }
+
+    function number(n) {
+        return Number(n).toLocaleString('en-US');
     }
 
     // 83.4 -> "1:23.4"
@@ -31,13 +44,24 @@ $(function () {
             "<i class='material-icons wynn-check'>verified</i><i class='material-icons'>open_in_new</i></a>";
     }
 
+    function cells(row, mode) {
+        if (mode == 'levels') {
+            return ["<b class='lvl'>" + row.level + "</b>", number(row.xp), number(row.games)];
+        }
+        if (mode == 'wins') {
+            return [number(row.wins), number(row.played), number(row.best)];
+        }
+        return [number(row.score), duration(row.time), day(row.date)];
+    }
+
     function load() {
         var mode = form.find('[name=mode]:checked').val();
+        var ladder = mode == 'levels' || mode == 'wins';
         var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
+        form.find('.filters').prop('hidden', ladder);
         $('#board-rounds').prop('hidden', mode != 'classic');
-        $('#board-score').text(mode == 'survival' ? 'Streak' : 'Score');
         var ask = ++asked;
-        $.ajax({url: board.data('api'), type: 'POST', dataType: 'json', data: {
+        $.ajax({url: board.data('api'), type: 'POST', dataType: 'json', data: ladder ? {mode: mode} : {
             mode: mode,
             provinces: "['" + provinces.join("', '") + "']",
             rounds: form.find('[name=rounds]:checked').val(),
@@ -45,19 +69,24 @@ $(function () {
         }}).done(function (r) {
             // a slow answer to an older choice of filters is ignored
             if (ask == asked) {
-                show(r.rows, r.me);
+                show(r.rows, r.me, mode);
             }
         });
     }
 
-    function show(rows, me) {
+    function show(rows, me, mode) {
+        $('#board-head').html('<th>#</th><th>Player</th>' + columns[mode].map(function (c, i) {
+            return '<th' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</th>';
+        }).join(''));
         $('#table-body').html(rows.map(function (row, i) {
             var rank = i < 3 ? "<i class='material-icons' style='color:" + medals[i] + "'>emoji_events</i>" : i + 1;
+            // who is winning right now
+            var fire = mode == 'wins' && row.streak >= 2 ? " <span class='board-fire' title='Wins in a row'>" +
+                "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
             return "<tr class='leaderboard-row" + (row.name == me ? ' you' : '') + "'><td>" + rank + "</td>" +
-                "<td class='board-player'>" + player(row) + "</td>" +
-                "<td>" + Number(row.score).toLocaleString('en-US') + "</td>" +
-                "<td>" + duration(row.time) + "</td>" +
-                "<td class='board-date'>" + day(row.date) + "</td></tr>";
+                "<td>" + player(row) + fire + "</td>" + cells(row, mode).map(function (c, i) {
+                    return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';
+                }).join('') + "</tr>";
         }).join(''));
         $('.board-table').prop('hidden', rows.length == 0);
         $('#board-empty').prop('hidden', rows.length > 0);

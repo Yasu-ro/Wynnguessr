@@ -89,6 +89,7 @@
             <thead><tr class="leaderboard-row"><th>Rank</th><th>Player</th><th id="results-score">Score</th></tr></thead>
             <tbody id="results-rows"></tbody>
         </table>
+        <div id="xp-slot" class="xp-slot"></div>
         <div class="room-actions">
             <button type="button" id="again-button" class="btn room-action" hidden>Play Again</button>
             <a href="mode" class="btn wood room-action">Back to Menu</a>
@@ -100,5 +101,6 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="{{ asset('js/xp.js') }}"></script>
 <script src="{{ asset('js/room.js') }}"></script>
 {% endblock %}

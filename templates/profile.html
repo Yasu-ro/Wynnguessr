@@ -15,10 +15,21 @@
         {% endif %}
     </div>
 
-    <div class="profile-stats">
-        <div class="profile-stat"><b>{{ played }}</b><span>Multiplayer games</span></div>
-        <div class="profile-stat"><b>{{ wins }}</b><span>Wins</span></div>
+    <div class="xp big" title="{{ '{:,}'.format(p.xp) }} XP">
+        <div class="xp-bar"><span class="xp-fill" style="width: {{ (100 * p.into / p.need) | round(1) }}%"></span></div>
+        <b class="xp-level">{{ p.level }}</b>
     </div>
+    <p class="xp-next">{{ '{:,}'.format(p.need - p.into) }} XP to level {{ p.level + 1 }}</p>
+    <p class="hint">1 XP for every 100 points you score, and 50 more when you beat your friends.</p>
+
+    <div class="profile-stats">
+        <div class="profile-stat"><b>{{ p.played }}</b><span>Multiplayer games</span></div>
+        <div class="profile-stat"><b>{{ p.wins }}</b><span>Wins</span></div>
+        <div class="profile-stat"><b>{{ p.best }}</b><span>Best win streak</span></div>
+    </div>
+    {% if p.streak >= 2 %}
+    <p class="streak-now"><i class="material-icons xp-fire">local_fire_department</i>{{ p.streak }} wins in a row!</p>
+    {% endif %}
 
     <h2 class="section-title">Match History</h2>
     {% for g in games %}

@@ -768,6 +768,7 @@ function results() {
             viewer.destroy();
             viewer = null;
         }
+        gain();
     }
     var medals = ['#d4af37', '#c0c0c0', '#cd7f32'];
     var rows, value, same;
@@ -811,6 +812,22 @@ function results() {
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
+}
+
+// the XP this game brought (accounts only), and the wins in a row
+function gain() {
+    var slot = document.getElementById('xp-slot');
+    $.ajax({url: 'api/room/' + code + '/xp', dataType: 'json', timeout: 8000}).done(function (x) {
+        if (x.success) {
+            var notes = x.bonus ? ['Win bonus: +' + x.bonus + ' XP'] : [];
+            if (x.streak >= 2) {
+                notes.push("<b><i class='material-icons xp-fire'>local_fire_department</i>" + x.streak + ' wins in a row!</b>');
+            }
+            xpGain(slot, x.xp, x.gained, notes);
+        } else if (x.guest) {
+            slot.innerHTML = "<p class='xp-note'><a href='register'>Make an account</a> to earn XP and level up.</p>";
+        }
+    });
 }
 
 $('#again-button').on('click', function () {

@@ -4,6 +4,10 @@
             <label for="board-classic" class="tab">Classic</label>
             <input type="radio" name="mode" id="board-survival" value="survival">
             <label for="board-survival" class="tab">Survival</label>
+            <input type="radio" name="mode" id="board-levels" value="levels">
+            <label for="board-levels" class="tab">Levels</label>
+            <input type="radio" name="mode" id="board-wins" value="wins">
+            <label for="board-wins" class="tab">Wins</label>
         </div>
         <div class="filters">
             <div class="board-group chips">
@@ -42,13 +46,7 @@
 
     <table class="leaderboard-table board-table">
         <thead>
-            <tr class="leaderboard-row">
-                <th>#</th>
-                <th class="board-player">Player</th>
-                <th id="board-score">Score</th>
-                <th>Time</th>
-                <th class="board-date">Date</th>
-            </tr>
+            <tr class="leaderboard-row" id="board-head"></tr>
         </thead>
         <tbody id="table-body"></tbody>
     </table>

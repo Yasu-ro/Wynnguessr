@@ -7,6 +7,8 @@ var maxRounds = $('#game-variables').attr('rounds');
 var score = 0;
 var totalScore = 0;
 var mode = $('#game-variables').attr('mode');
+var account = $('#game-variables').attr('account') == '1';
+var xpResult = null;     // what the saved game brought: {xp, gained}, 'pending' on its way
 var SURVIVAL = 500; // survival: how close a guess must land to keep going, in blocks
 var streak = 0;
 var images = [];
@@ -252,13 +254,37 @@ function saveIfOver(survived) {
     }
     saved = true;
     gameOver = true;
+    var game;
     if (mode == 'survival') {
         if (streak == 0) {
             return;  // nothing found: nothing for the leaderboard
         }
-        post('api/score', {'score': streak, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'mode': 'survival'});
+        game = {'score': streak, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'mode': 'survival'};
     } else {
-        post('api/score', {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds});
+        game = {'score': totalScore, 'look': look, 'provinces': provinces, 'totalTime': totalTime, 'rounds': maxRounds};
+    }
+    xpResult = 'pending';
+    $.ajax({url: 'api/score', data: game, type: 'post', dataType: 'json'})
+        .done(function (r) {
+            xpResult = r.success ? r : null;
+            showGain();
+        })
+        .fail(function (error) {
+            xpResult = null;
+            console.log(error);
+        });
+}
+
+// the end screen: the XP the game brought, or why there is none
+function showGain() {
+    var slot = document.getElementById('xp-slot');
+    if (!slot || slot.childNodes.length) {
+        return;
+    }
+    if (!account) {
+        slot.innerHTML = "<p class='xp-note'><a href='login?next=mode%3Fplay%3Dsolo'>Log in</a> to earn XP and level up.</p>";
+    } else if (xpResult && xpResult != 'pending') {
+        xpGain(slot, xpResult.xp, xpResult.gained);
     }
 }
 
@@ -285,9 +311,11 @@ function finalScore() {
         "<p id='Finish Message' class='score-info'></p>" + 
         "<div class = 'progress-bar'>" +
         "<div class = 'progress' id = 'progress'></div></div>" + 
-        "<p id='score' class='score-info'></p>" + 
+        "<p id='score' class='score-info'></p>" +
+        "<div id='xp-slot' class='xp-slot'></div>" +
         "<button id='next-button' class='next-button'>Play Again!</button></div>";
     document.getElementById('guess-screen').innerHTML = "";
+    showGain();
 
     scoreMap = L.map('scoreMap', {
         crs: L.CRS.Simple,
@@ -347,18 +375,6 @@ function finalScore() {
     }
     $('#next-button').click(function(){
         location.reload();
-    });
-}
-
-function post(path, params, method='post') {
-    $.ajax({
-        url: path,
-        data: params,
-        type: method,
-        dataType: 'json',
-        error: function(error){
-            console.log(error);
-        }
     });
 }
 

@@ -36,6 +36,10 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   Les fichiers statiques n'en ont pas besoin.
 - **Piège payé deux fois** : `pkill -f "...gunicorn..."` tue aussi le shell qui
   lance la commande (la ligne contient le motif). Tuer par PID via `ss -ltnp`.
+- **Recharger sans couper** (utile quand le mod est en tournée sur la bêta) :
+  `systemctl --user kill -s HUP --kill-whom=main wynnguessr-beta` — gunicorn
+  démarre un worker avec le nouveau code, l'ancien finit ses requêtes. Vérifié
+  le 2026-10-17 pendant une tournée : aucun envoi du mod perdu.
 - Exposition :
   - `https://wynndle.com` : tunnel Cloudflare, service `cloudflared`
     (`~/.cloudflared/config.yml`, voir le CLAUDE.md racine). Adresse principale.
@@ -254,6 +258,61 @@ Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
 - Seules les parties Classic (solo et salon) vont au classement ; les comptes
   invités jamais.
 
+## Niveaux, XP et séries de victoires
+
+2026-10-17, demande de Yasuro : des niveaux pour les comptes, « genre barre
+d'xp minecraft + lvl au milieu », ni trop durs ni trop faciles, sans fouillis ;
+au classement des onglets Levels et Wins ; des séries de victoires en multi.
+
+- **XP** (comptes seulement, jamais les invités) : 1 XP par 100 points
+  (chaque manche de salon, chaque partie solo Classic) ; 45 XP par lieu trouvé
+  en Survival (la partie ne garde que la série ; un lieu à moins de 500 blocs
+  vaut au moins 3 915 points, ~4 500 en moyenne) ; +50 XP par victoire en
+  salon (règle de `history()` : salon terminé, au moins 2 joueurs, 1er,
+  égalité comprise).
+- **Jamais stockée** : `progress()` la recalcule depuis `history()` et
+  `room_guesses`, comme les PV et les vies. Les parties d'avant les niveaux
+  comptent, et changer une règle recalcule tout le monde. Toute manche jouée
+  en salon compte, même dans une partie abandonnée.
+- **Courbe** : le niveau L demande 50·L·(L−1) XP au total, chaque niveau
+  100 XP de plus que le précédent (niveau 2 à 100, 5 à 1 000, 10 à 4 500, 20 à
+  19 000). Formule dans `level_of()` (app.py) et recopiée dans `levelOf()`
+  (xp.js). Calibrée sur les vraies données : une manche vaut 3 500 points en
+  moyenne (médiane 4 441), une partie de 5 manches ~175 XP, donc niveau 2 dès
+  la première partie, 5 en ~6 parties, 10 en ~25, 20 en ~110. Le 2026-10-17 :
+  Yasuro 8, 13tiak 5, Ragus 4, kemmi et Roguefort 3. Inspirée de Minecraft
+  (coût par niveau qui croît linéairement), de GeoGuessr (XP selon le score)
+  et du game design (petites victoires dès les premières minutes, paliers qui
+  s'espacent sans mur exponentiel).
+- **Où** : le niveau dans le carré du bouton Profile du menu, avec une fine
+  barre en bas ; sur le profil, la grande barre (« N XP to level L+1 » et une
+  ligne d'explication) ; en fin de partie solo (écran final) et de salon
+  (résultats) : « +N XP », la barre se remplit, le niveau fait un « pop » et
+  « Level N! » à chaque palier, puis le menu se met à jour. Joueur anonyme ou
+  invité : une seule ligne « Log in / Make an account to earn XP ».
+- **Sons** (`xp.js`, WebAudio, aucun fichier) : un tintement d'orbe à hauteur
+  aléatoire toutes les 100 ms pendant le remplissage (Minecraft : 10 orbes par
+  seconde, hauteur 0,55 à 1,25), un carillon montant à chaque niveau, plus long
+  tous les 5 niveaux (Minecraft joue sa fanfare tous les 5 niveaux). Coupés par
+  le bouton son des salons (`wynnguessr-muted`). Volume jamais validé à
+  l'oreille.
+- **Séries de victoires** (salons) : `best`, le record, toujours affiché (plaque
+  du profil, colonne du classement) ; `streak`, la série en cours, seulement à
+  partir de 2 (flamme sur le profil, dans l'onglet Wins, en fin de salon gagné).
+  Une série cassée n'est jamais affichée « 0 » : afficher la perte crée de
+  l'anxiété, le record sert de trophée permanent (recherche sur les séries).
+- **Classement** : Classic, Survival, Levels (niveau, XP, parties), Wins
+  (victoires, parties en salon, meilleure série ; seulement ceux qui ont gagné
+  au moins une fois ; départage : meilleure série, puis le moins de parties).
+  Pas d'onglet « Games » à part : presque identique à Levels puisque l'XP vient
+  des parties, d'où une colonne. Les filtres se masquent sur ces deux onglets.
+- API : `api/score` renvoie `xp` et `gained` ; `GET api/room/<code>/xp` (salon
+  terminé) renvoie `xp`, `gained`, `bonus`, `streak`, ou `guest`. `ladder()`
+  calcule les deux onglets (~5 ms le 2026-10-17).
+- **Limite connue** : les scores solo sont envoyés par le navigateur (comme
+  pour le classement), donc un tricheur peut gonfler son XP solo. Les salons
+  sont calculés par le serveur.
+
 ## Salons (multijoueur)
 
 - Code 6 caractères sans 0/O/1/I/L, insensible à la casse ; lien `room?code=`.
@@ -338,25 +397,35 @@ fan, sans rien voler).
   `:root`. `solo.py` et `room.py` (Playwright) jouent une partie solo de 3
   manches et un salon à deux invités `zz_` (`room.py <url> <préfixe>
   classic|duel|royale [largeur hauteur]`) et photographient chaque écran.
+  `xpsolo.py` (un compte `zz_` vise juste en solo, puis photographie la barre
+  d'XP qui se remplit) et `xproom.py` (deux comptes `zz_`, deux salons gagnés
+  d'affilée : bonus de victoire et série ; 3e argument = chemin de la base,
+  pour lire les réponses).
 - **Méthode qui a marché** : développer sur une copie isolée dans le
   scratchpad (templates + statiques copiés, grosses images en liens, base
-  copiée par `sqlite3.backup`, `REVIEWERS` remplacé par un compte `zz_`,
-  `PUBLISHER` vide, gunicorn sur un port libre), jamais en direct dans
+  copiée par `sqlite3.backup`, gunicorn sur un port libre), jamais en direct dans
   `~/Wynnguessr-beta` : ses fichiers statiques sont servis tout de suite et
   kemmi peut être en train de trier. Vérifier sous Chromium **et Firefox**
-  (navigateur de Yasuro), ordinateur et 375 px. Puis copier, redémarrer la
-  bêta, effacer les copies de base du scratchpad.
+  (navigateur de Yasuro), ordinateur et 375 px. Puis copier, recharger la
+  bêta, effacer les copies de base du scratchpad. Les réglages de test passent
+  par un petit `dev_app.py` à côté (il importe `app`, fait
+  `is_reviewer.__defaults__ = (('zz_review',),)` et active le rechargement des
+  templates) : `app.py` reste identique à celui de la bêta et se recopie tel
+  quel. Une copie de la **vraie** base montre les niveaux réels des joueurs ;
+  une session de test se signe avec la clé de la copie (cookie
+  `wynnguessr_session`).
 - Référence de leur style : leurs pages se photographient avec Playwright
   (site rendu en JS) ; les pages stats/classement sont derrière une
   vérification Cloudflare, ne pas la contourner.
 
 - `mode` : choix **Solo / With Friends** d'abord (`?play=solo|friends`), puis
   réglages (`settings.html` + `modes.html`, partagés avec la salle d'attente).
-- `profile` : stats multijoueur (parties, victoires) + historique façon
+- `profile` : barre d'XP, stats multijoueur (parties, victoires, meilleure
+  série) + historique façon
   Valorant (`history()` ; une partie de salon est dans `scores` avec `room`,
   pour ne pas la compter deux fois). Volontairement différent du classement.
-- `leaderboard` : onglets Classic/Survival, filtres, meilleure partie par
-  joueur ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
+- `leaderboard` : onglets Classic/Survival (filtres, meilleure partie par
+  joueur) et Levels/Wins (voir « Niveaux ») ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
 - Pied de page hors jeu (`footer.html`) : Made by Ched3, Hosted & modified
   by Yasuro, Wynncraft, Fan-made, not official (séparés par l'espace, plus par
   des points médians).
@@ -525,8 +594,9 @@ un lien déjà partagé peut garder l'ancien.
 ### Où on en est (2026-10-17, fin de session)
 
 - 671 lieux publiés. Flux : mod → tri sur la bêta → Push. **La bêta a
-  d'avance la refonte de la DA** (2026-10-17, voir « Pages et direction
-  artistique ») : pas encore fusionnée, en attente de l'accord de Yasuro. **Le classifieur de Claude Code refuse les mises en prod
+  d'avance la refonte de la DA et les niveaux** (2026-10-17, voir « Pages et
+  direction artistique » et « Niveaux ») : pas encore fusionnées, en attente de
+  l'accord de Yasuro. **Le classifieur de Claude Code refuse les mises en prod
   (fusion, redémarrage, écriture dans la base du vrai site) tant que Yasuro
   ne l'a pas dit explicitement dans le message même** (« push everything »
   a suffi) : demander, ne pas contourner.

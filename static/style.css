@@ -25,6 +25,7 @@
     --teal: #61abb0;
     --teal-light: #77d1d7;
     --track: #465b50;
+    --xp: #80ff20;           /* Minecraft's experience green */
     --night: #24221d;
     --stone: #1d1c19;
     --hand: 'Architects Daughter', Ubuntu, cursive;
@@ -161,6 +162,27 @@ button, input {
     font-size: 20px;
     color: var(--paper);
     background: var(--ink);
+}
+.pill {
+    position: relative;
+}
+.pill-level {
+    display: grid;
+    place-items: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 6px;
+    font: 700 17px/1 var(--sans);
+    color: var(--xp);
+    background: var(--ink);
+    text-shadow: 0 2px 0 #000;
+}
+.pill-xp {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    background: var(--xp);
 }
 .pill:hover, .pill[aria-current] {
     background: var(--paper-light);
@@ -664,8 +686,9 @@ button, input {
 }
 .tabs {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 14px;
+    gap: 12px 14px;
     margin-bottom: 22px;
 }
 .tab {
@@ -842,6 +865,123 @@ button, input {
     flex: 1;
 }
 .match-day {
+    white-space: nowrap;
+}
+
+/* ---------- Levels ---------- */
+
+/* the experience bar, Minecraft style: notched, bright green, the level on its middle */
+.xp {
+    position: relative;
+    margin: 14px 0 4px;
+}
+.xp-bar {
+    position: relative;
+    height: 14px;
+    overflow: hidden;
+    background: var(--track);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, .25);
+}
+.xp-bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), rgba(20, 30, 10, .45) calc(10% - 2px) 10%);
+}
+.xp-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(#c8ff8a 0 22%, var(--xp) 22% 68%, #59c416 68%);
+}
+.xp-level {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font: 700 26px/1 var(--sans);
+    color: var(--xp);
+    text-shadow: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink),
+                 2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink),
+                 0 4px 0 var(--ink);
+}
+.xp.big {
+    margin: 26px 0 6px;
+}
+.xp.big .xp-bar {
+    height: 20px;
+}
+.xp.big .xp-level {
+    font-size: 36px;
+}
+.xp-level.pop {
+    animation: xp-pop .5s cubic-bezier(.2, 1.8, .4, 1);
+}
+@keyframes xp-pop {
+    40% {
+        color: #fff;
+        transform: translate(-50%, -50%) scale(1.7);
+    }
+}
+.xp-next {
+    font-size: 15px;
+    color: var(--ink-soft);
+    text-align: center;
+}
+/* the end of a game: "+185 XP", the bar filling up, "Level 9!" */
+.xp-slot {
+    width: min(460px, 100%);
+    margin: 8px auto;
+    text-align: center;
+}
+.xp-slot:empty {
+    display: none;
+}
+.xp-panel {
+    text-align: center;
+}
+.xp-gain {
+    font: 700 24px/1.2 var(--sans);
+    color: var(--green-dark);
+    font-variant-numeric: tabular-nums;
+}
+.xp-up {
+    margin-top: 14px;
+    font: 400 28px/1 var(--hand);
+    -webkit-text-stroke: .4px currentColor;
+}
+.xp-note {
+    margin-top: 8px;
+    font-size: 16px;
+    color: var(--ink-soft);
+}
+.xp-note a {
+    color: var(--ink);
+    font-weight: 700;
+}
+.material-icons.xp-fire {
+    margin-right: 3px;
+    font-size: 20px;
+    color: #e8701a;
+    vertical-align: -4px;
+}
+.streak-now {
+    margin: -20px 0 30px;
+    font-weight: 700;
+    text-align: center;
+}
+/* the level in the leaderboard */
+.lvl {
+    font: 700 19px/1 var(--sans);
+    color: var(--xp);
+    text-shadow: 1.5px 0 0 var(--ink), -1.5px 0 0 var(--ink), 0 1.5px 0 var(--ink), 0 -1.5px 0 var(--ink),
+                 0 2.5px 0 var(--ink);
+}
+.board-fire {
+    margin-left: 6px;
+    font-weight: 700;
     white-space: nowrap;
 }
 
@@ -1715,8 +1855,31 @@ body.room-playing {
         width: 110px;
         height: 110px;
     }
-    .board-date {
+    .board-more {
         display: none;
+    }
+    .tabs {
+        gap: 10px 9px;
+    }
+    .tab {
+        padding: 5px 7px 6px;
+        font-size: 16px;
+    }
+    .profile-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0 22px;
+    }
+    .profile-stat {
+        min-width: 0;
+        padding: 8px 4px 10px;
+    }
+    .profile-stat b {
+        font-size: 30px;
+    }
+    .profile-stat span {
+        font-size: 13px;
+        line-height: 1.2;
     }
     .leaderboard-table {
         font-size: 15px;

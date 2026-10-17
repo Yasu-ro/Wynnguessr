@@ -102,7 +102,9 @@ def post_score():
                 return jsonify({"success": False})
         with connect() as c:
             c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (session['user_id'], score, date.today(), look, provinces, rounds, totalTime, mode))
-        return jsonify({"success": True})
+            # for the end screen: the XP of this game, and the total it reaches
+            xp = progress(c, session['user_id'])['xp']
+        return jsonify({"success": True, "xp": xp, "gained": solo_xp(int(score), mode)})
     return jsonify({"success": False})
 
 def board(c, form, user_id = None):
@@ -119,15 +121,31 @@ def board(c, form, user_id = None):
         params.append(user_id)
     return [dict(row) for row in c.execute(query + " ORDER BY s.score DESC, s.time ASC", params)]
 
+def ladder(c, mode):
+    # levels: the most XP first; wins (players who won at least once): the most
+    # wins with friends first, then the longest streak, then the fewest games for them
+    rows = []
+    for u in c.execute("SELECT id, username, mc_name FROM users WHERE COALESCE(guest, 0) = 0").fetchall():
+        p = progress(c, u['id'])
+        if p['xp'] if mode == 'levels' else p['wins']:
+            rows.append({'name': u['username'], 'mc': u['mc_name'],
+                         **{k: p[k] for k in ('xp', 'level', 'games', 'played', 'wins', 'best', 'streak')}})
+    if mode == 'levels':
+        return sorted(rows, key = lambda r: -r['xp'])
+    return sorted(rows, key = lambda r: (-r['wins'], -r['best'], r['played']))
+
 @app.route("/api/updaterank", methods=['POST'])
 def update_rank():
-    # each player's best game
+    # each player's best game, or the levels, or the wins with friends
     with connect() as c:
-        rows, seen = [], set()
-        for row in board(c, request.form):
-            if row['name'] not in seen:
-                seen.add(row['name'])
-                rows.append(row)
+        if request.form.get('mode') in ('levels', 'wins'):
+            rows = ladder(c, request.form['mode'])
+        else:
+            rows, seen = [], set()
+            for row in board(c, request.form):
+                if row['name'] not in seen:
+                    seen.add(row['name'])
+                    rows.append(row)
         me = session.get('user_id') and c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
     return jsonify({"rows": rows[:50], "me": me[0] if me else None})
 
@@ -265,10 +283,8 @@ def profile():
         return redirect('login?next=profile')
     with connect() as c:
         profile = c.execute("SELECT username, mc_name FROM users WHERE id = ?", (session['user_id'],)).fetchone()
-        games = history(c, session['user_id'])
-    multi = [g for g in games if g['multi']]
-    return render_template('profile.html', username = profile[0], mc_name = profile[1], games = games[:30],
-                           played = len(multi), wins = sum(g['win'] for g in multi))
+        p = progress(c, session['user_id'])
+    return render_template('profile.html', username = profile[0], mc_name = profile[1], games = p['history'][:30], p = p)
 
 def history(c, uid):
     # the player's games, newest first: finished rooms with at least two
@@ -290,7 +306,7 @@ def history(c, uid):
         if uid not in players or len(players) < 2:
             continue
         rank = 1 + sum(key(u) > key(uid) for u in players)
-        games.append({'multi': True, 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
+        games.append({'multi': True, 'code': r['code'], 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
                       'score': totals.get(uid, 0), 'rounds': r['round'], 'when': when or 0,
                       'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out')})
     for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode FROM scores
@@ -304,6 +320,56 @@ def history(c, uid):
     for g in games:
         g['day'] = time.strftime('%b %d, %Y', time.localtime(g['when'])) if g['when'] else ''
     return sorted(games, key = lambda g: g['when'], reverse = True)
+
+# ---------- Levels ----------
+# Accounts earn XP by playing (guests do not): 1 XP for every 100 points
+# scored, in a room or alone; in survival, which only keeps the streak, 45 XP
+# for each spot found (one within 500 blocks is worth about 4,500 points); and
+# 50 more for winning a game with friends. Like health and lives, XP is never
+# stored: it is worked out again from the games, so the games played before
+# levels existed count too. Level L takes 50·L·(L−1) XP in all: each level asks
+# 100 XP more than the one before (xp.js has the same formula).
+
+WIN_XP = 50
+SPOT_XP = 45
+
+def level_of(xp):
+    return (5 + math.isqrt(25 + 2 * xp)) // 10
+
+def level_xp(level):
+    # XP needed to reach a level
+    return 50 * level * (level - 1)
+
+def solo_xp(score, mode):
+    return score * SPOT_XP if mode == 'survival' else score // 100
+
+def room_xp(points, win):
+    return points // 100 + (WIN_XP if win else 0)
+
+def progress(c, uid):
+    # an account's XP and level, its games, and its wins with friends in a row
+    games = history(c, uid)
+    best = run = wins = 0
+    for g in sorted((g for g in games if g['multi']), key = lambda g: g['when']):
+        run = run + 1 if g['win'] else 0
+        best = max(best, run)
+        wins += g['win']
+    # every round played in a room counts, even in a game left unfinished
+    xp = (sum(p // 100 for (p,) in c.execute("SELECT SUM(score) FROM room_guesses WHERE user_id = ? GROUP BY code", (uid,)))
+          + sum(solo_xp(g['score'], g['mode']) for g in games if not g['multi'])
+          + WIN_XP * wins)
+    level = level_of(xp)
+    return {'xp': xp, 'level': level, 'into': xp - level_xp(level), 'need': level_xp(level + 1) - level_xp(level),
+            'games': len(games), 'played': sum(g['multi'] for g in games), 'wins': wins,
+            'best': best, 'streak': run, 'history': games}
+
+@app.context_processor
+def menu_level():
+    # the level shown in the menu, worked out only by the pages that show it
+    def mine():
+        with connect() as c:
+            return progress(c, session['user_id'])
+    return {'my_progress': mine}
 
 # ---------- Wynncraft account ----------
 # "Log in with Wynncraft" (OAuth2): Wynncraft vouches for the Minecraft
@@ -829,6 +895,23 @@ def room_again(code):
                                               'rounds': r['rounds'], 'time_limit': r['time_limit'], 'look': r['look']})
             c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (nxt, r['code']))
     return jsonify({"success": bool(nxt), "code": nxt})
+
+@app.route("/api/room/<code>/xp")
+def room_level(code):
+    # for the end screen: the XP this game brought, the total it reaches, and
+    # the wins in a row if it was one (guests earn none)
+    with connect() as c:
+        r, me = member(c, code)
+        if not r or r['state'] != 'finished':
+            return jsonify({"success": False})
+        if not session.get('loggedin'):
+            return jsonify({"success": False, "guest": True})
+        p = progress(c, me['user_id'])
+        win = any(g['win'] for g in p['history'] if g.get('code') == r['code'])
+        points = c.execute("SELECT COALESCE(SUM(score), 0) FROM room_guesses WHERE code = ? AND user_id = ?",
+                           (r['code'], me['user_id'])).fetchone()[0]
+    return jsonify({"success": True, "xp": p['xp'], "gained": room_xp(points, win), "bonus": WIN_XP if win else 0,
+                    "streak": p['streak'] if win else 0})
 
 # ---------- Captures and review ----------
 # The Wynndle Panorama mod (mod/) sends each panorama here as it is taken; it
