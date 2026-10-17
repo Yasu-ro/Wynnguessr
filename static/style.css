@@ -1882,6 +1882,262 @@ body.room-playing {
 
 /* ---------- Narrow screens ---------- */
 
+/* ---------- Motion ----------
+   Studied before drawing (2026-10-18, see CLAUDE.md): nothing moves without a
+   cause (a player's action, an event of the game), the more often something
+   happens the less it moves, and things move like what they are made of:
+   signs hang on ropes and swing, planks slide and knock, pins fall and
+   bounce, a stamp hits. The curves that overshoot and come back are
+   wynncraft.com's. Never a fade from below, a glow, a lift with a soft
+   shadow or a loop. */
+
+/* a sign comes down on its ropes and swings to a stop (every page: short) */
+.sign {
+    transform-origin: 50% -100px;
+    animation: sign-hang .9s both;
+}
+@keyframes sign-hang {
+    0% {
+        transform: translateY(-26px) rotate(2.4deg);
+        animation-timing-function: ease-in;
+    }
+    28% {
+        transform: translateY(2px) rotate(-1.6deg);
+        animation-timing-function: ease-in-out;
+    }
+    48% {
+        transform: translateY(0) rotate(.9deg);
+        animation-timing-function: ease-in-out;
+    }
+    68% {
+        transform: rotate(-.4deg);
+        animation-timing-function: ease-in-out;
+    }
+    85% {
+        transform: rotate(.15deg);
+    }
+    100% {
+        transform: none;
+    }
+}
+
+/* a pin put on the map falls into place and bounces once; the pins of a
+   reveal fall from higher */
+.pin-drop {
+    animation: pin-fall .22s both;
+    --fall: -16px;
+}
+.pin-land {
+    animation: pin-fall .34s both;
+    --fall: -44px;
+}
+@keyframes pin-fall {
+    0% {
+        translate: 0 var(--fall);
+        animation-timing-function: ease-in;
+    }
+    60% {
+        translate: 0 0;
+        animation-timing-function: ease-out;
+    }
+    78% {
+        translate: 0 -4px;
+        animation-timing-function: ease-in;
+    }
+    100% {
+        translate: 0 0;
+    }
+}
+
+/* "Bullseye!" hits like a stamp */
+.stamp {
+    animation: stamp .32s cubic-bezier(.2, 1.6, .4, 1) both;
+}
+@keyframes stamp {
+    0% {
+        opacity: 0;
+        transform: scale(1.7) rotate(-5deg);
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* what a round costs: the health or the hearts take the knock; a heart won back pops */
+.hit > td:last-child {
+    animation: knock .32s both;
+}
+@keyframes knock {
+    20%, 60% {
+        translate: -4px 0;
+    }
+    40%, 80% {
+        translate: 4px 0;
+    }
+}
+.heal > td:last-child .room-heart:not(.empty) {
+    animation: heart-pop .4s cubic-bezier(.2, 1.8, .4, 1);
+}
+@keyframes heart-pop {
+    40% {
+        transform: scale(1.6);
+    }
+}
+
+/* the podium: each place slides in like a plank and knocks into place */
+.plank-in {
+    animation: plank .38s both;
+}
+@keyframes plank {
+    0% {
+        opacity: 0;
+        translate: -70px 0;
+        animation-timing-function: cubic-bezier(.3, .7, .4, 1);
+    }
+    72% {
+        opacity: 1;
+        translate: 7px 0;
+        animation-timing-function: ease-in-out;
+    }
+    100% {
+        translate: 0 0;
+    }
+}
+
+/* the light that crosses a big button once when the pointer comes on it, and
+   the winner's line once (wynncraft.com's shine) */
+.btn.big, .guess-button {
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
+}
+.btn.big::after, .guess-button::after, .row-shine {
+    content: "";
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 22%;
+    z-index: -1;   /* over the colour, under the text */
+    background: rgba(255, 255, 255, .38);
+    transform: translateX(-160%) skewX(-28deg);
+    pointer-events: none;
+}
+.btn.big:not(:disabled):hover::after, .guess-button:not(:disabled):hover::after {
+    transform: translateX(560%) skewX(-28deg);
+    transition: transform .65s ease-in-out;
+}
+.row-shine {
+    width: 9%;
+    animation: shine 1s ease-in-out .15s both;
+}
+@keyframes shine {
+    to {
+        transform: translateX(1200%) skewX(-28deg);
+    }
+}
+.shine-box {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+}
+#results {
+    position: relative;
+}
+
+/* the profile's experience bar fills up when the page opens, then the level pops */
+.profile .xp-fill {
+    animation: xp-fill .9s cubic-bezier(.25, .8, .3, 1) .2s both;
+}
+@keyframes xp-fill {
+    from {
+        width: 0;
+    }
+}
+.profile .xp-level {
+    animation: xp-pop .5s cubic-bezier(.2, 1.8, .4, 1) 1.05s;
+}
+
+/* toasts, as in Minecraft: a small board slides in from the corner, says one
+   thing, and goes */
+.toasts {
+    position: fixed;
+    top: calc(var(--nav) + 14px);
+    right: 14px;
+    z-index: 2100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    pointer-events: none;
+}
+.toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(320px, calc(100vw - 28px));
+    min-height: 40px;
+    padding: 0 14px 0 0;
+    overflow: hidden;
+    font: 700 16px/1.25 var(--sans);
+    color: var(--ink);
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: inset 0 -3px 0 rgba(63, 39, 36, .15), 0 4px 0 rgba(0, 0, 0, .3);
+    animation: toast-in .3s cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.toast.out {
+    animation: toast-out .2s ease-in both;
+}
+.toast > .material-icons, .toast-level {
+    display: grid;
+    place-items: center;
+    flex: none;
+    align-self: stretch;
+    width: 40px;
+    font-size: 22px;
+    color: var(--paper);
+    background: var(--ink);
+}
+.toast-level {
+    font: 700 19px/1 var(--sans);
+    color: var(--xp);
+    text-shadow: 0 2px 0 #000;
+}
+.toast span {
+    padding: 8px 0;
+}
+@keyframes toast-in {
+    from {
+        transform: translateX(calc(100% + 20px));
+    }
+}
+@keyframes toast-out {
+    to {
+        transform: translateX(calc(100% + 20px));
+    }
+}
+
+/* the home page: the street of Wynn turns slowly behind the title, like the
+   title screen of Minecraft; it appears once its pictures are there */
+.hero-pano {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+    pointer-events: none;
+}
+.hero-pano.ready {
+    opacity: 1;
+}
+.hero > :not(.hero-pano) {
+    position: relative;
+}
+.hero::after {
+    z-index: 1;
+}
+
 @media (max-width: 900px) {
     .nav-btn span, .pill span {
         display: none;
@@ -2084,5 +2340,6 @@ body.room-playing {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         transition: none !important;
+        animation: none !important;
     }
 }

@@ -33,6 +33,9 @@ function xpGain(slot, total, gained, notes) {
         badge.classList.remove('pop');
         void badge.offsetWidth;  // restart the animation
         badge.classList.add('pop');
+        if (typeof toast == 'function') {
+            toast('Level ' + level + '!', "<b class='toast-level'>" + level + "</b>");
+        }
     };
     showXp(panel, from);
     if (gained <= 0 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {

@@ -19,7 +19,8 @@ var nextAt = null;       // when the next round starts by itself, local clock
 var polling = false, pollAgain = false, pollTimer = null;
 var heard = null;        // players already known to have guessed this round
 var lastSecond = null;   // last whole second of the clock shown
-var lobbyNames = null;   // players seen in the lobby, to hear who comes in
+var seenNames = null;    // players already known, to tell who comes in
+var seenHost = null;     // who held the room at the last look
 
 $(document).ready(function () {
     setNav();
@@ -106,6 +107,7 @@ function render(data) {
     s = data;
     if (s.next_url) preload(s.next_url);
     chat(s.chat);
+    arrivals();
     if (s.next && s.live && s.state == 'finished') {
         leaving = true;
         location.href = 'room?code=' + s.next;
@@ -123,6 +125,31 @@ function render(data) {
     } else {
         guess();
     }
+}
+
+// who came in (a door in the lobby, a toast everywhere: several at once make
+// one toast) and who holds the room now (not on the first look)
+function arrivals() {
+    var names = s.players.map(function (p) { return p.name; });
+    var host = s.players.filter(function (p) { return p.host; })[0];
+    if (seenNames) {
+        var come = names.filter(function (n) { return seenNames.indexOf(n) < 0; });
+        if (come.length) {
+            if (s.live && s.state == 'waiting') {
+                Sfx.play('join');
+            }
+            var old = document.querySelector('[data-group="join"]:not(.out)');
+            var all = (old && old.names || []).concat(come);
+            toast(esc(all[0]) + (all.length > 1 ? ' and ' + (all.length - 1) + ' more' : '') + ' joined',
+                  toastIcon('person_add'), 'join').names = all;
+        }
+        if (host && host.name != seenHost) {
+            Sfx.play('toast');
+            toast(host.you ? 'You are now the host' : esc(host.name) + ' is now the host', toastIcon('star'));
+        }
+    }
+    seenNames = names;
+    seenHost = host ? host.name : null;
 }
 
 // ---------- helpers ----------
@@ -363,11 +390,6 @@ function lobby() {
         view = 'lobby';
         show('lobby');
     }
-    var names = s.players.map(function (p) { return p.name; });
-    if (lobbyNames && names.some(function (n) { return lobbyNames.indexOf(n) < 0; })) {
-        Sfx.play('join');
-    }
-    lobbyNames = names;
     $('#lobby-players').html(s.players.map(function (p) {
         // the host can hand the room over, or kick (a second click confirms)
         var tools = s.host && !p.you ? "<span class='room-tools'>" +
@@ -509,6 +531,7 @@ function guess() {
             }
             var b = blockAt(e.latlng);
             marker = L.marker(blockSpot(b.x, b.z), {icon: pin(color(me()))}).addTo(map);
+            drop(marker);
             Sfx.play('pin');
             $('#guess-button').removeClass('room-warn').text('Guess!');
         });
@@ -654,8 +677,9 @@ function reveal() {
             revealMap.remove();
         }
         revealMap = makeMap('reveal-map', -1);
+        $('#reveal-mine').removeClass('stamp');
         var answer = blockSpot(s.reveal.X, s.reveal.Z);
-        L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(revealMap);
+        drop(L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(revealMap), true);
         // the guesses land one by one, the furthest first, each on a higher note
         var spots = [answer], drops = s.reveal.guesses.filter(function (g) {
             return g.x !== null && player(g.name);
@@ -667,9 +691,9 @@ function reveal() {
                 if (view != key) {
                     return;
                 }
-                L.polyline([answer, pos], {color: color(p), weight: 3, dashArray: '8 6'}).addTo(revealMap);
-                L.marker(pos, {icon: pin(color(p))}).addTo(revealMap)
-                    .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip'});
+                drawLine(L.polyline([answer, answer], {color: color(p), weight: 3, dashArray: '8 6'}).addTo(revealMap), answer, pos, 260);
+                drop(L.marker(pos, {icon: pin(color(p))}).addTo(revealMap)
+                    .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip'}), true);
                 Sfx.play('note', noteBlock(SCALE[Math.min(i, SCALE.length - 1)]));
             }, DROP * (i + 1));
         });
@@ -682,7 +706,9 @@ function reveal() {
     var mine = s.reveal.guesses.filter(function (g) { return g.name == you.name; })[0];
     var guessed = mine && mine.x !== null;
     var line = guessed ? "+<span id='reveal-count'>" + points(mine.score) + '</span>' : 'No guess this round';
-    if (guessed && mine.score >= BULLSEYE) {
+    var counted = !counting || counting.key != key || counting.done;
+    var bullseye = guessed && mine.score >= BULLSEYE && counted;
+    if (bullseye) {
         line = 'Bullseye! ' + line;
     }
     var bad = "<span class='room-loss'> · ", good = "<span class='room-gain'> · ";
@@ -709,7 +735,7 @@ function reveal() {
     }
     $('#reveal-title').text(s.mode == 'classic' ? 'Round ' + s.round + '/' + s.rounds
         : 'Round ' + s.round + (s.mode == 'duel' && s.multiplier > 1 ? ' · damage ×' + s.multiplier : ''));
-    $('#reveal-mine').html(line).toggleClass('none', !guessed).toggleClass('room-bullseye', guessed && mine.score >= BULLSEYE);
+    $('#reveal-mine').html(line).toggleClass('none', !guessed).toggleClass('room-bullseye', bullseye);
     $('#reveal-total').text({classic: 'Total', duel: 'HP', royale: 'Lives'}[s.mode]);
 
     var rows = s.players.map(function (p) {
@@ -725,7 +751,8 @@ function reveal() {
         var outA = a.p.out != null && a.p.out < s.round, outB = b.p.out != null && b.p.out < s.round;
         return outA - outB || b.score - a.score;
     });
-    $('#reveal-rows').html(rows.map(function (r) {
+    var knock = counting && counting.key == key && counting.done && !counting.knocked;
+    var html = rows.map(function (r) {
         var gone = r.p.out != null && r.p.out < s.round, last;
         if (s.mode == 'classic') {
             last = r.total.toLocaleString('en-US');
@@ -738,10 +765,21 @@ function reveal() {
         } else {
             last = hearts(r.p.left) + change(r.p);
         }
-        return "<tr class='" + (r.p.you ? 'you' : '') + (gone ? ' room-out' : '') + "'><td>" + dot(r.p) + esc(r.p.name) + "</td>" +
+        var hit = knock && !gone && s.mode != 'classic' && (r.p.out == s.round || r.p.delta < 0);
+        var heal = knock && !gone && s.mode == 'royale' && r.p.delta > 0;
+        return "<tr class='" + (r.p.you ? 'you' : '') + (gone ? ' room-out' : '') + (hit ? ' hit' : '') + (heal ? ' heal' : '') + "'>" +
+            "<td>" + dot(r.p) + esc(r.p.name) + "</td>" +
             "<td class='num'>" + (r.score >= 0 ? '+' + r.score.toLocaleString('en-US') : '-') + "</td>" +
             "<td class='num'>" + last + "</td></tr>";
-    }).join(''));
+    }).join('');
+    var plain = html.replace(/ (hit|heal)'/g, "'");
+    if (knock || plain != revealRows) {
+        $('#reveal-rows').html(html);
+        revealRows = plain;
+    }
+    if (knock) {
+        counting.knocked = true;
+    }
 
     if (s.next_in !== undefined) {
         nextAt = Date.now() + s.next_in * 1000;
@@ -757,6 +795,7 @@ var COUNT = 900;           // ms to count the points
 var SCALE = [5, 9, 12, 17, 21, 24];   // the pins' notes: up the scale, as note blocks
 var GOOD = 4000, BAD = 1500;          // above: a happy note; at or below: a low one
 var counting = null;
+var revealRows = '';       // the table as last written, without the knocks
 
 function count() {
     var c = counting;
@@ -766,8 +805,10 @@ function count() {
     var t = (Date.now() - c.from) / COUNT, el = document.getElementById('reveal-count');
     if (t >= 1) {
         c.done = true;
-        if (el) {
-            el.textContent = points(c.score);
+        // the line and the table as they end: "Bullseye!" stamps, health takes the knock
+        reveal();
+        if (c.verdict == 'perfect') {
+            replay(document.getElementById('reveal-mine'), 'stamp');
         }
         if (c.verdict) {
             Sfx.play(c.verdict);
@@ -854,16 +895,20 @@ function results() {
         podium(rows);
     }
     var rank = 0;
-    $('#results-rows').html(rows.map(function (p, i) {
+    var html = rows.map(function (p, i) {
         if (i == 0 || !same(p, rows[i - 1])) {
             rank = i + 1;
         }
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
         var v = value(p);
-        return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + (i < hidden ? ' podium-wait' : '') + "'><td>" + place + "</td>" +
-            "<td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td>" +
-            "<td>" + v[1] + "</td></tr>";
-    }).join(''));
+        return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + (i < hidden ? ' podium-wait' : '') + (i == plankNow ? ' plank-in' : '') + "'>" +
+            "<td>" + place + "</td><td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td><td>" + v[1] + "</td></tr>";
+    }).join('');
+    var plain = html.replace(" plank-in'", "'");
+    if (plankNow >= 0 || plain != resultRows) {
+        $('#results-rows').html(html);
+        resultRows = plain;
+    }
 
     var title = 'Results';
     if (hidden) {
@@ -879,6 +924,15 @@ function results() {
         if (s.live && rows.length > 1 && rows.some(function (p) { return p.you; })) {
             Sfx.play(rows[0].you && title != 'Draw!' ? 'win' : 'lose');
         }
+        if (s.live && rows.length > 1) {
+            // the sign swings with the winner's name, the light crosses their line once it has landed
+            replay(document.getElementById('results-title'));
+            if (title != 'Draw!') {
+                setTimeout(function () {
+                    shine(document.querySelector('#results-rows tr'), document.getElementById('results'));
+                }, 420);
+            }
+        }
         gain();
     }
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
@@ -892,6 +946,8 @@ function results() {
 // the villager's "hmm"), then the XP
 var PODIUM = 800;          // ms between two places
 var hidden = 0;            // top places still hidden
+var plankNow = -1;         // the place sliding in right now
+var resultRows = '';       // the table as last written, without the plank
 var finale = false;        // the podium is complete: time for the last sounds
 
 function podium(rows) {
@@ -907,7 +963,9 @@ function podium(rows) {
         hidden--;
         Sfx.play('note', noteBlock([24, 17, 12][hidden]));
         finale = !hidden;
+        plankNow = hidden;
         results();
+        plankNow = -1;
         if (hidden) {
             setTimeout(step, PODIUM);
         }

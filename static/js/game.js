@@ -60,6 +60,7 @@ function onMapClick(e) {
     var b = blockAt(e.latlng);
     markers[round - 1] = L.marker(blockSpot(b.x, b.z)).addTo(map);
     if (e.target === map) {
+        drop(markers[round - 1]);
         Sfx.play('pin');
     }
 }
@@ -113,7 +114,7 @@ function showScoreScreen() {
         if (mode == 'survival') {
             document.getElementById('next-button').innerHTML = "See Results";
         }
-        L.marker(blockSpot(xActual, zActual), { icon: greenIcon }).addTo(scoreMap);
+        drop(L.marker(blockSpot(xActual, zActual), { icon: greenIcon }).addTo(scoreMap), true);
         scoreMap.fitBounds(L.latLngBounds([blockSpot(xActual, zActual)]));
         return;
     }
@@ -154,13 +155,13 @@ function showScoreScreen() {
     document.getElementById('next-button').onclick = function(){
         nextStep(survived);
     };
-    L.marker(blockSpot(xActual, zActual), { icon: greenIcon }).addTo(scoreMap);
-    
-    L.marker(blockSpot(xGuess, zGuess)).addTo(scoreMap);
-    
-    //draws line between guess and actual location
-    polylines[round - 1] = L.polyline([blockSpot(xActual, zActual), blockSpot(xGuess, zGuess)], { color: 'red' }).addTo(scoreMap);
-    scoreMap.fitBounds(polylines[round - 1].getBounds());
+    // the answer lands, then the line runs from it to your guess
+    var actual = blockSpot(xActual, zActual), guessed = blockSpot(xGuess, zGuess);
+    drop(L.marker(actual, { icon: greenIcon }).addTo(scoreMap), true);
+    drop(L.marker(guessed).addTo(scoreMap), true);
+    polylines[round - 1] = L.polyline([actual, actual], { color: 'red' }).addTo(scoreMap);
+    drawLine(polylines[round - 1], actual, guessed, 300);
+    scoreMap.fitBounds(L.latLngBounds([actual, guessed]));
 }
 
 // the points of a round, counted up with a tick now and then (the same as in rooms)
@@ -178,7 +179,14 @@ function countUp(el, points, verdict) {
                 Sfx.play('tick', 0.8 + t * 0.7, 0.5);
             }
             requestAnimationFrame(step);
-        } else if (verdict) {
+            return;
+        }
+        if (verdict == 'perfect') {
+            // as in rooms: "Bullseye!" stamps once the points are counted
+            el.innerHTML = "Bullseye! " + points + " points!";
+            replay(el, 'stamp');
+        }
+        if (verdict) {
             Sfx.play(verdict);
         }
     };

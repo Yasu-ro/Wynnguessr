@@ -28,6 +28,7 @@ SOUNDS = {
     'good': ['note/pling'],
     'bad': ['note/bass'],
     'bubble': ['ui/hud/hud_bubble'],
+    'toast': ['ui/toast/in'],
 }
 
 def get(url):

@@ -11,6 +11,7 @@
 <body>
 {% include "nav.html" %}
     <header class="hero">
+        <div class="hero-pano" id="hero-pano"></div>
         <img class="hero-logo" src="static/wynnlogo.png" alt="" width="150" height="150">
         <h1 class="hero-name">WynnGuessr</h1>
         <p class="hero-tagline">The GeoGuessr of Wynncraft</p>
@@ -39,12 +40,34 @@
 
     <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
     <script>
+        const DEMO = {"basePath": "static/demo", "path": "/%l/%s%y_%x", "fallbackPath": "/fallback/%s",
+            "extension": "jpg", "tileResolution": 512, "maxLevel": 3, "cubeResolution": 2048};
         let viewer = pannellum.viewer('panorama', {
         "type": "multires",
-        "multiRes": {"basePath": "static/demo", "path": "/%l/%s%y_%x", "fallbackPath": "/fallback/%s",
-            "extension": "jpg", "tileResolution": 512, "maxLevel": 3, "cubeResolution": 2048},
+        "multiRes": DEMO,
         "autoLoad": true
         });
+        // behind the title, the same street turns slowly, like the title
+        // screen of Minecraft (a turn in about 2.5 minutes), from the east,
+        // the picture the page shows while it loads; still while out of sight
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            const SPIN = -2.5;  // degrees per second
+            let hero = pannellum.viewer('hero-pano', {
+                "type": "multires", "multiRes": DEMO, "autoLoad": true, "autoRotate": SPIN,
+                // framed like the still picture: never more than 90 degrees up and down
+                "yaw": 90, "pitch": 4, "minHfov": 30,
+                "hfov": Math.min(90, 2 * Math.atan(innerWidth / document.getElementById('hero-pano').clientHeight) * 180 / Math.PI),
+                "showControls": false, "draggable": false, "mouseZoom": false, "keyboardZoom": false,
+                "disableKeyboardCtrl": true, "compass": false
+            });
+            let ready = function () {
+                setTimeout(function () { document.getElementById('hero-pano').classList.add('ready'); }, 600);
+            };
+            if (hero.isLoaded()) ready(); else hero.on('load', ready);
+            new IntersectionObserver(function (seen) {
+                if (seen[0].isIntersecting) hero.startAutoRotate(SPIN); else hero.stopAutoRotate();
+            }).observe(document.getElementById('hero-pano'));
+        }
     </script>
 </body>
 </html>

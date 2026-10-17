@@ -483,7 +483,7 @@ sonore ; certains sons se coupaient.
   seconde) étaient coupées.
   Volumes jamais validés à l'oreille : à régler sur les retours de Yasuro.
 
-## Animations — recherche (2026-10-18, rien de codé)
+## Animations (2026-10-18)
 
 Demande de Yasuro : tout plus vivant (pages, transitions, résultats), mais
 **rien de « visiblement généré par IA »**, dans la DA Wynncraft, sans
@@ -525,6 +525,41 @@ encombrer ni lasser. Avant : une seule animation sur tout le site (`xp-pop`).
   coupe tout (aujourd'hui il ne coupe que les transitions, pas `xp-pop`).
   Piège technique : les salons se redessinent chaque seconde, une animation
   doit partir d'un **changement d'état** (comme les sons), pas du rendu.
+
+**Fait (2026-10-18, les 8 choix de Yasuro, en bêta)** — section « Motion »
+de `style.css` et `static/js/motion.js` (inclus par `game.html` et
+`room.html`) :
+- **Panneaux** (`.sign`, toutes les pages) : descend sur ses cordes et
+  oscille jusqu'à l'arrêt (0,9 s, pivot 100 px au-dessus). Le titre des
+  résultats se balance encore quand le gagnant s'affiche (`replay()`).
+- **Accueil** : la rue de Wynn (tuiles `static/demo`) tourne derrière le
+  titre, -2,5 °/s, partant de l'est (la photo fixe `hero.webp`, qui reste
+  dessous jusqu'au chargement) ; champ calculé sur les proportions de
+  l'écran (au plus 90° en hauteur, sinon déformé sur téléphone) ; arrêtée
+  hors de vue (`IntersectionObserver`), pas créée en mouvement réduit.
+- **Épingles** : la tienne tombe et rebondit (0,22 s, `pin-drop`), celles de
+  la révélation tombent de plus haut (`pin-land`) et le pointillé se trace
+  depuis la réponse (`drawLine`, 260 ms) ; idem en solo.
+- **Révélation** : « Bullseye! » n'apparaît qu'une fois les points comptés,
+  et frappe comme un tampon (`stamp`, salon et solo) ; à la même seconde,
+  la case PV/vies de chaque touché tremble (`hit`) et un cœur regagné saute
+  (`heal`). **Le tableau n'est réécrit que s'il change** (`revealRows`,
+  `resultRows`) : sinon le poll coupait l'animation, ou la rejouait.
+- **Podium** : chaque place glisse comme une planche et bute (`plank-in`),
+  puis le reflet traverse une fois la ligne du gagnant (`shine()`, après la
+  fin de la planche : sa position est mesurée).
+- **Reflet** des gros boutons (`.btn.big`, Guess) au survol : sous le texte
+  (`z-index: -1` dans le bouton).
+- **Barre d'XP du profil** : se remplit en arrivant, puis le niveau saute.
+- **Toasts** (`toast()`) : « X joined » (regroupés : « X and 2 more
+  joined »), « X is now the host » / « You are now the host » (son
+  `ui/toast/in`), « Level N! » ; papier, carré d'encre, glissent du coin.
+- Les épingles bougent par la propriété CSS `translate`, pas `transform` :
+  Leaflet place ses marqueurs avec `transform`.
+- `prefers-reduced-motion` coupe désormais aussi les `animation`.
+- Vérifié (Chromium + Firefox, 1280 et 375 px, salons Duel/BR jusqu'à 25
+  manches) par `animationstart` : chaque animation part une fois par
+  événement, aucune rejouée par le poll, jamais plus large que l'écran.
 
 
 
