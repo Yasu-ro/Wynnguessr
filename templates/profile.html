@@ -32,33 +32,31 @@
     {% endif %}
 
     <h2 class="section-title">Match History</h2>
-    {% for g in games %}
-        {% if g.multi %}
-        <div class="match {{ 'match-win' if g.win else 'match-loss' }}">
-            <div class="match-result">
-                <b>{{ 'Victory' if g.win else '#' ~ g.rank ~ ' of ' ~ g.of }}</b>
-                <span>{{ names[g.mode] }} · {{ g.of }} players</span>
-            </div>
-            <div class="match-detail">
-                {% if g.mode == 'classic' %}{{ '{:,}'.format(g.score) }} pts · {{ g.rounds }} rounds
-                {% elif g.out %}Out in round {{ g.out }}
-                {% elif g.mode == 'duel' %}{{ '{:,}'.format(g.left) }} HP left · {{ g.rounds }} rounds
-                {% else %}{{ g.left }} {{ 'life' if g.left == 1 else 'lives' }} left · {{ g.rounds }} rounds{% endif %}
-            </div>
-            <div class="match-day">{{ g.day }}</div>
-        </div>
-        {% else %}
-        <div class="match match-solo">
-            <div class="match-result">
-                <b>{% if g.mode == 'survival' %}Streak {{ g.score }}{% else %}{{ '{:,}'.format(g.score) }} pts{% endif %}</b>
-                <span>{{ names[g.mode] }} · Solo</span>
-            </div>
-            <div class="match-detail">{% if g.rounds %}{{ g.rounds }} rounds{% endif %}</div>
-            <div class="match-day">{{ g.day }}</div>
-        </div>
-        {% endif %}
+    {% if games %}
+    <table class="leaderboard-table history">
+        <thead><tr><th>Result</th><th>Game</th><th class="num">Score</th><th class="num board-more">Date</th></tr></thead>
+        <tbody>
+        {% for g in games %}
+            <tr>
+            {% if g.multi %}
+                <td><span class="result {{ 'win' if g.win else 'loss' }}">{{ 'Victory' if g.win else '#' ~ g.rank ~ ' of ' ~ g.of }}</span></td>
+                <td>{{ names[g.mode] }}<small>{{ g.of }} players · {{ g.rounds }} rounds</small></td>
+                <td class="num">{% if g.mode == 'classic' %}{{ '{:,}'.format(g.score) }} pts
+                    {% elif g.out %}Out in round {{ g.out }}
+                    {% elif g.mode == 'duel' %}{{ '{:,}'.format(g.left) }} HP
+                    {% else %}{{ g.left }} {{ 'life' if g.left == 1 else 'lives' }}{% endif %}</td>
+            {% else %}
+                <td><span class="result solo">Solo</span></td>
+                <td>{{ names[g.mode] }}{% if g.rounds %}<small>{{ g.rounds }} rounds</small>{% endif %}</td>
+                <td class="num">{% if g.mode == 'survival' %}Streak {{ g.score }}{% else %}{{ '{:,}'.format(g.score) }} pts{% endif %}</td>
+            {% endif %}
+                <td class="num board-more">{{ g.day }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
     {% else %}
         <p class="hint">No games yet.</p>
-    {% endfor %}
+    {% endif %}
 </div>
 {% endblock %}

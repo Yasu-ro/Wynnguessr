@@ -123,25 +123,22 @@ def board(c, form, user_id = None):
 
 def ladder(c, mode):
     # levels: the most XP first; wins (players who won at least once): the most
-    # wins with friends first, then the longest streak, then the fewest games for
-    # them; streaks: the longest run of wins first, then the current one
+    # wins with friends first, then the longest streak, then the fewest games for them
     rows = []
     for u in c.execute("SELECT id, username, mc_name FROM users WHERE COALESCE(guest, 0) = 0").fetchall():
         p = progress(c, u['id'])
-        if p['xp'] if mode == 'levels' else p['wins'] if mode == 'wins' else p['best']:
+        if p['xp'] if mode == 'levels' else p['wins']:
             rows.append({'name': u['username'], 'mc': u['mc_name'],
                          **{k: p[k] for k in ('xp', 'level', 'games', 'played', 'wins', 'best', 'streak')}})
     if mode == 'levels':
         return sorted(rows, key = lambda r: -r['xp'])
-    if mode == 'streaks':
-        return sorted(rows, key = lambda r: (-r['best'], -r['streak'], -r['wins']))
     return sorted(rows, key = lambda r: (-r['wins'], -r['best'], r['played']))
 
 @app.route("/api/updaterank", methods=['POST'])
 def update_rank():
-    # each player's best game, or the levels, the wins or the win streaks with friends
+    # each player's best game, or the levels, or the wins with friends
     with connect() as c:
-        if request.form.get('mode') in ('levels', 'wins', 'streaks'):
+        if request.form.get('mode') in ('levels', 'wins'):
             rows = ladder(c, request.form['mode'])
         else:
             rows, seen = [], set()
@@ -149,10 +146,11 @@ def update_rank():
                 if row['name'] not in seen:
                     seen.add(row['name'])
                     rows.append(row)
-            # every leaderboard shows the players' levels
-            levels = {r['name']: r['level'] for r in ladder(c, 'levels')}
+            # every leaderboard shows the players' levels and current win streaks
+            known = {r['name']: r for r in ladder(c, 'levels')}
             for row in rows:
-                row['level'] = levels.get(row['name'], 1)
+                row['level'] = known.get(row['name'], {}).get('level', 1)
+                row['streak'] = known.get(row['name'], {}).get('streak', 0)
         me = session.get('user_id') and c.execute("SELECT username FROM users WHERE id = ?", (session['user_id'],)).fetchone()
     return jsonify({"rows": rows[:50], "me": me[0] if me else None})
 

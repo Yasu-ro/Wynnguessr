@@ -303,14 +303,13 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   l'anxiété, le record sert de trophée permanent (recherche sur les séries).
 - **Classement** : Classic, Survival, Levels (niveau, XP, parties), Wins
   (victoires, meilleure série, parties en salon ; seulement ceux qui ont gagné
-  au moins une fois ; départage : meilleure série, puis le moins de parties),
-  Streaks (ajouté le 2026-10-17 à la demande de Yasuro, « il n'y a pas de best
-  streak » : meilleure série d'abord, puis série en cours, puis victoires).
-  **Le niveau est devant chaque pseudo dans tous les onglets** (demande de
-  Yasuro). Sur téléphone la dernière colonne est masquée : la mettre en
-  dernier seulement si elle est secondaire (d'où Games en dernier). Pas
-  d'onglet « Games » à part : presque identique à Levels. Les filtres se
-  masquent sur Levels, Wins et Streaks.
+  au moins une fois ; départage : meilleure série, puis le moins de parties).
+  Dans **tous** les onglets, devant chaque pseudo son niveau, et après lui sa
+  série en cours (flamme + nombre, dès 1 victoire) : demande de Yasuro, qui a
+  refusé l'onglet Streaks (ajouté puis retiré le 2026-10-17) et une colonne
+  dédiée. Sur téléphone la dernière colonne est masquée : n'y mettre que du
+  secondaire. Pas d'onglet « Games » : presque identique à Levels. Les filtres
+  se masquent sur Levels et Wins.
 - API : `api/score` renvoie `xp` et `gained` ; `GET api/room/<code>/xp` (salon
   terminé) renvoie `xp`, `gained`, `bonus`, `streak`, ou `guest`. `ladder()`
   calcule les deux onglets (~5 ms le 2026-10-17).
@@ -426,7 +425,9 @@ fan, sans rien voler).
 - `mode` : choix **Solo / With Friends** d'abord (`?play=solo|friends`), puis
   réglages (`settings.html` + `modes.html`, partagés avec la salle d'attente).
 - `profile` : barre d'XP, stats multijoueur (parties, victoires, meilleure
-  série) + historique façon
+  série) + historique (2026-10-17 : tableau au style du classement, résultat
+  sur une plaque facettée verte/rouge/bois ; Yasuro trouvait les anciennes
+  bandes à bord coloré hors DA) façon
   Valorant (`history()` ; une partie de salon est dans `scores` avec `room`,
   pour ne pas la compter deux fois). Volontairement différent du classement.
 - `leaderboard` : onglets Classic/Survival (filtres, meilleure partie par
