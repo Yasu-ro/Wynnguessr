@@ -600,10 +600,10 @@ un lien déjà partagé peut garder l'ancien.
 
 ### Où on en est (2026-10-17, fin de session)
 
-- 671 lieux publiés. Flux : mod → tri sur la bêta → Push. **La bêta a
-  d'avance la refonte de la DA et les niveaux** (2026-10-17, voir « Pages et
-  direction artistique » et « Niveaux ») : pas encore fusionnées, en attente de
-  l'accord de Yasuro. **Le classifieur de Claude Code refuse les mises en prod
+- Flux : mod → tri sur la bêta → Push. **2026-10-17 au soir, mis en prod**
+  (accord de Yasuro après une vérification complète) : refonte de la DA,
+  niveaux/XP/séries, Fruma jouable (741 lieux gardés). Bêta et prod au même
+  commit ; recharge à chaud par `HUP`. **Le classifieur de Claude Code refuse les mises en prod
   (fusion, redémarrage, écriture dans la base du vrai site) tant que Yasuro
   ne l'a pas dit explicitement dans le message même** (« push everything »
   a suffi) : demander, ne pas contourner.
