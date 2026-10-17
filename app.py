@@ -170,7 +170,7 @@ def leaderboard():
 def game():
     # the mode page sends its settings in the address, so "Play Again" is a plain reload
     form = request.values
-    session['provinces'] = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']
+    session['provinces'] = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
     if 'rounds' in form:
         if form.get('mode') in ('duel', 'royale'):
             return render_template('apology.html', message = "This mode is played with friends: create a room")
@@ -204,7 +204,7 @@ def game():
         print(provinces, time_limit, look, rounds)
 
         return render_template('game.html', provinces = provinces, time_limit = time_limit, look = look, rounds = rounds, mode = mode)
-    return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']", time_limit = -1, look = False, rounds = 5, mode = 'classic')
+    return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']", time_limit = -1, look = False, rounds = 5, mode = 'classic')
 
 @app.route("/login", methods=['POST', 'GET'])
 def login():
@@ -474,7 +474,7 @@ def apology():
 # lands in the same ranking. Rooms only move forward when someone asks: every
 # room request first runs tick().
 
-PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse']
+PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
 ROUNDS = ['3', '5', '10', '25']
 MODES = ['classic', 'duel', 'royale']
 LAST_CALL = 15   # once someone guessed, the others have this long
@@ -935,7 +935,7 @@ REVIEWERS = ('Yasuro', 'kemmi')   # exact usernames
 PUBLISHER = ('Yasuro',)           # the only one who may push to the live site
 # the live site's database, next to this checkout: ~/Wynnguessr beside ~/Wynnguessr-beta
 LIVE_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Wynnguessr', 'database.db')
-REVIEW_PROVINCES = PROVINCES + ['fruma']
+REVIEW_PROVINCES = PROVINCES
 
 def capture_key():
     try:

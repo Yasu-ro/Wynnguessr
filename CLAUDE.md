@@ -181,8 +181,6 @@ répondent 404/403.
 - Captures des mods < 1.6 : webp q85 dans `static/captures/`, **hors git** ;
   toujours acceptées par `/api/capture` (JPEG). Originaux JPEG de Yasuro
   dans `~/wynndle-captures/`.
-- `fruma` est une province de tri, **pas encore jouable** (absente de
-  `PROVINCES` et des réglages de partie).
 
 **Netteté** : au-delà de 1 px par bloc (zoom > 0), toutes les cartes
 Leaflet (jeu, salons, tri) passent en `image-rendering: pixelated` (classe
@@ -559,11 +557,14 @@ un lien déjà partagé peut garder l'ancien.
 
 ### Fruma et moteurs de recherche
 
-- 2026-10-17 : Fruma figure dans les réglages de partie en **« Fruma (coming
-  soon) », case désactivée et sans `name`** (rien n'est envoyé) tant que
-  Yasuro n'a pas de photos. Le mod et la tournée savent déjà y aller : la
-  carte de couverture et la règle Fruma de `guess_province` sont en place. Pour l'ouvrir : l'ajouter à `PROVINCES`, à
-  `mode.html`, au filtre de `board.html`, et rendre la case normale.
+- **Fruma ouverte le 2026-10-17** (70 lieux gardés, demande de Yasuro) :
+  dans `PROVINCES`, cochée par défaut partout (solo, salons, filtre du
+  classement). Choix de Yasuro, en connaissance de cause : le classement ne
+  compare que les parties aux provinces identiques, donc les scores d'avant
+  (sans Fruma) ne se voient plus qu'en décochant Fruma ; le classement par
+  défaut repart de zéro. L'ordre des provinces doit rester le même partout
+  (formulaire, `PROVINCES`, filtre) : la chaîne enregistrée doit être
+  exactement celle du filtre. Le texte d'accueil dit « Over 700 spots ».
 - Seul `wynndle.com` doit être indexé : `after_request` envoie
   `X-Robots-Tag: noindex` pour tout autre nom (bêta, ancienne adresse ts.net).
   cloudflared transmet bien le `Host` d'origine (vérifié). Search Console et
