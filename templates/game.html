@@ -14,6 +14,7 @@
     <nav class="navbar">
         <a class="nav-logo" href="./" title="Home"><img src="static/wynnlogo.png" alt="WynnGuessr" width="40" height="40"></a>
         <a class="nav-btn" href="./"><i class="material-icons">home</i><span>Home</span></a>
+        <button type="button" class="nav-btn" id="sound-button" title="Sound on/off"><i class="material-icons">volume_up</i></button>
         <p class="nav-stat" id="round-number">Round: 1/{{rounds}}</p>
         <p class="nav-stat" id="totalScore">Score: 0</p>
         {% if time_limit > 0 %}
@@ -25,6 +26,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="{{ asset('js/sound.js') }}"></script>
     <script src="{{ asset('js/xp.js') }}"></script>
     <script src="{{ asset('js/block.js') }}"></script>
     <script src="{{ asset('js/game.js') }}"></script>

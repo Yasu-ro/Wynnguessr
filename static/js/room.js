@@ -19,6 +19,7 @@ var nextAt = null;       // when the next round starts by itself, local clock
 var polling = false, pollAgain = false, pollTimer = null;
 var heard = null;        // players already known to have guessed this round
 var lastSecond = null;   // last whole second of the clock shown
+var lobbyNames = null;   // players seen in the lobby, to hear who comes in
 
 $(document).ready(function () {
     setNav();
@@ -284,66 +285,6 @@ $('.room-chat-head').on('click', function (e) {
     $('#chat-title').text('Chat');
 });
 
-// ---------- sounds ----------
-// short beeps made on the spot, no files: a player guessed, and the last
-// seconds of the clock (10, 5, 3, 2, 1). Browsers only allow sound after the
-// first click or key on the page.
-
-var audio = null, muted = false;
-try {
-    muted = localStorage.getItem('wynnguessr-muted') == '1';
-} catch (e) {}
-
-function showMute() {
-    $('#sound-button i').text(muted ? 'volume_off' : 'volume_up');
-}
-showMute();
-
-$(document).on('pointerdown keydown', function () {
-    try {
-        audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-        if (audio.state == 'suspended') {
-            audio.resume();
-        }
-    } catch (e) {}
-});
-
-$('#sound-button').on('click', function () {
-    muted = !muted;
-    try {
-        localStorage.setItem('wynnguessr-muted', muted ? '1' : '0');
-    } catch (e) {}
-    showMute();
-});
-
-function beep(freq, length, delay) {
-    var start = audio.currentTime + (delay || 0);
-    var osc = audio.createOscillator(), gain = audio.createGain();
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, start);
-    gain.gain.exponentialRampToValueAtTime(0.25, start + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
-    osc.connect(gain).connect(audio.destination);
-    osc.start(start);
-    osc.stop(start + length + 0.05);
-}
-
-function sound(kind) {
-    if (muted || !audio || audio.state != 'running') {
-        return;
-    }
-    if (kind == 'guess') {
-        beep(660, 0.12);
-        beep(990, 0.18, 0.11);
-    } else if (kind == 'warn') {
-        beep(520, 0.35);
-    } else if (kind == 'tick') {
-        beep(880, 0.15);
-    } else if (kind == 'last') {
-        beep(1175, 0.4);
-    }
-}
-
 // ---------- modes ----------
 // duel: health points; royale: lives. Both come from the server (left, out,
 // delta) for the contestants (seat) after the last finished round.
@@ -396,6 +337,11 @@ function lobby() {
         view = 'lobby';
         show('lobby');
     }
+    var names = s.players.map(function (p) { return p.name; });
+    if (lobbyNames && names.some(function (n) { return lobbyNames.indexOf(n) < 0; })) {
+        Sfx.play('join');
+    }
+    lobbyNames = names;
     $('#lobby-players').html(s.players.map(function (p) {
         return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) +
             (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + "</div>";
@@ -488,6 +434,9 @@ function guess() {
     var key = 'guess' + s.round;
     var watching = s.live && !s.playing;
     if (view != key) {
+        if (view) {
+            Sfx.play(view == 'lobby' ? 'start' : 'round');
+        }
         view = key;
         show('guess-screen');
         marker = null;
@@ -509,6 +458,7 @@ function guess() {
             }
             var b = blockAt(e.latlng);
             marker = L.marker(blockSpot(b.x, b.z), {icon: pin(color(me()))}).addTo(map);
+            Sfx.play('pin');
             $('#guess-button').removeClass('room-warn').text('Guess!');
         });
 
@@ -531,7 +481,7 @@ function guess() {
     // a sound each time another player guesses (not for those already in when the page opened)
     var now = s.players.filter(function (p) { return p.guessed && !p.you; }).map(function (p) { return p.name; });
     if (heard && now.some(function (n) { return heard.indexOf(n) < 0; })) {
-        sound('guess');
+        Sfx.play('other');
     }
     heard = now;
     // live rounds follow the server's clock
@@ -584,6 +534,9 @@ function submit(auto) {
         return;
     }
     submitted = true;
+    if (marker) {
+        Sfx.play('guess');
+    }
     var key = view, data = {round: s.round};
     if (marker) {
         var b = blockAt(marker.getLatLng());
@@ -623,11 +576,9 @@ function clocks() {
                 .toggleClass('urgent', left <= 10);
             if (guessing && second != lastSecond && left > 0) {
                 if (second == 10 || second == 5) {
-                    sound('warn');
-                } else if (second == 3 || second == 2) {
-                    sound('tick');
-                } else if (second == 1) {
-                    sound('last');
+                    Sfx.play('warn');
+                } else if (second <= 3) {
+                    Sfx.play('tick', [1.5, 1.26, 1.06][second - 1]);   // rising to the last second
                 }
             }
             lastSecond = second;
@@ -643,7 +594,7 @@ function clocks() {
 // ---------- end of a round ----------
 
 function reveal() {
-    var key = 'reveal' + s.round;
+    var key = 'reveal' + s.round, fresh = view != key;
     if (view != key) {
         view = key;
         show('reveal-screen');
@@ -682,6 +633,16 @@ function reveal() {
             line += you.delta ? bad + you.delta.toLocaleString('en-US') + ' HP</span>' : good + 'no damage</span>';
         } else if (you.delta) {
             line += you.delta < 0 ? bad + 'you lose a life</span>' : good + 'a life back!</span>';
+        }
+    }
+    // one sound for what the round did to you: out, hurt, or a bullseye
+    if (fresh) {
+        if (s.mode != 'classic' && you.seat && you.out == s.round) {
+            Sfx.play('out');
+        } else if (guessed && mine.score >= BULLSEYE) {
+            Sfx.play('perfect');
+        } else if (s.mode != 'classic' && you.seat && you.out == null && you.delta < 0) {
+            Sfx.play('hurt');
         }
     }
     $('#reveal-title').text(s.mode == 'classic' ? 'Round ' + s.round + '/' + s.rounds
@@ -764,6 +725,7 @@ $('#next-button').on('click', function () {
 // ---------- end of the game ----------
 
 function results() {
+    var fresh = view != 'results';
     if (view != 'results') {
         view = 'results';
         show('results');
@@ -811,6 +773,9 @@ function results() {
         title = rows[0].you ? 'You Win!' : rows[0].name + ' Wins!';
     }
     $('#results-title').text(title);
+    if (fresh && s.live && rows.length > 1 && rows.some(function (p) { return p.you; })) {
+        Sfx.play(rows[0].you && title != 'Draw!' ? 'win' : 'lose');
+    }
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];

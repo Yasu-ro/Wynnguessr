@@ -96,41 +96,13 @@ function menu(xp) {
     }
 }
 
-// a little bell at a random pitch for each bit of XP, like an orb picked up
-// in Minecraft; a short rising chime for a new level, longer every five
-// levels. Muted with the room's sound button.
-var xpAudio = null;
+// Minecraft's own: an orb picked up, at a random pitch as in the game, for
+// each bit of XP; the level-up sound at each new level, louder every five
+// levels, when Minecraft plays it
 function xpSound(kind, level) {
-    try {
-        if (localStorage.getItem('wynnguessr-muted') == '1') {
-            return;
-        }
-        xpAudio = xpAudio || new (window.AudioContext || window.webkitAudioContext)();
-        if (xpAudio.state == 'suspended') {
-            xpAudio.resume();
-        }
-    } catch (e) {
-        return;
-    }
-    var t = xpAudio.currentTime;
-    var note = function (freq, at, length, volume, type) {
-        var osc = xpAudio.createOscillator(), gain = xpAudio.createGain();
-        osc.type = type || 'sine';
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, t + at);
-        gain.gain.exponentialRampToValueAtTime(volume, t + at + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + at + length);
-        osc.connect(gain).connect(xpAudio.destination);
-        osc.start(t + at);
-        osc.stop(t + at + length + 0.05);
-    };
     if (kind == 'orb') {
-        var f = 1400 * (0.55 + Math.random() * 0.7);
-        note(f, 0, 0.12, 0.05);
-        note(f * 2.4, 0, 0.07, 0.015);
+        Sfx.play('orb', 0.55 + Math.random() * 0.7);
     } else {
-        (level % 5 == 0 ? [523, 659, 784, 1047, 1319] : [523, 659, 784]).forEach(function (f, n) {
-            note(f, n * 0.09, 0.4, 0.1, 'triangle');
-        });
+        Sfx.play('level', 1, level % 5 == 0 ? 1 : 0.6);
     }
 }

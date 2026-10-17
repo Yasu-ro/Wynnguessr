@@ -345,12 +345,9 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   (résultats) : « +N XP », la barre se remplit, le niveau fait un « pop » et
   « Level N! » à chaque palier, puis le menu se met à jour. Joueur anonyme ou
   invité : une seule ligne « Log in / Make an account to earn XP ».
-- **Sons** (`xp.js`, WebAudio, aucun fichier) : un tintement d'orbe à hauteur
-  aléatoire toutes les 100 ms pendant le remplissage (Minecraft : 10 orbes par
-  seconde, hauteur 0,55 à 1,25), un carillon montant à chaque niveau, plus long
-  tous les 5 niveaux (Minecraft joue sa fanfare tous les 5 niveaux). Coupés par
-  le bouton son des salons (`wynnguessr-muted`). Volume jamais validé à
-  l'oreille.
+- **Sons** : l'orbe de Minecraft à hauteur aléatoire toutes les 100 ms
+  pendant le remplissage (comme le jeu : 0,55 à 1,25), son « level up » à
+  chaque niveau, plus fort tous les 5 niveaux. Voir « Sons » plus bas.
 - **Séries de victoires** (salons) : `best`, le record, toujours affiché (plaque
   du profil, colonne du classement) ; `streak`, la série en cours, seulement à
   partir de 2 (flamme sur le profil, dans l'onglet Wins, en fin de salon gagné).
@@ -404,10 +401,44 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   résultats.
 - Temps restant : boîte **statique sous le bandeau**, sans animation, rouge à
   10 s (Yasuro a refusé le gros chiffre au centre et les pulsations).
-- Sons générés en WebAudio (aucun fichier) : un joueur valide ; 10, 5, 3, 2, 1 s.
-  Bouton muet mémorisé (localStorage). Volume jamais validé à l'oreille.
+- Sons : voir « Sons » plus bas.
 - `beforeunload` : confirmation pour quitter pendant une manche/révélation
   (salon) ou une partie solo ; pas pour les redirections du jeu lui-même.
+
+## Sons (2026-10-17)
+
+Demande de Yasuro : « refaire tous les sons », plein de petits sons
+d'interaction en jeu, **de préférence ceux de Minecraft**, sans fouillis
+sonore ; certains sons se coupaient.
+
+- **Les sons de Minecraft, hors git** : `tools/sounds.py` les télécharge
+  chez Mojang (index d'assets de la dernière version) et les convertit en mp3
+  (tous les navigateurs les décodent, vérifié Chromium et Firefox) dans
+  `static/sounds/`, **à lancer sur chaque site** (bêta fait ; prod à faire
+  lors de la mise en prod). Ils appartiennent à Mojang : le dépôt public ne
+  les porte pas. Risque accepté en connaissance de cause par Yasuro : un site
+  de fan non commercial qui les sert.
+- `static/js/sound.js` (`Sfx.play(nom, hauteur, volume)`), inclus par
+  `game.html` et `room.html` avant `xp.js`. Fichiers chargés une fois, joués
+  en entier (les anciens bips étaient des notes coupées à la main). Contre le
+  fouillis : volume propre à chaque son (`LOUD`), même son ignoré à moins de
+  80 ms, 6 sons par seconde au plus, rien quand l'onglet est caché, rien
+  avant le premier clic (sinon des sons s'empilaient et partaient tous d'un
+  coup). **Piège payé en test** : la limite comptait les sons « en cours »
+  par `onended`, qui ne vient jamais si l'audio dort ; après 6 sons, plus un
+  bruit. D'où un compte par seconde à l'horloge.
+- Bouton volume unique (`#sound-button`, clé `wynnguessr-muted`) : dans le
+  chat des salons, et dans la barre du solo.
+- Moments (un seul son par événement) : épingle posée (dessin sur carte de la
+  table de cartographie), guess (pop), un autre joueur devine (clic de bois),
+  manche suivante (page de livre), compte à rebours 10 et 5 s (cloche de
+  bloc musical) puis 3, 2, 1 (charleston, de plus en plus aigu), bullseye ≥
+  4 950 (« ding » de la flèche qui touche), dégât en Duel/BR et Survival raté
+  (coup reçu du joueur), éliminé (objet cassé), victoire (fanfare de défi
+  accompli), défaite (« hmm » du villageois), quelqu'un entre dans le salon
+  (porte), début de partie (cloche de village), XP (orbe, level up). Pas de
+  son sur les pages hors jeu ni sur le chat. Volumes jamais validés à
+  l'oreille : à régler sur les retours de Yasuro.
 
 ## Pages et direction artistique
 
@@ -687,11 +718,8 @@ plan : **attendre ses choix avant de coder**. Mes propositions, en attente :
    selon la distance, un 5 000 rend un cœur, chrono qui descend (60 s → 20 s),
    score = lieux survécus (points en départage). Barème à calculer sur les
    vraies distances, comme l'XP.
-4. **Sons** — remplacer les bips WebAudio par de vrais sons **CC0** (packs
-   Kenney…, jamais ceux de Minecraft : propriété de Mojang), un bouton son
-   unique partout (solo compris) avec volume. Moments : épingle, guess, autre
-   joueur qui devine, compte à rebours, révélation, 5 000, perte de PV/cœur,
-   élimination, victoire/défaite, orbes et niveau.
+4. **Sons** — fait le 2026-10-17 (voir « Sons »), avec ceux de Minecraft,
+   choix de Yasuro.
 5. **Modes plus dynamiques** — à choisir, ne pas tout empiler : révélation
    animée (épingles une à une, scores qui défilent, « Perfect! »), bonus de
    rapidité en Classic, dernière manche ×2, coups de Duel en grand, zone qui

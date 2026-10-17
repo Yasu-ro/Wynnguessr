@@ -59,6 +59,9 @@ function onMapClick(e) {
     }
     var b = blockAt(e.latlng);
     markers[round - 1] = L.marker(blockSpot(b.x, b.z)).addTo(map);
+    if (e.target === map) {
+        Sfx.play('pin');
+    }
 }
 
 // same formula as guess_score() in app.py: the right block, or within PERFECT
@@ -102,6 +105,9 @@ function showScoreScreen() {
         document.getElementById('score').innerHTML = "No location selected!";
         document.getElementById('progress').style.width = "0%";
         document.getElementById('distance').innerHTML = mode == 'survival' ? "Game over!" : "Distance: 0 blocks away!";
+        if (mode == 'survival') {
+            Sfx.play('hurt');
+        }
         saveIfOver(false);
         document.getElementById('next-button').onclick = function(){
             nextStep(false);
@@ -127,6 +133,12 @@ function showScoreScreen() {
     document.getElementById('score').innerHTML = score + " points!";
 
     var survived = distance <= SURVIVAL;
+    // one sound for the result: a bullseye, or the end of a survival game
+    if (score >= 4950) {
+        Sfx.play('perfect');
+    } else if (mode == 'survival' && !survived) {
+        Sfx.play('hurt');
+    }
     if (mode == 'survival') {
         if (survived) {
             streak++;
@@ -155,6 +167,9 @@ function showScoreScreen() {
 function showNextLocation() {
     showContent('guess-screen');
     round++;
+    if (round > 1) {
+        Sfx.play('round');
+    }
     $('#time-left').html("Time: " + timeLimit);
     document.getElementById('guess-screen').innerHTML = 
     "<div id='game-panorama'></div>" +
@@ -190,6 +205,7 @@ function showNextLocation() {
             return;
         }
         clearInterval(timer);
+        Sfx.play('guess');
         showScoreScreen();
     };
 
@@ -212,9 +228,19 @@ function showNextLocation() {
     // multires tiles report "load" while the viewer is still being built,
     // before anyone listens: then the clock starts from here
     let clock = function(){
-        let countdown = timeLimit;
+        let countdown = timeLimit, lastSecond = null;
         timer = setInterval(function(){
             if(countdown >= 0){
+                // the last seconds out loud, as in rooms
+                let second = Math.ceil(countdown);
+                if (second != lastSecond && countdown > 0) {
+                    if (second == 10 || second == 5) {
+                        Sfx.play('warn');
+                    } else if (second <= 3) {
+                        Sfx.play('tick', [1.5, 1.26, 1.06][second - 1]);
+                    }
+                }
+                lastSecond = second;
                 document.getElementById('time-left').innerHTML = "Time: " + countdown;
                 countdown = Math.round((countdown - .01) * 100) / 100;
                 if (countdown < 0) {
