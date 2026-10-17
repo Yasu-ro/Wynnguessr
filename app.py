@@ -708,6 +708,10 @@ def room_state(code):
                 FROM room_guesses g JOIN users u ON u.id = g.user_id WHERE g.code = ? AND g.round = ?''', (r['code'], n))]}
             if live and r['state'] == 'playing':
                 out['next_in'] = max(0, r['round_end'] + REVEAL - now)
+                # load the next picture during the reveal: everyone has it when the round starts
+                ids = json.loads(r['locations'])
+                if n < len(ids):
+                    out['next_url'] = c.execute("SELECT image_url FROM locations WHERE location_id = ?", (ids[n],)).fetchone()[0]
         return jsonify(out)
 
 @app.route("/api/room/<code>/chat", methods=['POST'])
@@ -874,7 +878,8 @@ def capture():
     data = request.get_data()
     if len(data) > 100_000_000:
         return jsonify({"success": False}), 400
-    name = f"{int(x)}_{int(z)}_{int(time.time() * 1000)}"
+    # a random name: the address of a picture must not give away where it is
+    name = secrets.token_hex(10)
     if data.startswith(b'PK'):
         # mod 1.6+: the six cube faces in a zip, cut into tiles
         try:

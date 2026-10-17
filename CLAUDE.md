@@ -152,6 +152,16 @@ répondent 404/403.
   du viewer, avant tout `on('load')` : le chrono de `game.js` ne démarrait
   plus. D'où `if (viewer.isLoaded()) clock()`.
   Pillow ajouté au `.venv` (partagé avec la prod) pour ce découpage.
+- **Noms aléatoires** (`secrets.token_hex(10)`) pour les tuiles et les
+  captures : **piège évité de justesse** (2026-10-17), les noms
+  `<X>_<Z>_<horodatage>` donnaient la réponse à quiconque ouvrait les outils
+  du navigateur. Les 18 premières ont été renommées. Ne jamais remettre
+  d'information de lieu dans une URL d'image.
+- **Préchargement en salon** : pendant la révélation, `/api/room/<code>`
+  envoie `next_url` ; `room.js` (`preload`) charge l'image suivante, ou les
+  tuiles des niveaux 1 à 3 (126 tuiles, le niveau 4 seulement au zoom), avec
+  `crossOrigin` comme Pannellum pour que le cache serve. Vérifié en vrai salon
+  (2 invités de test). Les fichiers statiques ont `max-age=14400`.
 - Captures des mods < 1.6 : webp q85 dans `static/captures/`, **hors git** ;
   toujours acceptées par `/api/capture` (JPEG). Originaux JPEG de Yasuro
   dans `~/wynndle-captures/`.

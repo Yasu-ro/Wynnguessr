@@ -61,6 +61,34 @@ function poll() {
         });
 }
 
+// During the reveal the next picture loads in the background: the browser
+// keeps it, so the round starts for everyone with the picture already there.
+// Multires: the tiles of levels 1 to 3 (what a first look needs, ~130
+// tiles); the sharpest level only loads when zooming. Same crossOrigin as
+// Pannellum, or the browser would not reuse them.
+var preloaded = null, preloads = [];
+function preload(url) {
+    if (url == preloaded) return;
+    preloaded = url;
+    preloads = [];
+    var load = function (src) {
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = src;
+        preloads.push(img);
+    };
+    if (url.slice(-1) != '/') {
+        load(url);
+        return;
+    }
+    for (var level = 1; level <= 3; level++) {
+        var n = 1 << (level - 1);
+        'fbudlr'.split('').forEach(function (face) {
+            for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) load(url + level + '/' + face + i + '_' + j + '.jpg');
+        });
+    }
+}
+
 function send(action, data) {
     var req = $.ajax({url: 'api/room/' + code + '/' + action, type: 'POST', data: data, dataType: 'json', timeout: 8000});
     req.always(poll);
@@ -75,6 +103,7 @@ function render(data) {
         return;
     }
     s = data;
+    if (s.next_url) preload(s.next_url);
     chat(s.chat);
     if (s.next && s.live && s.state == 'finished') {
         leaving = true;
