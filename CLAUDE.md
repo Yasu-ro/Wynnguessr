@@ -623,6 +623,43 @@ un lien déjà partagé peut garder l'ancien.
 - Première publication le 2026-10-17 : 671 lieux. Sauvegarde de la base du vrai
   site juste avant : `/data/wynnguessr-live-before-push-2026-10-17.db`.
 
+### Prochains chantiers (demandés le 2026-10-17, rien de commencé)
+
+Liste de Yasuro d'après les parties et les retours des testeurs : réparer le
+chat, un meilleur écran spectateur, refaire complètement le Survival, refaire
+tous les sons, des modes plus fun et dynamiques. Yasuro prépare son propre
+plan : **attendre ses choix avant de coder**. Mes propositions, en attente :
+
+1. **Chat** — on ne sait pas encore ce qui gêne : demander les retours exacts.
+   Défaut proposé : place fixe en partie (tiroir à droite, compteur de non
+   lus), plus lisible, messages du jeu (« X a deviné », éliminé, rejoint),
+   plein écran sur téléphone.
+2. **Spectateur** (éliminé ou arrivé en retard) — aujourd'hui un bouton gris
+   « Spectating ». Proposé : il voit la réponse dès le début de la manche, le
+   panneau des joueurs en lice (PV/cœurs, qui a deviné), les épingles qui
+   tombent à la révélation. À trancher : risque de souffler la réponse
+   (chat des spectateurs réservé aux spectateurs pendant la manche, ou
+   confiance).
+3. **Survival** (aucune partie Survival en prod : on peut changer les règles
+   sans rien casser) — proposé : « à cœurs » façon Minecraft, 10 cœurs, perte
+   selon la distance, un 5 000 rend un cœur, chrono qui descend (60 s → 20 s),
+   score = lieux survécus (points en départage). Barème à calculer sur les
+   vraies distances, comme l'XP.
+4. **Sons** — remplacer les bips WebAudio par de vrais sons **CC0** (packs
+   Kenney…, jamais ceux de Minecraft : propriété de Mojang), un bouton son
+   unique partout (solo compris) avec volume. Moments : épingle, guess, autre
+   joueur qui devine, compte à rebours, révélation, 5 000, perte de PV/cœur,
+   élimination, victoire/défaite, orbes et niveau.
+5. **Modes plus dynamiques** — à choisir, ne pas tout empiler : révélation
+   animée (épingles une à une, scores qui défilent, « Perfect! »), bonus de
+   rapidité en Classic, dernière manche ×2, coups de Duel en grand, zone qui
+   se resserre en Battle Royale, podium en bois à la fin, réactions rapides.
+   Mes préférées : révélation animée, podium, dernière manche ×2.
+
+Ordre proposé : sons → chat → spectateur → modes → Survival. Méthode : copie
+isolée, vraies parties à plusieurs, téléphone et Firefox, puis **bêta** pour
+les testeurs avant la prod (changements trop gros pour aller direct).
+
 ### Où on en est (2026-10-17, fin de session)
 
 - Flux : mod → tri sur la bêta → Push. **2026-10-17 au soir, mis en prod**
