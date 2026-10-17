@@ -113,7 +113,12 @@ public class WynndlePanorama implements ClientModInitializer {
 		WORKER.execute(() -> {
 			try {
 				File file = freeName(out, x + "_" + z);
-				packFaces(tmp.resolve("screenshots"), file);
+				try {
+					packFaces(tmp.resolve("screenshots"), file);
+				} catch (Exception e) {
+					file.delete(); // half a zip helps nobody
+					throw e;
+				}
 				if (config.key.isEmpty()) {
 					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
 				} else {
@@ -186,10 +191,21 @@ public class WynndlePanorama implements ClientModInitializer {
 					Thread.sleep(200);
 				}
 				out.putNextEntry(new ZipEntry(FACE_LETTERS[i] + ".jpg"));
-				writeJpeg(face, out);
+				writeJpeg(opaque(face), out);
 				out.closeEntry();
 			}
 		}
+	}
+
+	// Minecraft's PNGs have an alpha channel, which Java's JPEG writer refuses
+	// ("Bogus input colorspace")
+	static BufferedImage opaque(BufferedImage img) {
+		if (img.getType() == BufferedImage.TYPE_INT_RGB) return img;
+		BufferedImage rgb = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
+		java.awt.Graphics2D g = rgb.createGraphics();
+		g.drawImage(img, 0, 0, null);
+		g.dispose();
+		return rgb;
 	}
 
 	static File freeName(Path dir, String base) throws IOException {

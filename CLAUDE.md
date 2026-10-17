@@ -144,6 +144,10 @@ répondent 404/403.
   image découpée à la manière de Minecraft et l'originale : Minecraft
   0..5 = Pannellum `f r b l u d`. La netteté venait du manque de pixels (faces
   2048, rééchantillonnées en équirectangulaire), pas du webp (−1 % mesuré).
+  **Piège payé (1.6.0)** : les PNG de Minecraft ont un canal alpha, que
+  l'encodeur JPEG de Java refuse (« Bogus input colorspace ») ; mes faces de
+  test étaient RGB, d'où un test vert et une 1.6.0 cassée en jeu. `opaque()`
+  convertit avant l'encodage. **Tester avec des PNG RGBA.**
   **Piège payé** : en multires, Pannellum émet `load` pendant la construction
   du viewer, avant tout `on('load')` : le chrono de `game.js` ne démarrait
   plus. D'où `if (viewer.isLoaded()) clock()`.
