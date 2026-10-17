@@ -102,6 +102,10 @@ répondent 404/403.
   et les **622 lieux d'origine sont passés en `deleted` dans la base de la
   bêta** (pris sur l'ancienne carte, tous à refaire). La bêta n'a donc aucun
   lieu jouable tant que rien n'est gardé. La prod n'est pas touchée.
+- 2026-10-17, demande de Yasuro : **un point `planned` à chacun des 622
+  lieux d'origine** (province d'origine reprise), sauf hors couverture (0) et
+  à moins de 30 blocs d'un point existant (66) → 556 ajoutés, par script sur
+  la base de la bêta.
 - **Trous** (demande de Yasuro : « pas faciles à voir ») : un chunk manquant
   qu'on ne peut pas relier au bord de la carte par d'autres chunks manquants
   est en **magenta**, et chaque groupe est entouré d'un cercle magenta de
