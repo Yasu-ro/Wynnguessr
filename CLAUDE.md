@@ -434,3 +434,21 @@ un lien déjà partagé peut garder l'ancien.
   spots »** (671 lieux `kept` ce jour-là) et les modes réels (solo : Classic,
   Survival ; salon : Classic, Duel, Battle Royale). À corriger si le nombre de
   lieux ou les modes changent.
+
+### Publication des lieux (bouton Push)
+
+- Le vrai site ne fabrique plus de lieux : **ils viennent tous de la bêta**.
+  Bouton « Push to wynndle.com » de `/review`, réservé à `PUBLISHER`
+  (Yasuro ; kemmi trie mais ne publie pas). Il écrit dans
+  `~/Wynnguessr/database.db` (`LIVE_DB`, voisin du dossier bêta) : tout y passe
+  en `deleted`, puis les points verts de la bêta y entrent en `kept` sous le
+  **même `location_id`** (la bêta est une copie de la base du vrai site, qui
+  n'a jamais créé de lieu : pas de collision). Rien n'est effacé là-bas : les
+  salons finis rejouent leurs lieux.
+- Les photos ne sont pas copiées : `~/Wynnguessr/static/tiles` est **aussi un
+  lien vers `/data/wynnguessr-tiles`**, posé à la main (hors git) lors de la
+  mise en prod. Corollaire : **un lieu `kept` supprimé à la bêta ne doit
+  jamais voir ses tuiles effacées** (seuls `new` et `planned`, jamais publiés,
+  le sont) — sinon le vrai site perd la photo avant le prochain Push.
+- Première publication le 2026-10-17 : 671 lieux. Sauvegarde de la base du vrai
+  site juste avant : `/data/wynnguessr-live-before-push-2026-10-17.db`.
