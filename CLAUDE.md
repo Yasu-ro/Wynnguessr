@@ -382,6 +382,17 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
 - Rejoindre avant la fin = jouer en direct (même en cours) ; un salon Classic
   terminé se rejoue en différé, même classement.
 - « Play Again » : nouveau salon (`next_code`), tout le monde suit.
+- **Outils de l'hôte** (2026-10-18, demande de Yasuro : « kick or grant
+  player the head ») : dans la liste des joueurs du salon d'attente, sur
+  chaque autre joueur, « Make host » (étoile creuse, seulement s'il est là)
+  et « Kick » (deux clics : le premier arme un bouton rouge « Kick? » pendant
+  3 s, pas de `confirm()`). Kick seulement avant le début ; le joueur est
+  retiré et inscrit dans `room_bans` : sa page se recharge sur « The host
+  removed you from this room », il ne peut pas revenir. Un invité peut
+  revenir sous un autre pseudo (nouveau compte invité) : accepté, minimal.
+  Pour ces outils, `api/room/<code>` envoie désormais l'`uid` des joueurs
+  (déjà public par les liens du classement ; le chat ne l'envoie toujours
+  pas).
 - Scores calculés **côté serveur** (`guess_score`, même formule que `game.js`).
 - **On devine un bloc** (2026-10-17, des joueurs n'arrivaient jamais à 5 000 :
   la formule ne le donne qu'à moins d'un demi-bloc, donc au hasard du clic).
@@ -421,9 +432,9 @@ sonore ; certains sons se coupaient.
   (tous les navigateurs les décodent, vérifié Chromium et Firefox) dans
   `static/sounds/`, **à lancer sur chaque site** (bêta fait ; prod à faire
   lors de la mise en prod). Ils appartiennent à Mojang : le dépôt public ne
-  les porte pas. Risque signalé à Yasuro le 2026-10-17 (en attente de sa
-  réponse) : un site de fan non commercial qui les sert reste exposé à une
-  demande de retrait de Mojang.
+  les porte pas. Risque signalé à Yasuro (un site de fan non commercial qui
+  les sert reste exposé à une demande de retrait de Mojang) ; **il a choisi
+  de les garder** le 2026-10-18 (« keep the minecraft sounds ! »).
 - `static/js/sound.js` (`Sfx.play(nom, hauteur, volume)`), inclus par
   `game.html` et `room.html` avant `xp.js`. Fichiers chargés une fois, joués
   en entier (les anciens bips étaient des notes coupées à la main). Contre le

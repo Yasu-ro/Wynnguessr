@@ -369,8 +369,15 @@ function lobby() {
     }
     lobbyNames = names;
     $('#lobby-players').html(s.players.map(function (p) {
+        // the host can hand the room over, or kick (a second click confirms)
+        var tools = s.host && !p.you ? "<span class='room-tools'>" +
+            (p.here ? "<button type='button' class='room-tool' data-host='" + p.uid + "' title='Make host'><i class='material-icons'>star_border</i></button>" : '') +
+            (kickArmed == p.uid && Date.now() - kickAt < KICK_ARMED
+                ? "<button type='button' class='room-tool armed' data-kick='" + p.uid + "'>Kick?</button>"
+                : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") +
+            "</span>" : '';
         return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) +
-            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + "</div>";
+            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + tools + "</div>";
     }).join(''));
     if (!pending && JSON.stringify(s.settings) != settingsKey) {
         settingsKey = JSON.stringify(s.settings);
@@ -385,6 +392,24 @@ function lobby() {
         : tooFew ? MODE_NAMES[s.settings.mode] + ' needs at least 2 players'
         : 'Start the Game');
 }
+
+var KICK_ARMED = 3000;     // ms the "Kick?" button waits for the second click
+var kickArmed = null, kickAt = 0;
+
+$('#lobby-players').on('click', '[data-host]', function () {
+    send('host', {uid: $(this).data('host')});
+}).on('click', '[data-kick]', function () {
+    var uid = $(this).data('kick');
+    if (kickArmed == uid && Date.now() - kickAt < KICK_ARMED) {
+        kickArmed = null;
+        send('kick', {uid: uid});
+    } else {
+        kickArmed = uid;
+        kickAt = Date.now();
+        lobby();
+        setTimeout(function () { if (view == 'lobby') lobby(); }, KICK_ARMED + 50);
+    }
+});
 
 function showSettings(st) {
     $('#room-settings [name=mode]').each(function () {

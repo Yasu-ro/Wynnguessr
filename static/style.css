@@ -1266,6 +1266,39 @@ button, input {
     font-size: 20px;
     color: #c08a00;
 }
+/* the host's tools on each player: make host, kick */
+.room-tools {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+    padding-left: 12px;
+}
+.room-tool {
+    display: grid;
+    place-items: center;
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+    font: 700 14px/1 var(--sans);
+    text-transform: uppercase;
+    color: #fff;
+    background: var(--wood) var(--facet) center / 100% 100% no-repeat;
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.room-tool:hover {
+    filter: brightness(1.1);
+}
+.room-tool.armed {
+    background-color: var(--red);
+    text-shadow: 0 2px 0 rgba(0, 0, 0, .3);
+}
+.room-player .room-tool .material-icons {
+    margin: 0;
+    font-size: 18px;
+    color: #fff;
+}
 .room-dot {
     display: inline-block;
     flex: none;

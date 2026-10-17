@@ -795,6 +795,8 @@ with connect() as c:
             at REAL, time REAL, PRIMARY KEY (code, user_id, round));
         CREATE TABLE IF NOT EXISTS room_chat (
             id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, user_id INTEGER, at REAL, text TEXT);
+        CREATE TABLE IF NOT EXISTS room_bans (
+            code TEXT, user_id INTEGER, PRIMARY KEY (code, user_id));
     ''')
     # the scores table comes with the original game, which had no modes
     if 'mode' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
@@ -1003,6 +1005,8 @@ def room():
         r = find_room(c, code)
         if not r:
             return render_template('apology.html', message = "No room with the code " + code)
+        if c.execute("SELECT 1 FROM room_bans WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone():
+            return render_template('apology.html', message = "The host removed you from this room")
         # names tell players apart on screen: two of the same in a room would mix up
         clash = c.execute('''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id, users me
             WHERE p.code = ? AND me.id = ? AND p.user_id != me.id AND u.username = me.username COLLATE NOCASE''',
@@ -1060,7 +1064,8 @@ def room_state(code):
             '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text FROM room_chat m JOIN users u ON u.id = m.user_id
             WHERE m.code = ? AND m.id > ? ORDER BY m.id DESC LIMIT 50''',
             (r['code'], int(since) if since.isnumeric() else 0)).fetchall())]
-        for p in out['players'] + out['chat']:
+        # players keep their id: the host's tools (make host, kick) name them by it
+        for p in out['chat']:
             del p['uid']
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
@@ -1118,6 +1123,32 @@ def room_set(code):
             return jsonify({"success": False, "error": error or "Not enough locations in these provinces"})
         c.execute("UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ? WHERE code = ?",
                   (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, r['code']))
+    return jsonify({"success": True})
+
+@app.route("/api/room/<code>/host", methods=['POST'])
+def room_host(code):
+    # host only: hands the room over to another player who is here
+    with room_tx() as c:
+        r, me = member(c, code)
+        uid = request.form.get('uid', type = int)
+        if not r or r['host_id'] != me['user_id'] or not c.execute(
+                "SELECT 1 FROM room_players WHERE code = ? AND user_id = ? AND live = 1 AND last_seen > ?",
+                (r['code'], uid, time.time() - AWAY)).fetchone():
+            return jsonify({"success": False})
+        c.execute("UPDATE rooms SET host_id = ? WHERE code = ?", (uid, r['code']))
+    return jsonify({"success": True})
+
+@app.route("/api/room/<code>/kick", methods=['POST'])
+def room_kick(code):
+    # host only, before the start: the player leaves and cannot come back
+    # (their page reloads on the room, which says so)
+    with room_tx() as c:
+        r, me = member(c, code)
+        uid = request.form.get('uid', type = int)
+        if not r or r['host_id'] != me['user_id'] or r['state'] != 'waiting' or uid == me['user_id']:
+            return jsonify({"success": False})
+        c.execute("DELETE FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid))
+        c.execute("INSERT OR IGNORE INTO room_bans (code, user_id) VALUES (?, ?)", (r['code'], uid))
     return jsonify({"success": True})
 
 @app.route("/api/room/<code>/start", methods=['POST'])
