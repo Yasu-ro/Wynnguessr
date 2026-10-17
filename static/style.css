@@ -979,6 +979,13 @@ button, input {
     text-shadow: 1.5px 0 0 var(--ink), -1.5px 0 0 var(--ink), 0 1.5px 0 var(--ink), 0 -1.5px 0 var(--ink),
                  0 2.5px 0 var(--ink);
 }
+.name-lvl {
+    display: inline-block;
+    min-width: 24px;
+    margin-right: 8px;
+    font-size: 16px;
+    text-align: center;
+}
 .board-fire {
     margin-left: 6px;
     font-weight: 700;
@@ -1859,11 +1866,11 @@ body.room-playing {
         display: none;
     }
     .tabs {
-        gap: 10px 9px;
+        gap: 10px 8px;
     }
     .tab {
-        padding: 5px 7px 6px;
-        font-size: 16px;
+        padding: 4px 5px 5px;
+        font-size: 14px;
     }
     .profile-stats {
         display: grid;

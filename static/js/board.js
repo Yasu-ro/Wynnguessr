@@ -1,5 +1,5 @@
 // Leaderboard: the best game of each player with exactly the settings of the
-// filters (classic, survival), or the levels, or the wins with friends
+// filters (classic, survival), or the levels, the wins, the win streaks with friends
 $(function () {
     var board = $('.board'), form = $('#filter-options');
     var medals = ['#d4af37', '#c0c0c0', '#cd7f32'];
@@ -10,7 +10,8 @@ $(function () {
         classic: ['Score', 'Time', 'Date'],
         survival: ['Streak', 'Time', 'Date'],
         levels: ['Level', 'XP', 'Games'],
-        wins: ['Wins', 'Games', 'Best streak']
+        wins: ['Wins', 'Best streak', 'Games'],
+        streaks: ['Best streak', 'Wins', 'Games']
     };
 
     function esc(text) {
@@ -49,14 +50,17 @@ $(function () {
             return ["<b class='lvl'>" + row.level + "</b>", number(row.xp), number(row.games)];
         }
         if (mode == 'wins') {
-            return [number(row.wins), number(row.played), number(row.best)];
+            return [number(row.wins), number(row.best), number(row.played)];
+        }
+        if (mode == 'streaks') {
+            return [number(row.best), number(row.wins), number(row.played)];
         }
         return [number(row.score), duration(row.time), day(row.date)];
     }
 
     function load() {
         var mode = form.find('[name=mode]:checked').val();
-        var ladder = mode == 'levels' || mode == 'wins';
+        var ladder = mode == 'levels' || mode == 'wins' || mode == 'streaks';
         var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
         form.find('.filters').prop('hidden', ladder);
         $('#board-rounds').prop('hidden', mode != 'classic');
@@ -81,10 +85,11 @@ $(function () {
         $('#table-body').html(rows.map(function (row, i) {
             var rank = i < 3 ? "<i class='material-icons' style='color:" + medals[i] + "'>emoji_events</i>" : i + 1;
             // who is winning right now
-            var fire = mode == 'wins' && row.streak >= 2 ? " <span class='board-fire' title='Wins in a row'>" +
+            var fire = (mode == 'wins' || mode == 'streaks') && row.streak >= 2 ? " <span class='board-fire' title='Wins in a row'>" +
                 "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
             return "<tr class='leaderboard-row" + (row.name == me ? ' you' : '') + "'><td>" + rank + "</td>" +
-                "<td>" + player(row) + fire + "</td>" + cells(row, mode).map(function (c, i) {
+                "<td>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
+                player(row) + fire + "</td>" + cells(row, mode).map(function (c, i) {
                     return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';
                 }).join('') + "</tr>";
         }).join(''));

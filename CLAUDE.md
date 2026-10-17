@@ -302,10 +302,15 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   Une série cassée n'est jamais affichée « 0 » : afficher la perte crée de
   l'anxiété, le record sert de trophée permanent (recherche sur les séries).
 - **Classement** : Classic, Survival, Levels (niveau, XP, parties), Wins
-  (victoires, parties en salon, meilleure série ; seulement ceux qui ont gagné
-  au moins une fois ; départage : meilleure série, puis le moins de parties).
-  Pas d'onglet « Games » à part : presque identique à Levels puisque l'XP vient
-  des parties, d'où une colonne. Les filtres se masquent sur ces deux onglets.
+  (victoires, meilleure série, parties en salon ; seulement ceux qui ont gagné
+  au moins une fois ; départage : meilleure série, puis le moins de parties),
+  Streaks (ajouté le 2026-10-17 à la demande de Yasuro, « il n'y a pas de best
+  streak » : meilleure série d'abord, puis série en cours, puis victoires).
+  **Le niveau est devant chaque pseudo dans tous les onglets** (demande de
+  Yasuro). Sur téléphone la dernière colonne est masquée : la mettre en
+  dernier seulement si elle est secondaire (d'où Games en dernier). Pas
+  d'onglet « Games » à part : presque identique à Levels. Les filtres se
+  masquent sur Levels, Wins et Streaks.
 - API : `api/score` renvoie `xp` et `gained` ; `GET api/room/<code>/xp` (salon
   terminé) renvoie `xp`, `gained`, `bonus`, `streak`, ou `guest`. `ladder()`
   calcule les deux onglets (~5 ms le 2026-10-17).
