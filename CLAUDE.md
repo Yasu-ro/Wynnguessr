@@ -304,6 +304,14 @@ Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
   non enregistrée.
 - **Duel** : 6 000 PV ; chaque manche on perd `(meilleur score − le sien) ×
   multiplicateur` (×1 manches 1-2, puis +0,5 par manche).
+  **Défaut connu, laissé tel quel à la demande de Yasuro** (2026-10-18 : il
+  refera les modes un par un) : ne pas deviner compte 0 point, donc ne coûte
+  que l'écart au meilleur. Si l'autre a mal joué, c'est presque gratuit
+  (ZDVNC4 et 75S9DP, manche 2 : **1 PV** perdu sans guess, l'autre avait 1
+  point). Correctif testé puis retiré : sans guess (pas de ligne, ou `x`
+  NULL), `5000 × multiplicateur`, quoi que fassent les autres ; aucun
+  vainqueur de partie finie ne changeait. Battle Royale : sans guess = le
+  pire de la manche = une vie, comme un mauvais guess (Yasuro : à garder).
 - **Battle Royale** : 3 vies ; le pire de la manche perd une vie (égalité = rien) ;
   un bullseye (≥ 4 950 pts) ne perd **jamais** de vie et en rend une (règle
   ajoutée après une vraie partie : 4 976 contre 4 979 coûtait une vie).
