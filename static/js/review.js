@@ -27,6 +27,7 @@ var have = null;    // chunks of the downloaded world: Uint8Array, 1 = there
 var veil = null, veilData = '';
 var rings = [];     // one circle per group of holes, visible at any zoom
 var focusOn = false, focusMap = null, focusDot = null;
+var back = [];      // full screen: ids of the photos seen before, for Previous
 var spin = 0;       // full screen: degrees per second the view turns by itself, 0 = still
 
 function style(loc) {
@@ -202,7 +203,15 @@ function next() {
         var d = current ? (l.X - current.X) * (l.X - current.X) + (l.Z - current.Z) * (l.Z - current.Z) : 0;
         if (d < bestDist) { bestDist = d; best = l; }
     });
-    if (best) open(best); else closeFocus();
+    if (best) { if (current) back.push(current.id); open(best); } else closeFocus();
+}
+
+// back to the photo before (a Keep clicked too fast): it can still be deleted
+function previous() {
+    while (back.length) {
+        var id = back.pop();
+        if (places[id]) { open(places[id]); return; }
+    }
 }
 
 function send(action) {
@@ -234,6 +243,7 @@ document.querySelectorAll('.review-delete').forEach(function (b) {
 });
 document.getElementById('review-full').onclick = openFocus;
 document.getElementById('focus-next').onclick = next;
+document.getElementById('focus-prev').onclick = previous;
 document.getElementById('focus-close').onclick = closeFocus;
 // negative: Pannellum turns to the right; after a drag it starts again by itself
 document.getElementById('focus-spin').oninput = function () {
