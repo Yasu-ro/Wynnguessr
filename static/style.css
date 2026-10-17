@@ -917,6 +917,10 @@ button, input {
     background-color: var(--green);
     text-shadow: none;
 }
+/* the end of a room: the top three show up one by one */
+.podium-wait {
+    visibility: hidden;
+}
 .result.loss {
     background-color: var(--red);
 }

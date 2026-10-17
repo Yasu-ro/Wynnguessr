@@ -258,14 +258,18 @@ function chatPlace() {
     log.scrollTop = chatStick ? log.scrollHeight : chatTop;
 }
 
+var bubbleAt = 0;         // the last chat sound: one every 2 seconds at most
+var chatSeen = false;     // the messages already there when the page opened make no sound
+
 function chat(messages) {
-    var log = $('#chat-log');
+    var log = $('#chat-log'), theirs = false;
     (messages || []).forEach(function (m) {
         if (m.id <= chatId) {
             return;
         }
         chatId = m.id;
         log.append("<p>" + dot(m) + "<b>" + esc(m.name) + "</b><span>" + esc(m.text) + "</span></p>");
+        theirs = theirs || m.name != me().name;
         if ($('#room-chat').hasClass('folded') && m.name != me().name) {
             unread++;
         }
@@ -273,6 +277,12 @@ function chat(messages) {
     log.children().slice(0, -100).remove();
     // follow the conversation, unless the player scrolled up to read
     chatPlace();
+    // someone else wrote (not the messages already there when the page opened)
+    if (chatSeen && theirs && Date.now() - bubbleAt > 2000) {
+        bubbleAt = Date.now();
+        Sfx.play('bubble');
+    }
+    chatSeen = true;
     $('#chat-title').text(unread ? 'Chat (' + unread + ')' : 'Chat');
 }
 
@@ -620,24 +630,33 @@ function reveal() {
         }
         revealMap = makeMap('reveal-map', -1);
         var answer = blockSpot(s.reveal.X, s.reveal.Z);
-        var group = [L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(revealMap)];
-        s.reveal.guesses.forEach(function (g) {
-            var p = player(g.name);
-            if (g.x === null || !p) {
-                return;
-            }
-            var pos = blockSpot(g.x, g.z);
-            L.polyline([answer, pos], {color: color(p), weight: 3, dashArray: '8 6'}).addTo(revealMap);
-            group.push(L.marker(pos, {icon: pin(color(p))}).addTo(revealMap)
-                .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip'}));
+        L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(revealMap);
+        // the guesses land one by one, the furthest first, each on a higher note
+        var spots = [answer], drops = s.reveal.guesses.filter(function (g) {
+            return g.x !== null && player(g.name);
+        }).sort(function (a, b) { return a.score - b.score; });
+        drops.forEach(function (g, i) {
+            var p = player(g.name), pos = blockSpot(g.x, g.z);
+            spots.push(pos);
+            setTimeout(function () {
+                if (view != key) {
+                    return;
+                }
+                L.polyline([answer, pos], {color: color(p), weight: 3, dashArray: '8 6'}).addTo(revealMap);
+                L.marker(pos, {icon: pin(color(p))}).addTo(revealMap)
+                    .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip'});
+                Sfx.play('note', noteBlock(SCALE[Math.min(i, SCALE.length - 1)]));
+            }, DROP * (i + 1));
         });
-        revealMap.fitBounds(L.featureGroup(group).getBounds(), {padding: [60, 60], maxZoom: 1});
+        revealMap.fitBounds(L.latLngBounds(spots), {padding: [60, 60], maxZoom: 1});
+        // then your points count up, and one sound says how it went
+        counting = {key: key, from: Date.now() + DROP * (drops.length + 1), score: 0, done: false};
     }
 
     var you = me();
     var mine = s.reveal.guesses.filter(function (g) { return g.name == you.name; })[0];
     var guessed = mine && mine.x !== null;
-    var line = guessed ? '+' + points(mine.score) : 'No guess this round';
+    var line = guessed ? "+<span id='reveal-count'>" + points(mine.score) + '</span>' : 'No guess this round';
     if (guessed && mine.score >= BULLSEYE) {
         line = 'Bullseye! ' + line;
     }
@@ -651,15 +670,17 @@ function reveal() {
             line += you.delta < 0 ? bad + 'you lose a life</span>' : good + 'a life back!</span>';
         }
     }
-    // one sound for what the round did to you: out, hurt, or a bullseye
     if (fresh) {
-        if (s.mode != 'classic' && you.seat && you.out == s.round) {
-            Sfx.play('out');
-        } else if (guessed && mine.score >= BULLSEYE) {
-            Sfx.play('perfect');
-        } else if (s.mode != 'classic' && you.seat && you.out == null && you.delta < 0) {
-            Sfx.play('hurt');
-        }
+        // only for who played this round (not a spectator, not someone already out)
+        var played = s.mode == 'classic' || (you.seat && (you.out == null || you.out == s.round));
+        counting.score = guessed ? mine.score : 0;
+        counting.verdict = !played ? null
+            : s.mode != 'classic' && you.out == s.round ? 'out'
+            : guessed && mine.score >= BULLSEYE ? 'perfect'
+            : s.mode != 'classic' && you.delta < 0 ? 'hurt'
+            : guessed && mine.score >= GOOD ? 'good'
+            : guessed && mine.score > BAD ? null : 'bad';
+        requestAnimationFrame(count);
     }
     $('#reveal-title').text(s.mode == 'classic' ? 'Round ' + s.round + '/' + s.rounds
         : 'Round ' + s.round + (s.mode == 'duel' && s.multiplier > 1 ? ' · damage ×' + s.multiplier : ''));
@@ -701,6 +722,41 @@ function reveal() {
         nextAt = Date.now() + s.next_in * 1000;
     }
     nextButton();
+}
+
+// your points of the round, counted up after the pins have landed, with a
+// tick now and then; the poll rewrites the line every second, the count
+// writes over it until it is done
+var DROP = 350;            // ms between two pins landing
+var COUNT = 900;           // ms to count the points
+var SCALE = [5, 9, 12, 17, 21, 24];   // the pins' notes: up the scale, as note blocks
+var GOOD = 4000, BAD = 1500;          // above: a happy note; at or below: a low one
+var counting = null;
+
+function count() {
+    var c = counting;
+    if (!c || c.done || view != c.key) {
+        return;
+    }
+    var t = (Date.now() - c.from) / COUNT, el = document.getElementById('reveal-count');
+    if (t >= 1) {
+        c.done = true;
+        if (el) {
+            el.textContent = points(c.score);
+        }
+        if (c.verdict) {
+            Sfx.play(c.verdict);
+        }
+        return;
+    }
+    if (el) {
+        el.textContent = points(Math.round(c.score * Math.max(0, t)));
+    }
+    if (t > 0 && c.score && Date.now() - (c.tick || 0) > 140) {
+        c.tick = Date.now();
+        Sfx.play('tick', 0.8 + t * 0.7, 0.5);
+    }
+    requestAnimationFrame(count);
 }
 
 // is the round on display the last one?
@@ -749,7 +805,6 @@ function results() {
             viewer.destroy();
             viewer = null;
         }
-        gain();
     }
     var medals = ['#d4af37', '#c0c0c0', '#cd7f32'];
     var rows, value, same;
@@ -770,6 +825,9 @@ function results() {
         };
         same = function (a, b) { return a.out == b.out && a.left == b.left && a.total == b.total; };
     }
+    if (fresh) {
+        podium(rows);
+    }
     var rank = 0;
     $('#results-rows').html(rows.map(function (p, i) {
         if (i == 0 || !same(p, rows[i - 1])) {
@@ -777,25 +835,59 @@ function results() {
         }
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
         var v = value(p);
-        return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + "'><td>" + place + "</td>" +
+        return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + (i < hidden ? ' podium-wait' : '') + "'><td>" + place + "</td>" +
             "<td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td>" +
             "<td>" + v[1] + "</td></tr>";
     }).join(''));
 
     var title = 'Results';
-    if (rows.length > 1 && same(rows[0], rows[1])) {
+    if (hidden) {
+        title = 'Results';
+    } else if (rows.length > 1 && same(rows[0], rows[1])) {
         title = 'Draw!';
     } else if (rows.length > 1) {
         title = rows[0].you ? 'You Win!' : rows[0].name + ' Wins!';
     }
     $('#results-title').text(title);
-    if (fresh && s.live && rows.length > 1 && rows.some(function (p) { return p.you; })) {
-        Sfx.play(rows[0].you && title != 'Draw!' ? 'win' : 'lose');
+    if (finale) {
+        finale = false;
+        if (s.live && rows.length > 1 && rows.some(function (p) { return p.you; })) {
+            Sfx.play(rows[0].you && title != 'Draw!' ? 'win' : 'lose');
+        }
+        gain();
     }
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
+}
+
+// the podium: at the end of a live game the top three show up one by one,
+// third place first, each on a higher note; then the winner's fanfare (or
+// the villager's "hmm"), then the XP
+var PODIUM = 800;          // ms between two places
+var hidden = 0;            // top places still hidden
+var finale = false;        // the podium is complete: time for the last sounds
+
+function podium(rows) {
+    hidden = s.live && rows.length > 1 ? Math.min(3, rows.length) : 0;
+    if (!hidden) {
+        finale = true;
+        return;
+    }
+    var step = function () {
+        if (view != 'results') {
+            return;
+        }
+        hidden--;
+        Sfx.play('note', noteBlock([24, 17, 12][hidden]));
+        finale = !hidden;
+        results();
+        if (hidden) {
+            setTimeout(step, PODIUM);
+        }
+    };
+    setTimeout(step, PODIUM);
 }
 
 // the XP this game brought (accounts only), and the wins in a row

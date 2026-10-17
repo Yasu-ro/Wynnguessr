@@ -442,9 +442,27 @@ sonore ; certains sons se coupaient.
   4 950 (« ding » de la flèche qui touche), dégât en Duel/BR et Survival raté
   (coup reçu du joueur), éliminé (objet cassé), victoire (fanfare de défi
   accompli), défaite (« hmm » du villageois), quelqu'un entre dans le salon
-  (porte), début de partie (cloche de village), XP (orbe, level up). Pas de
-  son sur les pages hors jeu ni sur le chat. Volumes jamais validés à
-  l'oreille : à régler sur les retours de Yasuro.
+  (porte), début de partie (cloche de village), XP (orbe, level up).
+- **Deuxième passe (2026-10-18)**, Yasuro : « still kinda feels empty »,
+  « met des sons un peu partout pour rendre le jeu plus vivant », **en jeu
+  seulement pour l'instant** (les animations seront son étape suivante) :
+  - clic des menus de Minecraft sur boutons, choix et onglets des pages de
+    jeu (`sound.js`, sauf le bouton Guess qui a son pop) ;
+  - **révélation en étapes** (salons) : les épingles tombent une à une, la
+    plus loin d'abord, chacune sur une note plus haute (harpe de bloc
+    musical, `SCALE`, `noteBlock()`), puis tes points défilent avec un tic
+    toutes les 140 ms, puis un verdict : éliminé, bullseye, dégât, bon
+    (≥ 4 000, `GOOD` : pling), raté (≤ 1 500 ou rien, `BAD` : basse). Même
+    défilement et verdict en solo (`countUp`). Le poll réécrit la ligne
+    chaque seconde ; le défilement écrit par-dessus jusqu'à la fin ;
+  - **podium** (fin d'un salon en direct) : les 3 premiers apparaissent du
+    3e au 1er (`.podium-wait`), une note chacun, puis fanfare ou « hmm »,
+    puis l'XP (avant, les orbes couvraient tout) ;
+  - **bulle du chat** de Minecraft quand un autre écrit, une toutes les 2 s
+    au plus, rien pour les messages déjà là à l'ouverture.
+  `SOUND_MAX` passé à 14 par seconde : à 6, les orbes d'XP (10 par
+  seconde) étaient coupées.
+  Volumes jamais validés à l'oreille : à régler sur les retours de Yasuro.
 
 ## Pages et direction artistique
 

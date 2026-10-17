@@ -105,9 +105,7 @@ function showScoreScreen() {
         document.getElementById('score').innerHTML = "No location selected!";
         document.getElementById('progress').style.width = "0%";
         document.getElementById('distance').innerHTML = mode == 'survival' ? "Game over!" : "Distance: 0 blocks away!";
-        if (mode == 'survival') {
-            Sfx.play('hurt');
-        }
+        Sfx.play(mode == 'survival' ? 'hurt' : 'bad');
         saveIfOver(false);
         document.getElementById('next-button').onclick = function(){
             nextStep(false);
@@ -130,14 +128,15 @@ function showScoreScreen() {
     document.getElementById('distance').innerHTML = "Distance: " + distance + " blocks away!";
     document.getElementById('progress').style.width = (score / 5000) * 100 + "%";
     document.getElementById('totalScore').innerHTML = "Score: " + totalScore;
-    document.getElementById('score').innerHTML = score + " points!";
-
     var survived = distance <= SURVIVAL;
-    // one sound for the result: a bullseye, or the end of a survival game
-    if (score >= 4950) {
-        Sfx.play('perfect');
-    } else if (mode == 'survival' && !survived) {
-        Sfx.play('hurt');
+    // the points count up, then one sound says how it went
+    var verdict = score >= 4950 ? 'perfect'
+        : mode == 'survival' ? (survived ? 'good' : 'hurt')
+        : score >= 4000 ? 'good' : score <= 1500 ? 'bad' : null;
+    if (mode == 'survival') {
+        Sfx.play(verdict);
+    } else {
+        countUp(document.getElementById('score'), score, verdict);
     }
     if (mode == 'survival') {
         if (survived) {
@@ -162,6 +161,28 @@ function showScoreScreen() {
     //draws line between guess and actual location
     polylines[round - 1] = L.polyline([blockSpot(xActual, zActual), blockSpot(xGuess, zGuess)], { color: 'red' }).addTo(scoreMap);
     scoreMap.fitBounds(polylines[round - 1].getBounds());
+}
+
+// the points of a round, counted up with a tick now and then (the same as in rooms)
+function countUp(el, points, verdict) {
+    var from = Date.now(), tick = 0;
+    var step = function () {
+        if (!document.body.contains(el)) {
+            return;
+        }
+        var t = Math.min(1, (Date.now() - from) / 900);
+        el.innerHTML = Math.round(points * t) + " points!";
+        if (t < 1) {
+            if (Date.now() - tick > 140) {
+                tick = Date.now();
+                Sfx.play('tick', 0.8 + t * 0.7, 0.5);
+            }
+            requestAnimationFrame(step);
+        } else if (verdict) {
+            Sfx.play(verdict);
+        }
+    };
+    step();
 }
 
 function showNextLocation() {

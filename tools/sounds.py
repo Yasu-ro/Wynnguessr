@@ -23,6 +23,11 @@ SOUNDS = {
     'start': ['block/bell/bell_use01', 'block/bell/bell_use02'],
     'orb': ['random/orb'],
     'level': ['random/levelup'],
+    'click': ['random/click'],
+    'note': ['note/harp'],
+    'good': ['note/pling'],
+    'bad': ['note/bass'],
+    'bubble': ['ui/hud/hud_bubble'],
 }
 
 def get(url):
