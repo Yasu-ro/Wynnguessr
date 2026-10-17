@@ -483,7 +483,50 @@ sonore ; certains sons se coupaient.
   seconde) étaient coupées.
   Volumes jamais validés à l'oreille : à régler sur les retours de Yasuro.
 
-## Pages et direction artistique
+## Animations — recherche (2026-10-18, rien de codé)
+
+Demande de Yasuro : tout plus vivant (pages, transitions, résultats), mais
+**rien de « visiblement généré par IA »**, dans la DA Wynncraft, sans
+encombrer ni lasser. Avant : une seule animation sur tout le site (`xp-pop`).
+
+- **Ce que wynncraft.com anime vraiment** (leurs CSS téléchargées et
+  `document.getAnimations()` sur l'accueil, 2026-10-18) : un ciel de 3
+  couches de nuages qui dérivent en 60, 80 et 100 s (la vie vient du décor
+  lent, pas de l'interface) ; transitions surtout `.3s ease` (105 sur 248) ;
+  survol = agrandissement 1,02 à 1,1 et icône qui monte de 5 px ; courbes
+  **qui dépassent puis reviennent** : `cubic-bezier(.57,.04,.32,1.47)` (0,5 s,
+  icônes), `cubic-bezier(.44,.51,.53,1.94)` (0,15 s, survols « bouncy ») ;
+  reflet blanc en diagonale qui traverse un bouton une fois (1 s,
+  `wynn-shine-worker`) ; séparateurs qui se dessinent en largeur (0,5 s) ;
+  icônes qui flottent de quelques px (5 s) ; bordures or/argent/bronze qui
+  brillent lentement (10 s, rangs). Leur « pop-in » (fondu + 30 px vers le
+  haut) existe aussi : c'est justement le tic à éviter chez nous.
+- **Minecraft** : l'interface change d'un coup (aucun fondu entre écrans),
+  les toasts glissent depuis le coin, l'écran titre tourne lentement son
+  panorama : du mouvement lent en fond, une interface sèche.
+- **Tics « IA » du mouvement** (rapport Sailop 2026, HN, hustletoai) :
+  fondu + 20 px vers le haut à l'entrée dans l'écran, décalé de 0,1 s par
+  élément, sur tout (défaut de Framer Motion / shadcn / v0) ; cartes qui se
+  soulèvent de 4 px avec une ombre floue au survol ; lueurs au survol sur
+  tout ; halo qui suit la souris ; barre de progression du défilement ;
+  dégradés et reflets qui tournent en boucle ; même durée et même courbe
+  partout ; transitions inégales d'un composant à l'autre. Diagnostic du
+  rapport : « animation as performative competence ».
+- **Ce qui fait humain** : chaque mouvement a une cause (une action du
+  joueur, un événement du jeu), sinon rien ; un seul élément mène, le reste
+  apparaît ; durées selon la taille et la distance (NN/g : ~100 ms pour un
+  retour simple, 200-300 ms pour un grand changement, 400 ms au plus) ;
+  sortie plus courte que l'entrée ; une physique propre au monde (bois,
+  papier, clous, cordes) ; un peu d'irrégularité ; tout interruptible.
+- **Ne pas lasser** : plus c'est fréquent, plus c'est court ou absent (NN/g,
+  Emil Kowalski : pas d'animation sur ce qu'on fait des dizaines de fois) ;
+  intensité par paliers (clic < écran < manche < partie) ; un clic passe
+  toute séquence ; jamais de délai imposé au jeu ; `prefers-reduced-motion`
+  coupe tout (aujourd'hui il ne coupe que les transitions, pas `xp-pop`).
+  Piège technique : les salons se redessinent chaque seconde, une animation
+  doit partir d'un **changement d'état** (comme les sons), pas du rendu.
+
+
 
 **Tout doit respecter la DA, partout** (Yasuro y tient beaucoup).
 **Refonte complète le 2026-10-17**, demande de Yasuro : l'interface faisait
