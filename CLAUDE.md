@@ -328,6 +328,27 @@ fan, sans rien voler).
   identiques, ombres grises floues partout, apparitions animées au défilement,
   petites étiquettes en majuscules au-dessus des titres, numéros 01/02/03,
   émojis en guise d'icônes. Ne pas les réintroduire.
+- Yasuro a validé la refonte telle quelle (« just what I wanted »). Toute
+  nouvelle page reprend ces composants : `.page` + `.sign`, `.panel` (titre
+  `h2` sur la ligne à clou), `.btn` (`.wood`, `.red`, `.big`, `.wide`),
+  `.chips`/`.chip`, `.field`, `.tabs`, `.leaderboard-table`.
+- **Outils (`tools/`)** : `ornaments.py` et `textures.py` impriment les
+  variables de dessin de `style.css` (facettes, clou, pierres, textures) ;
+  pour retoucher un dessin, modifier le script et recoller sa sortie dans
+  `:root`. `solo.py` et `room.py` (Playwright) jouent une partie solo de 3
+  manches et un salon à deux invités `zz_` (`room.py <url> <préfixe>
+  classic|duel|royale [largeur hauteur]`) et photographient chaque écran.
+- **Méthode qui a marché** : développer sur une copie isolée dans le
+  scratchpad (templates + statiques copiés, grosses images en liens, base
+  copiée par `sqlite3.backup`, `REVIEWERS` remplacé par un compte `zz_`,
+  `PUBLISHER` vide, gunicorn sur un port libre), jamais en direct dans
+  `~/Wynnguessr-beta` : ses fichiers statiques sont servis tout de suite et
+  kemmi peut être en train de trier. Vérifier sous Chromium **et Firefox**
+  (navigateur de Yasuro), ordinateur et 375 px. Puis copier, redémarrer la
+  bêta, effacer les copies de base du scratchpad.
+- Référence de leur style : leurs pages se photographient avec Playwright
+  (site rendu en JS) ; les pages stats/classement sont derrière une
+  vérification Cloudflare, ne pas la contourner.
 
 - `mode` : choix **Solo / With Friends** d'abord (`?play=solo|friends`), puis
   réglages (`settings.html` + `modes.html`, partagés avec la salle d'attente).
