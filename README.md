@@ -1,79 +1,36 @@
----
-
 # WynnGuessr
 
-Welcome to **WynnGuessr**, an interactive map-based guessing game inspired by GeoGuessr and set within the world of Wynncraft, an MMORPG in Minecraft! *WynnGuessr* challenges players to test their map knowledge by guessing specific locations within Wynncraft based on visual cues.
+play it here : **https://wynndle.com**
 
-## Table of Contents
-1. [Project Overview](#project-overview)
-2. [Features](#features)
-3. [Technologies Used](#technologies-used)
-4. [Installation](#installation)
-5. [Usage](#usage)
-6. [Future Plans](#future-plans)
-7. [Contributing](#contributing)
+this is a fork of [Ched3's WynnGuessr](https://github.com/Ched3/Wynnguessr). the original was a really cool idea, GeoGuessr but in Wynncraft, but it hasn't been updated in a while and the map changed a lot since. so i took it and started making an updated and better version of it with my friends.
 
----
+big thanks to Ched3 (Edison Chen) for making the original, none of this would exist without it !
 
-## Project Overview
-*WynnGuessr* was created to provide Wynncraft fans with a new way to engage with the game world. Inspired by GeoGuessr, *WynnGuessr* incorporates over 600 locations across Wynncraft and provides an immersive, location-based guessing experience for players.
+## what's different
 
-## Features
-- **Interactive Map**: Powered by Leaflet.js, the game features a custom, interactive map with 600+ locations for players to explore and guess.
-- **User Authentication and Profiles**: User authentication lets players create profiles, save game history, and track progress.
-- **Leaderboards**: Compete against others with dynamically updated leaderboards.
-- **AWS-Optimized Performance**: Runs smoothly with AWS EC2 and EBS, supporting 100+ concurrent players while maintaining <2s load times.
+we redid basically everything location-wise. the map is the 2026 one now, and all the old photos got replaced by new 360° panoramas we took ourselves with a small Fabric mod (no hud, no players, no name tags, just the world). there's over 600 spots right now, from Wynn to Gavel, Corkus, the Ocean and the Silent Expanse. Fruma is coming once i've got photos for it.
 
-## Technologies Used
-- **Frontend**: JavaScript, HTML, CSS, Leaflet.js
-- **Backend**: Python, Flask
-- **Database**: SQL
-- **Deployment**: AWS EC2, Nginx, Gunicorn
+the photos are also way sharper than before, you can actually zoom in and see stuff.
 
-## Installation
-To set up *WynnGuessr* locally:
+and there's multiplayer now !! you make a room, send the code to your friends and play together. in rooms you have Classic, Duel and Battle Royale, and solo you have Classic and Survival.
 
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/Ched3/WynnGuessr.git
-    cd WynnGuessr
-    ```
+also : you can log in with your Wynncraft account, there's leaderboards for Classic and Survival, your friends can join rooms as guests without making an account, and it works on phone.
 
-2. **Install dependencies**:
-   Ensure you have Python installed. Install required Python packages with:
-    ```bash
-    pip install -r requirements.txt
-    ```
+## running it yourself
 
-3. **Set up environment variables**:
-   Create a `.env` file in the project root and configure your database URI and any necessary API keys.
+it's a Flask app :
 
-4. **Run the application**:
-    ```bash
-    flask run
-    ```
+```bash
+git clone https://github.com/Yasu-ro/Wynnguessr.git
+cd Wynnguessr
+pip install -r requirements.txt
+flask run
+```
 
-5. **Access the application**:
-   Open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your web browser to start playing *WynnGuessr* locally!
+then go on http://127.0.0.1:5000. the new photos aren't in the repo (way too big), so locally you'll only get the old ones from the original.
 
-## Usage
-- **Gameplay**: Players guess locations on the map based on in-game screenshots or map fragments.
-- **Leaderboard**: Tracks top players; scores are updated in real-time.
-- **User Profiles**: Users can view past scores, saved locations, and progress in their profiles.
+## contact
 
-## Future Plans
-- **Expanded Map Options**: Adding more regions and unique locations from Wynncraft.
-- **Game Modes**: Implementing timed modes and multi-player options.
-- **Enhanced Leaderboards**: Regional and seasonal rankings.
-- **Mobile Optimization**: Improving experience for mobile players.
+if you find a bug or a spot that's broken, open an issue !
 
-## Contributing
-I welcome contributions to enhance *WynnGuessr*! To contribute:
-1. Fork the repository.
-2. Create a new branch.
-3. Make your changes and submit a pull request.
-
----
-
-Feel free to reach out if you have any questions or feedback. Happy guessing!
-
+it's a fan project, not affiliated with Wynncraft.
