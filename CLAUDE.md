@@ -34,6 +34,12 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   gunicorn est en 26.x : la 20.1 du dépôt d'origine plante sous Python 3.13.
 - Après modif de `app.py` ou d'un template : `systemctl --user restart wynnguessr`.
   Les fichiers statiques n'en ont pas besoin.
+- **Piège payé le 2026-10-17** : modifier un `.js` directement dans
+  `~/Wynnguessr` le met en ligne aussitôt, alors que les templates restent
+  ceux du dernier chargement ; un script qui attend un nouveau `<script>` casse
+  le jeu jusqu'au rechargement (~3 min de panne ce jour-là). Toujours écrire
+  et tester dans la copie isolée, puis copier **tous** les fichiers et
+  recharger dans la foulée.
 - **Piège payé deux fois** : `pkill -f "...gunicorn..."` tue aussi le shell qui
   lance la commande (la ligne contient le motif). Tuer par PID via `ss -ltnp`.
 - **Recharger sans couper** (utile quand le mod est en tournée sur la bêta) :
