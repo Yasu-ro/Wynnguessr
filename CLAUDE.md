@@ -350,7 +350,13 @@ face nord n'avait **ni DH ni nuages** (vanilla), les 5 autres si. C'est la
 **première face dessinée** par `grabPanoramixScreenshot` qui sort incomplète,
 cause non trouvée. Contournement (1.7.0) : deux panoramas d'affilée, le
 second démarré à l'est (yaw 270) ; sa face 3 (yaw 180, même caméra que la
-face 0 du premier) remplace le nord. Coût : un rendu de plus par photo.
+face 0 du premier) remplace le nord. **Échec aussi.**
+**Vraie cause, trouvée par diagnostic (2026-10-17)** : la caméra à **yaw
+180,0 exactement**. Même endroit, même instant : à 180,0 le nord est vide,
+à 180,5 et à 225 tout est complet (la face 3 du second panorama de la 1.7.0
+tombait elle aussi pile à 180). Seulement en solo (pas vu sur Wynncraft),
+même sans aucun mod d'optimisation. Depuis la 1.7.2 : `NORTH = 180.5f`, un
+seul panorama ; le cube est tourné d'un demi-degré, invisible.
 **Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
 (`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
 (mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire
