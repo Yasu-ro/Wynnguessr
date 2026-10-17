@@ -93,13 +93,20 @@ public class WynndlePanorama implements ClientModInitializer {
 		Path tmp = out.resolve(".tmp-" + System.currentTimeMillis());
 
 		// Every image faces north in its centre, whatever way the player looks.
+		// The first face Minecraft draws comes out without clouds or Distant
+		// Horizons (cause unknown, drawing it twice did not help): so a second
+		// panorama starts east, and its fourth face is the north kept.
 		float yaw = p.getYRot(), yawO = p.yRotO;
-		p.setYRot(180f);
-		p.yRotO = 180f;
 		try {
-			Files.createDirectories(tmp);
+			Files.createDirectories(tmp.resolve("a"));
+			Files.createDirectories(tmp.resolve("b"));
 			capturing = true;
-			mc.grabPanoramixScreenshot(tmp.toFile());
+			p.setYRot(180f);
+			p.yRotO = 180f;
+			mc.grabPanoramixScreenshot(tmp.resolve("a").toFile());
+			p.setYRot(270f);
+			p.yRotO = 270f;
+			mc.grabPanoramixScreenshot(tmp.resolve("b").toFile());
 		} catch (IOException e) {
 			say(mc, Component.literal("Wynndle: " + e.getMessage()).withStyle(ChatFormatting.RED));
 			return;
@@ -114,7 +121,7 @@ public class WynndlePanorama implements ClientModInitializer {
 			try {
 				File file = freeName(out, x + "_" + z);
 				try {
-					packFaces(tmp.resolve("screenshots"), file);
+					packFaces(tmp.resolve("a/screenshots"), tmp.resolve("b/screenshots"), file);
 				} catch (Exception e) {
 					file.delete(); // half a zip helps nobody
 					throw e;
@@ -173,12 +180,13 @@ public class WynndlePanorama implements ClientModInitializer {
 
 	// Minecraft writes the faces asynchronously: each is read back once it is
 	// complete, then goes into the zip as a JPEG, one at a time (64 MB each).
-	static void packFaces(Path dir, File zip) throws Exception {
+	// North is face 3 of the panorama started east (b), the rest come from a.
+	static void packFaces(Path a, Path b, File zip) throws Exception {
 		long deadline = System.currentTimeMillis() + 60_000;
 		try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip.toPath()))) {
 			out.setLevel(0); // JPEGs do not compress further
 			for (int i = 0; i < 6; i++) {
-				File f = dir.resolve("panorama_" + i + ".png").toFile();
+				File f = (i == 0 ? b.resolve("panorama_3.png") : a.resolve("panorama_" + i + ".png")).toFile();
 				BufferedImage face = null;
 				while (face == null) {
 					try {

@@ -340,14 +340,17 @@ Téléchargement de la carte : Yasuro a choisi **Simple World Downloader**
 (Modrinth, 1.21.11), pour voler en créatif et choisir l'heure, usage
 personnel. Dans le monde solo, couper la « distant generation » de DH, sinon
 il invente du terrain là où rien n'est téléchargé.
-**Face avant incomplète** (corrigé en 1.4.1, non vérifié en jeu) : sur les
+**Face avant incomplète** : sur les
 premières tournées, la face nord (centre de l'image, rendue en premier)
 n'avait ni paysage lointain Distant Horizons ni nuages. DH a une image de
 retard après le changement de caméra : `PanoramaWarmupMixin` dessine chaque
-face deux fois et garde la seconde. **Insuffisant** : le nord manquait encore
-par endroits. Réglage DH conseillé à Yasuro : Advanced options → Graphics →
-Culling → **Disable Frustum Culling = True** (DH dessine alors aussi ce qui
-est hors de sa dernière caméra connue). Non confirmé à ce jour.
+face deux fois et garde la seconde. **Inefficace** (mixin retiré en 1.7.0),
+comme « Disable Frustum Culling » de DH : sur une photo de Fruma (1.6.1), la
+face nord n'avait **ni DH ni nuages** (vanilla), les 5 autres si. C'est la
+**première face dessinée** par `grabPanoramixScreenshot` qui sort incomplète,
+cause non trouvée. Contournement (1.7.0) : deux panoramas d'affilée, le
+second démarré à l'est (yaw 270) ; sa face 3 (yaw 180, même caméra que la
+face 0 du premier) remplace le nord. Coût : un rendu de plus par photo.
 **Sans entités** (1.3.0, demande de Yasuro) : pendant la capture
 (`WynndlePanorama.capturing`), `HideEntitiesMixin` cache toute entité vivante
 (mobs, PNJ, joueurs, familiers) et les `TextDisplay` ; `HideNamesMixin` retire

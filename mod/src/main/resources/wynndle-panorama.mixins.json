@@ -2,7 +2,7 @@
 	"required": true,
 	"package": "com.wynndle.panorama.mixin",
 	"compatibilityLevel": "JAVA_21",
-	"client": ["PanoramaDownscaleMixin", "PanoramaWarmupMixin", "HideEntitiesMixin", "HideNamesMixin"],
+	"client": ["PanoramaDownscaleMixin", "HideEntitiesMixin", "HideNamesMixin"],
 	"injectors": {
 		"defaultRequire": 1
 	}
