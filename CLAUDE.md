@@ -416,8 +416,9 @@ sonore ; certains sons se coupaient.
   (tous les navigateurs les décodent, vérifié Chromium et Firefox) dans
   `static/sounds/`, **à lancer sur chaque site** (bêta fait ; prod à faire
   lors de la mise en prod). Ils appartiennent à Mojang : le dépôt public ne
-  les porte pas. Risque accepté en connaissance de cause par Yasuro : un site
-  de fan non commercial qui les sert.
+  les porte pas. Risque signalé à Yasuro le 2026-10-17 (en attente de sa
+  réponse) : un site de fan non commercial qui les sert reste exposé à une
+  demande de retrait de Mojang.
 - `static/js/sound.js` (`Sfx.play(nom, hauteur, volume)`), inclus par
   `game.html` et `room.html` avant `xp.js`. Fichiers chargés une fois, joués
   en entier (les anciens bips étaient des notes coupées à la main). Contre le
