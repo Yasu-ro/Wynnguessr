@@ -396,3 +396,13 @@ Wynncraft.
   passe ; journal d'accès activé pour voir sa prochaine partie.
 - Flash blanc entre pages : corrigé sans vérification visuelle.
 - `www.wynndle.com` non configuré ; « Always Use HTTPS » à activer côté Cloudflare.
+
+### Photo d'accueil (« Look Around »)
+
+2026-10-17, choix de Yasuro : le lieu X -881 Z -1576 (Wynn). Ses tuiles
+multires sont **copiées dans `static/demo/`, dans git** (niveaux 1 à 3 et
+`fallback`, 5,5 Mo ; le niveau 4 pèserait 10 Mo de plus pour une petite
+fenêtre) : `static/tiles` n'existe que sur la bêta et le lieu peut être
+supprimé au tri. Pour en changer, remplacer le dossier entier par un **nouveau
+nom** : Cloudflare garde 4 h les fichiers statiques, et des tuiles neuves sous
+les mêmes noms se mélangeraient aux anciennes.
