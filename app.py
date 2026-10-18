@@ -125,8 +125,8 @@ def board(c, form, user_id = None):
         params += [form.get('provinces', ''), form.get('nolook', 'No'), form.get('rounds', '')]
         order = " ORDER BY s.score DESC, s.time ASC"
     else:
-        query += " AND s.difficulty = ?"
-        params.append(form.get('difficulty', 'normal'))
+        query += " AND s.difficulty = ? AND COALESCE(s.milk, 0) = ?"
+        params += [form.get('difficulty', 'normal'), int(form.get('milk') == '1')]
         order = " ORDER BY s.score DESC, s.points DESC, s.time ASC"
     if user_id:
         query += " AND s.user_id = ?"
@@ -194,7 +194,7 @@ def game():
     form = request.values
     if form.get('mode') == 'survival':
         # Survival has its own page (and no settings but the difficulty)
-        return redirect('survival?' + urlencode({'difficulty': form.get('difficulty', 'normal')}))
+        return redirect('survival?' + urlencode({'difficulty': form.get('difficulty', 'normal'), 'milk': int(form.get('milk') == 'on')}))
     if 'rounds' in form:
         if form.get('mode') in ('duel', 'royale'):
             return render_template('apology.html', message = "This mode is played with friends: create a room")
@@ -581,15 +581,15 @@ def history(c, uid):
         games.append({'multi': True, 'code': r['code'], 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
                       'score': totals.get(uid, 0), 'rounds': r['round'], 'when': when or 0,
                       'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out'),
-                      'survived': st.get(uid, {}).get('survived')})
-    for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode, difficulty FROM scores
-            WHERE user_id = ? AND room IS NULL''', (uid,)).fetchall():
+                      'survived': st.get(uid, {}).get('survived'), 'milk': r['mode'] == 'survival' and r['milk']})
+    for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode, difficulty, COALESCE(milk, 0) AS milk
+            FROM scores WHERE user_id = ? AND room IS NULL''', (uid,)).fetchall():
         try:
             when = time.mktime(time.strptime(g['date'], '%Y-%m-%d'))
         except (TypeError, ValueError):
             when = 0
         games.append({'multi': False, 'mode': g['mode'], 'score': g['score'], 'rounds': g['rounds'],
-                      'difficulty': g['difficulty'], 'time': g['time'], 'when': when})
+                      'difficulty': g['difficulty'], 'milk': g['milk'], 'time': g['time'], 'when': when})
     for g in games:
         g['day'] = time.strftime('%b %d, %Y', time.localtime(g['when'])) if g['when'] else ''
     return sorted(games, key = lambda g: g['when'], reverse = True)
@@ -817,7 +817,7 @@ def room_settings(form):
         if form.get('difficulty') not in DIFFICULTIES:
             return None, "Unknown difficulty"
         return {'mode': mode, 'provinces': PROVINCES, 'rounds': SURVIVAL_ROUNDS, 'time_limit': -1, 'look': 0,
-                'difficulty': form['difficulty']}, None
+                'difficulty': form['difficulty'], 'milk': int(form.get('milk') == 'on')}, None
     provinces = [p for p in PROVINCES if p in form.getlist('province')]
     if not provinces:
         return None, "Please select at least one province"
@@ -830,7 +830,7 @@ def room_settings(form):
             return None, "Time limit must be between 1 and 1800 seconds"
         time_limit = int(t)
     return {'mode': mode, 'provinces': provinces, 'rounds': int(form['rounds']) if mode == 'classic' else LAST_ROUND,
-            'time_limit': time_limit, 'look': int(form.get('look') == 'on'), 'difficulty': None}, None
+            'time_limit': time_limit, 'look': int(form.get('look') == 'on'), 'difficulty': None, 'milk': 0}, None
 
 def pick_locations(c, s):
     # survival: only places with their fog photo, when there are enough, so
@@ -851,9 +851,9 @@ def new_room(c, host, s):
     code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
     while find_room(c, code):
         code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
-    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?)''',
-        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty']))
+    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty, milk)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?, ?)''',
+        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], s['milk']))
     c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
     return code
 
@@ -1062,7 +1062,7 @@ def room_state(code):
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
         if r['mode'] == 'survival':
-            out['settings']['difficulty'] = r['difficulty']
+            out['settings'].update({"difficulty": r['difficulty'], "milk": bool(r['milk'])})
             return jsonify(survival_view(c, r, me, out, now))
         if n == 0 or (live and r['state'] == 'waiting'):
             return jsonify(out)
@@ -1116,8 +1116,9 @@ def room_set(code):
         locations = s and pick_locations(c, s)
         if not locations:
             return jsonify({"success": False, "error": error or "Not enough locations in these provinces"})
-        c.execute("UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ?, difficulty = ? WHERE code = ?",
-                  (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], r['code']))
+        c.execute("""UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ?, difficulty = ?, milk = ?
+                WHERE code = ?""", (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations,
+                s['difficulty'], s['milk'], r['code']))
     return jsonify({"success": True})
 
 @app.route("/api/room/<code>/host", methods=['POST'])
@@ -1234,7 +1235,8 @@ def room_again(code):
             nxt = new_room(c, me['user_id'], {'mode': mode, 'provinces': PROVINCES if mode == 'survival' else json.loads(r['provinces']),
                                               'rounds': SURVIVAL_ROUNDS if mode == 'survival' else r['rounds'],
                                               'time_limit': r['time_limit'], 'look': r['look'],
-                                              'difficulty': r['difficulty'] or ('normal' if mode == 'survival' else None)})
+                                              'difficulty': r['difficulty'] or ('normal' if mode == 'survival' else None),
+                                              'milk': r['milk'] or 0})
             c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (nxt, r['code']))
     return jsonify({"success": bool(nxt), "code": nxt})
 
@@ -1772,7 +1774,7 @@ POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkn
 SHAKE = (20, 60)           # Nausea: the pin lands this many blocks off, in any direction
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
-MILK = 2                   # milk buckets a run starts with: each one cancels the potion thrown with a result
+MILK = 2                   # milk buckets a run with milk starts with (an option, off by default): each cancels a potion
 
 def zone(n, effect = None):
     # round n: no damage within `safe` blocks, the most a guess can cost from
@@ -1844,6 +1846,15 @@ with connect() as c:
     if 'milk' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
         c.execute(f"ALTER TABLE survival_runs ADD COLUMN milk INTEGER DEFAULT {MILK}")
         c.execute("ALTER TABLE survival_guesses ADD COLUMN milked TEXT")
+    # milk became an option (Yasuro: the runs with milk apart from the others,
+    # on the leaderboard too): the run's choice, and the score's. Before, every
+    # run had its buckets: those that drank one count as runs with milk
+    if 'milk_on' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
+        c.execute("ALTER TABLE survival_runs ADD COLUMN milk_on INTEGER DEFAULT 0")
+        c.execute("ALTER TABLE scores ADD COLUMN milk INTEGER DEFAULT 0")
+        c.execute("""UPDATE survival_runs SET milk_on = 1 WHERE id IN (SELECT run_id FROM survival_guesses WHERE milked IS NOT NULL)
+                OR (phase != 'over' AND milk > 0)""")
+        c.execute("""UPDATE scores SET milk = 1 WHERE id IN (SELECT score_id FROM survival_runs WHERE milk_on = 1 AND score_id IS NOT NULL)""")
     if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN difficulty TEXT")
         c.execute("ALTER TABLE scores ADD COLUMN points INTEGER")
@@ -1872,12 +1883,13 @@ def survival_record(c, run):
     if not run['user_id'] or not run['survived'] or run['test']:
         return
     if run['score_id']:
-        c.execute("UPDATE scores SET score = ?, points = ?, time = ? WHERE id = ?",
-                  (run['survived'], run['points'], round(run['time'], 2), run['score_id']))
+        c.execute("UPDATE scores SET score = ?, points = ?, time = ?, milk = ? WHERE id = ?",
+                  (run['survived'], run['points'], round(run['time'], 2), run['milk_on'], run['score_id']))
     else:
-        sid = c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points)
-                VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?)""",
-                (run['user_id'], run['survived'], date.today(), round(run['time'], 2), run['difficulty'], run['points'])).lastrowid
+        sid = c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points, milk)
+                VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?, ?)""",
+                (run['user_id'], run['survived'], date.today(), round(run['time'], 2), run['difficulty'], run['points'],
+                 run['milk_on'])).lastrowid
         c.execute("UPDATE survival_runs SET score_id = ? WHERE id = ?", (sid, run['id']))
 
 def survival_end(c, run):
@@ -1977,7 +1989,7 @@ def survival_state(c, run):
     # what the page may know: never the answer of a round still open
     out = {"success": True, "difficulty": run['difficulty'], "max": DIFFICULTIES[run['difficulty']],
            "hp": run['hp'], "round": run['round'], "survived": run['survived'], "points": run['points'],
-           "phase": run['phase'], "test": bool(run['test'])}
+           "phase": run['phase'], "test": bool(run['test']), "milk_on": bool(run['milk_on'])}
     if run['phase'] == 'over':
         # the end screen: the XP the run brought, or a word to log in and keep it
         if run['user_id']:
@@ -2013,7 +2025,7 @@ def survival_tester():
 def survival_page():
     difficulty = request.args.get('difficulty')
     return render_template('survival.html', difficulty = difficulty if difficulty in DIFFICULTIES else 'normal',
-                           test = request.args.get('test') == '1' and survival_tester())
+                           milk = request.args.get('milk') == '1', test = request.args.get('test') == '1' and survival_tester())
 
 @app.route("/api/survival/test", methods=['POST'])
 def survival_test():
@@ -2074,8 +2086,10 @@ def survival_start():
             for r in c.execute("SELECT * FROM survival_runs WHERE user_id = ? AND phase != 'over'", (uid,)).fetchall():
                 survival_end(c, r)
         test = request.form.get('test') == '1' and survival_tester()
-        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started, test, milk) VALUES (?, ?, ?, 'new', ?, ?, ?)",
-                        (uid, difficulty, DIFFICULTIES[difficulty], time.time(), int(test), MILK)).lastrowid
+        milk = request.form.get('milk') == '1'
+        rid = c.execute("""INSERT INTO survival_runs (user_id, difficulty, hp, phase, started, test, milk, milk_on)
+                VALUES (?, ?, ?, 'new', ?, ?, ?, ?)""",
+                (uid, difficulty, DIFFICULTIES[difficulty], time.time(), int(test), MILK if milk else 0, int(milk))).lastrowid
         run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone()
         survival_next(c, run)
         session['survival'] = rid
@@ -2189,11 +2203,10 @@ def survival_tile(token, name):
 # II...), and so on. Like duel, nothing is stored but what the players did
 # (guesses, purchases and random potions in room_shop, milk drunk in
 # room_milk): hearts and emeralds are replayed each time (survivors()).
-# As in the other rooms, once someone guessed the others have LAST_CALL
-# seconds (Yasuro: nobody may hold the room up), or less if their own clock
-# (Swiftness) ends sooner. Against cheating, as alone: the server's clock, a
-# purchase checked against the emeralds left and the shop's hours, a guess
-# only in its round. Known limits: the picture
+# Unlike the other rooms, no last call once someone guessed: everyone has
+# their whole clock, as alone (Yasuro, after trying one). Against cheating,
+# as alone: the server's clock, a purchase checked against the emeralds left
+# and the shop's hours, a guess only in its round. Known limits: the picture
 # loads PREP seconds early (classic rooms load it during the reveal), and
 # what only the page draws (Darkness, Nausea's spin, Mining Fatigue).
 
@@ -2206,9 +2219,11 @@ PREP = 5                # the picture loads unseen; effects; milk
 # players: about 9 a round for the strongest tenth, 5.5 for the median, 4
 # for the weakest quarter, much the same from round 1 to 20 (CLAUDE.md)
 EMERALDS = (10, 6, 2)
-# the median player buys a cheap potion every round, a dear one every three
-PRICES = {'mining_fatigue': 5, 'swiftness': 5, 'wither': 10, 'nausea': 10, 'blindness': 10, 'milk': 10,
-          'darkness': 15, 'regeneration': 15}
+# the median player buys two potions a round, the strongest three (Yasuro:
+# one a round, as at first with 5, 10, 15, was boring)
+PRICES = {'mining_fatigue': 2, 'swiftness': 2, 'wither': 3, 'nausea': 3, 'blindness': 3, 'milk': 4,
+          'darkness': 5, 'regeneration': 6}
+SHOP_MAX = 3            # purchases a player may make in one shop (Yasuro: nobody buys every potion for one player)
 SELF = ('regeneration', 'milk')   # bought for oneself; every other potion is thrown at someone else
 MILK_BUYS = 2           # buckets a player may buy in a game (then: out of stock)
 SWIFT_STEP = 5          # Swiftness II gives 5 seconds less than I, III 10 less...
@@ -2226,6 +2241,9 @@ with connect() as c:
     # guess under Nausea was aimed before it landed off
     if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
         c.execute("ALTER TABLE rooms ADD COLUMN difficulty TEXT")
+    # milk in the shop: an option of the room (off by default), with a leaderboard of its own
+    if 'milk' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
+        c.execute("ALTER TABLE rooms ADD COLUMN milk INTEGER DEFAULT 0")
     if 'ready' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
         c.execute("ALTER TABLE room_players ADD COLUMN ready INTEGER DEFAULT 0")
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(room_guesses)")]:
@@ -2248,10 +2266,9 @@ def room_time(difficulty, fx):
     k = fx.get('swiftness', 0)
     return max(SWIFT_MIN, SWIFT_TIME - SWIFT_STEP * (k - 1)) if k else ROUND_TIME[difficulty]
 
-def survival_deadline(r, fx, cut):
-    # a player's end of the round: their own clock, or the last call if sooner
-    own = r['round_start'] + room_time(r['difficulty'], fx)
-    return min(own, cut) if cut else own
+def survival_deadline(r, fx):
+    # a player's end of the round: their own clock
+    return r['round_start'] + room_time(r['difficulty'], fx)
 
 def room_shop_rows(c, code):
     return (c.execute("SELECT * FROM room_shop WHERE code = ?", (code,)).fetchall(),
@@ -2333,25 +2350,32 @@ def next_fog(c, r):
 def wares(c, r, s):
     # what one player may buy in this shop, with the prices: potions to throw
     # (Blindness only where the next place has its fog photo); for the
-    # living, Regeneration and milk (MILK_BUYS at most, then out of stock)
+    # living, Regeneration and, if the room has it, milk (MILK_BUYS at most,
+    # then out of stock)
     fog = next_fog(c, r)
     return {k: p for k, p in PRICES.items() if (k not in SELF or s['out'] is None) and (k != 'blindness' or fog)
-            and (k != 'milk' or s['milk_bought'] < MILK_BUYS)}
+            and (k != 'milk' or (r['milk'] and s['milk_bought'] < MILK_BUYS))}
+
+def bought(c, r, uid):
+    # purchases a player made in the shop open now
+    return c.execute("SELECT COUNT(*) FROM room_shop WHERE code = ? AND round = ? AND buyer = ?",
+                     (r['code'], r['round'] + 1, uid)).fetchone()[0]
+
+def shopping(c, r, uid, s):
+    # can this player still buy something here: emeralds enough, and fewer than SHOP_MAX purchases
+    prices = wares(c, r, s).values()
+    return bool(prices) and s['emeralds'] >= min(prices) and bought(c, r, uid) < SHOP_MAX
 
 def present(c, r):
     return {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], time.time() - AWAY))}
 
 def shop_shut(c, r, st):
     # the shop closes after SHOP seconds, or once everyone here is ready;
-    # who cannot pay for anything is ready already
+    # who cannot buy anything more is ready already
     if time.time() >= r['round_end'] + REVEAL + SHOP:
         return True
     ready = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND ready = ?", (r['code'], r['round']))}
-    for u in present(c, r) & set(st) - ready:
-        prices = wares(c, r, st[u]).values()
-        if prices and st[u]['emeralds'] >= min(prices):
-            return False
-    return True
+    return not any(shopping(c, r, u, st[u]) for u in present(c, r) & set(st) - ready)
 
 def survival_room_tick(c, r):
     # a round closes once everyone alive and here has guessed, or is past their
@@ -2363,8 +2387,7 @@ def survival_room_tick(c, r):
         shop, milked = room_shop_rows(c, code)
         alive = {u for u, s in survivors(c, r, n - 1).items() if s['out'] is None}
         done = {g[0] for g in c.execute("SELECT user_id FROM room_guesses WHERE code = ? AND round = ?", (code, n))}
-        cut, _ = round_deadline(c, r)
-        ends = {u: survival_deadline(r, room_effects(shop, milked, u, n), cut) for u in alive - done}
+        ends = {u: survival_deadline(r, room_effects(shop, milked, u, n)) for u in alive - done}
         here = present(c, r)
         if any(now < end + GRACE for u, end in ends.items() if u in here):
             return r
@@ -2415,9 +2438,9 @@ def survival_room_record(c, r, uid):
     c.execute("UPDATE room_players SET recorded = 1 WHERE code = ? AND user_id = ?", (r['code'], uid))
     points, spent = c.execute("SELECT COALESCE(SUM(score), 0), COALESCE(SUM(time), 0) FROM room_guesses WHERE code = ? AND user_id = ?",
                               (r['code'], uid)).fetchone()
-    c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points, room)
-            VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?, ?)""",
-            (uid, s['survived'], date.today(), round(spent, 2), r['difficulty'], points, r['code']))
+    c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points, room, milk)
+            VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?, ?, ?)""",
+            (uid, s['survived'], date.today(), round(spent, 2), r['difficulty'], points, r['code'], r['milk']))
 
 def survival_room_guess(c, r, me, n):
     # a guess in its round, within the player's own clock (Nausea: the hand shakes)
@@ -2427,7 +2450,7 @@ def survival_room_guess(c, r, me, n):
         return False
     shop, milked = room_shop_rows(c, r['code'])
     fx = room_effects(shop, milked, uid, n)
-    deadline = survival_deadline(r, fx, round_deadline(c, r)[0])
+    deadline = survival_deadline(r, fx)
     if now > deadline + GRACE or c.execute("SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?",
                                            (r['code'], uid, n)).fetchone():
         return False
@@ -2487,9 +2510,8 @@ def survival_view(c, r, me, out, now):
             p['effects'] = room_effects(known, milked, p['uid'], upcoming)
             p['milked'] = (p['uid'], upcoming) in milked
         if phase == 'shop':
-            # who cannot pay for anything is ready already (shop_shut)
-            prices = wares(c, r, s).values()
-            p['ready'] = p['uid'] in ready or not prices or s['emeralds'] < min(prices)
+            # who cannot buy anything more is ready already (shop_shut)
+            p['ready'] = p['uid'] in ready or not shopping(c, r, p['uid'], s)
         if closed and 'result' in s:
             p['result'] = {k: v for k, v in s['result'].items() if k != 'earned'}
     mine = st.get(uid)
@@ -2497,6 +2519,8 @@ def survival_view(c, r, me, out, now):
     if mine:
         out['me'] = {"emeralds": mine['emeralds'], "milk": mine['milk'], "milk_left": MILK_BUYS - mine['milk_bought'],
                      "earned": mine.get('result', {}).get('earned') if closed else None}
+        if phase == 'shop':
+            out['me']['buys_left'] = SHOP_MAX - bought(c, r, uid)
     if phase == 'shop':
         out['phase_left'] = max(0, r['round_end'] + REVEAL + SHOP - now)
         if mine:
@@ -2522,9 +2546,8 @@ def survival_view(c, r, me, out, now):
             out.update({"time": room_time(r['difficulty'], fx), "answered": bool(c.execute(
                 "SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?", (code, uid, n)).fetchone())})
             if phase == 'guess':
-                cut, out['first'] = round_deadline(c, r)
                 # elapsed: since the start, for what counts from it (Darkness, Wither)
-                out.update({"time_left": max(0, survival_deadline(r, fx, cut) - now), "elapsed": now - r['round_start']})
+                out.update({"time_left": max(0, survival_deadline(r, fx) - now), "elapsed": now - r['round_start']})
     elif n:
         loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (ids[n - 1],)).fetchone()
         totals = {p['uid']: p['total'] for p in out['players']}
@@ -2555,9 +2578,12 @@ def room_buy(code):
             return jsonify({"success": False, "error": "Pick another player"})
         if s['emeralds'] < PRICES[item]:
             return jsonify({"success": False, "error": "Not enough emeralds"})
+        done = bought(c, r, uid)
+        if done >= SHOP_MAX:
+            return jsonify({"success": False, "error": "That's %d for this round" % SHOP_MAX})
         c.execute("INSERT INTO room_shop (code, round, buyer, target, item, at) VALUES (?, ?, ?, ?, ?, ?)",
                   (r['code'], r['round'] + 1, uid, target, item, time.time()))
-    return jsonify({"success": True, "emeralds": s['emeralds'] - PRICES[item]})
+    return jsonify({"success": True, "emeralds": s['emeralds'] - PRICES[item], "buys_left": SHOP_MAX - done - 1})
 
 @app.route("/api/room/<code>/ready", methods=['POST'])
 def room_ready(code):

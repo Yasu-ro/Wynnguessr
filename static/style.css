@@ -2403,6 +2403,89 @@ body.room-playing {
     z-index: 1;
 }
 
+/* the players during a round, one per line, on a sign of their own at the
+   right, hanging from the menu like the round's; on a phone they stay in the
+   round's sign, side by side */
+.room-board {
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 190px;
+    max-width: 290px;
+    padding: 8px 14px 9px;
+    font-size: 16px;
+    background: var(--sign);
+    border: 3px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 0 0 0 6px var(--wood), 0 0 0 9px var(--ink), 0 5px 0 9px rgba(0, 0, 0, .3);
+    pointer-events: none;
+}
+.room-board::before, .room-board::after {
+    content: "";
+    position: absolute;
+    bottom: calc(100% + 9px);
+    z-index: -1;
+    width: 7px;
+    height: 40px;
+    background: repeating-linear-gradient(-50deg, #927859 0 5px, #5d4634 5px 8px);
+    border: solid var(--ink);
+    border-width: 0 2px;
+}
+.room-board::before {
+    left: 16%;
+}
+.room-board::after {
+    right: 16%;
+}
+.room-board .room-hud-player {
+    margin: 0;
+}
+.room-board .room-hud-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.room-hud-value {
+    margin-left: 6px;
+    white-space: nowrap;
+}
+.room-board .room-hud-value {
+    margin-left: 14px;
+}
+.room-hud-check {
+    color: var(--green-dark);
+}
+.room-board .room-hud-check {
+    width: 18px;
+    margin: 0 0 0 6px;
+    font-size: 18px;
+}
+.room-hud-check:empty {
+    display: none;
+}
+.room-board .room-hud-check:empty {
+    display: inline-block;
+}
+.room-screen.covered .room-board {
+    z-index: 520;
+}
+@media (min-width: 901px) {
+    .room-hud-players {
+        display: none;
+    }
+}
+@media (max-width: 900px) {
+    .room-board {
+        display: none;
+    }
+}
+
 /* ---------- Survival with friends ---------- */
 
 /* your hearts on the picture, bottom left, as alone */

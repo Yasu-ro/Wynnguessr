@@ -463,6 +463,7 @@ function showSettings(st) {
             this.checked = this.value == st.difficulty;
         });
     }
+    $('#milk-on').prop('checked', !!st.milk);
     showDifficulty();
     showRules();
 }
@@ -605,11 +606,21 @@ function guess() {
         return s.mode == 'classic' ? p.here || p.guessed : p.seat && p.out == null;
     });
     // everyone's health or lives stay in sight during the round
-    $('#hud-players').html(!s.live ? '' : inRound.map(function (p) {
-        var left = s.mode == 'duel' ? ' ' + p.left.toLocaleString('en-US') + ' HP' : s.mode == 'royale' ? hearts(p.left) : '';
-        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + left +
-            "<i class='material-icons'>" + (p.guessed ? 'check_circle' : 'more_horiz') + "</i></span>";
-    }).join(''));
+    roundPlayers(!s.live ? [] : inRound, s.mode == 'duel' ? function (p) { return p.left.toLocaleString('en-US') + ' HP'; }
+        : s.mode == 'royale' ? function (p) { return hearts(p.left); } : null);
+}
+
+// the players during a round, one per line on a sign of their own at the
+// right (on a phone: in the round's sign, side by side), with what they have
+// left; a tick once they have guessed
+function roundPlayers(list, value, extra) {
+    var html = list.map(function (p) {
+        return "<span class='room-hud-player'>" + dot(p) + "<span class='room-hud-name'>" + esc(p.name) + '</span>' +
+            (extra ? extra(p) : '') + (value ? "<span class='room-hud-value'>" + value(p) + '</span>' : '') +
+            "<i class='material-icons room-hud-check'>" + (p.guessed ? 'check_circle' : '') + '</i></span>';
+    }).join('');
+    $('#hud-players').html(html);
+    $('#room-board').html(html).prop('hidden', !html);
 }
 
 // auto: the clock ran out, send the marker if there is one
@@ -1073,6 +1084,7 @@ function panoramaConfig(url, options) {
 
 var SHOP_ITEMS = ['mining_fatigue', 'swiftness', 'wither', 'nausea', 'blindness', 'darkness', 'regeneration', 'milk'];
 var SELF = ['regeneration', 'milk'];      // bought for oneself, never thrown
+var SHOP_MAX = 3;          // purchases a player may make in one shop (app.py has the same)
 var FUSE = 3;              // seconds of hissing before the creeper explodes
 var DRINK_MS = 1600;       // milk, drunk as in Minecraft (survival.js has the same)
 var GULPS = [400, 600, 800, 1000, 1200, 1400, 1600];
@@ -1084,7 +1096,7 @@ var started = null;        // the round whose clock and effects have started
 var startedAt = 0;         // when it started, local clock
 var darkTimer = null, witherShown = null, fused = false, exploded = false, drinking = false;
 var announced = null;      // the round whose throws were announced
-var coverHtml = null, shopPick = null, shopSlots = '', targetsHtml = '', shopSays = null;
+var coverHtml = null, shopPick = null, shopHover = null, shopSlots = '', targetsHtml = '', shopSays = null;
 
 function hardcore() {
     return s.difficulty == 'hardcore';
@@ -1200,11 +1212,8 @@ function guessSurvival() {
         return "<b class='room-effect'>" + potionIcon(k) + POTIONS[k][0] + roman(fx[k]) + '</b>';
     }).join(' ') : '');
     $('#hud-score').text(s.playing ? '' : 'Watching');
-    $('#hud-call').text(round && s.first && !submitted && s.playing ? s.first + ' has guessed, hurry up!' : '');
-    $('#hud-players').html(standingNow().map(function (p) {
-        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + ' ' + lifeLeft(p.left) + bottles(p.effects || {}) +
-            (round ? "<i class='material-icons'>" + (p.guessed ? 'check_circle' : 'more_horiz') + "</i>" : '') + "</span>";
-    }).join(''));
+    $('#hud-call').text('');   // no last call in survival: everyone has their whole clock
+    roundPlayers(standingNow(), function (p) { return lifeLeft(p.left); }, function (p) { return bottles(p.effects || {}); });
 }
 
 // the map and the panorama of a round, with what the potions do to them
@@ -1473,7 +1482,7 @@ function shop() {
     if (view != key) {
         view = key;
         show('shop-screen');
-        shopPick = null;
+        shopPick = shopHover = null;
         shopSlots = targetsHtml = '';
         Sfx.play('trader');
     }
@@ -1494,15 +1503,17 @@ function shop() {
         $('#shop-slots').html(slots);
         shopSlots = slots;
     }
-    tip(shopPick);
+    // the potion under the mouse, else the one picked (the poll redraws the
+    // shop every second: it must not take the tooltip away)
+    tip(shopHover || shopPick);
     targets(shopPick);
-    $('#shop-bought').html(!s.bought || !s.bought.length ? '' : 'You bought: ' + s.bought.map(function (b) {
+    $('#shop-bought').html(!s.bought || !s.bought.length ? '' : 'You bought (' + s.bought.length + '/' + SHOP_MAX + '): ' + s.bought.map(function (b) {
         return "<span class='shop-had'>" + itemIcon(b.item) + (SELF.indexOf(b.item) < 0 ? '→ ' + esc(b.to) : '') + '</span>';
     }).join(' '));
     var ready = you && you.ready;
     $('#ready-button').prop('hidden', !mine).prop('disabled', !!ready).text(ready ? 'Waiting for the others...' : 'Ready');
     $('#shop-ready').html(contestants().filter(function (p) { return p.here; }).map(function (p) {
-        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + "<i class='material-icons'>" + (p.ready ? 'check_circle' : 'more_horiz') + "</i></span>";
+        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + "<i class='material-icons room-hud-check'>" + (p.ready ? 'check_circle' : '') + "</i></span>";
     }).join(''));
 }
 
@@ -1534,6 +1545,8 @@ function targets(k) {
     var box = $('#shop-targets'), html;
     if (!s.me) {
         html = '';
+    } else if (!s.me.buys_left) {
+        html = "<p class='shop-hint'>That's " + SHOP_MAX + ' for this round.</p>';
     } else if (!k) {
         var prices = Object.keys(s.wares || {}).map(function (w) { return s.wares[w]; });
         html = "<p class='shop-hint'>" + (prices.length && s.me.emeralds >= Math.min.apply(null, prices) ? 'Pick a potion.' : 'Not enough emeralds for anything.') + '</p>';
@@ -1558,8 +1571,10 @@ $('#shop-slots').on('click', '.shop-slot', function () {
     Sfx.play('click');
     shop();
 }).on('mouseenter', '.shop-slot', function () {
-    tip($(this).data('item'));
+    shopHover = $(this).data('item');
+    tip(shopHover);
 }).on('mouseleave', function () {
+    shopHover = null;
     tip(shopPick);
 });
 
@@ -1570,14 +1585,15 @@ $('#shop-targets').on('click', '[data-buy]', function () {
 // paid at once if the emeralds are there: the merchant says yes; if not, no
 function buy(item, target) {
     var price = (s.wares || {})[item];
-    if (price === undefined || s.me.emeralds < price) {
-        refuse(price === undefined ? 'Out of stock' : 'Not enough emeralds');
+    if (price === undefined || s.me.emeralds < price || !s.me.buys_left) {
+        refuse(!s.me.buys_left ? "That's " + SHOP_MAX + ' for this round' : price === undefined ? 'Out of stock' : 'Not enough emeralds');
         return;
     }
     send('buy', {round: s.round, item: item, target: target || ''}).done(function (r) {
         if (r.success) {
             Sfx.play('sold');
             s.me.emeralds = r.emeralds;
+            s.me.buys_left = r.buys_left;
             $('#shop-purse b').text(r.emeralds);
             replay(document.querySelector('.shop-slot[data-item="' + item + '"]'), 'bought');
         } else {

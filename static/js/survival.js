@@ -12,6 +12,7 @@ var deadline = null, clockTimer = null, fused = false, sending = false;
 
 // the potions, the hearts and the throw: potions.js
 var HARDCORE = DIFFICULTY == 'hardcore';
+var MILK_ON = document.body.dataset.milk == '1';   // the milk buckets: an option, off by default
 var TEST = document.body.dataset.test == '1';   // the beta's test panel (reviewers only, runs off the leaderboard)
 // the milk: a bucket cancels the potion thrown with a result (2 a run).
 // Drunk as in Minecraft: 1.6 s, a gulp every 0.2 s from the 0.4th on
@@ -45,7 +46,7 @@ function show(state) {
 }
 
 function start() {
-    api('/start', {difficulty: DIFFICULTY, test: TEST ? 1 : 0}).done(show);
+    api('/start', {difficulty: DIFFICULTY, milk: MILK_ON ? 1 : 0, test: TEST ? 1 : 0}).done(show);
 }
 
 // ---------- a round ----------
@@ -388,7 +389,7 @@ $('#again-button').on('click', function () {
 // a run in progress at this difficulty goes on (a reload brings back the same
 // round and its clock); otherwise a new one starts
 api('').done(function (r) {
-    if (r.success && r.phase != 'over' && r.difficulty == DIFFICULTY && r.test == TEST) {
+    if (r.success && r.phase != 'over' && r.difficulty == DIFFICULTY && r.milk_on == MILK_ON && r.test == TEST) {
         show(r);
     } else {
         start();

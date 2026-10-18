@@ -45,7 +45,7 @@
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
 {% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('survival', 'Survival')], friends = True %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
-{% include "difficulty.html" %}
+{% with friends = True %}{% include "difficulty.html" %}{% endwith %}
                 </fieldset>
                 <p id="settings-error" class="room-error"></p>
             </form>
@@ -65,6 +65,8 @@
             </div>
             <div id="room-countdown" class="room-countdown" hidden></div>
         </div>
+        <!-- the players, on a sign of their own at the right (on a phone: in the round's sign) -->
+        <div class="room-board" id="room-board" hidden></div>
         <div class="room-chat-game" id="chat-slot-game" hidden></div>
         <div class="map-container">
             <div id="map"></div>

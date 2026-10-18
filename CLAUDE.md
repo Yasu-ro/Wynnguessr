@@ -416,7 +416,9 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   (image retournée).
 - **Lait** (2026-10-18, demande de Yasuro : « 2 milk buckets for free …
   with a nice moment to use them (after potion effect) ») : 2 seaux par
-  partie (`MILK`, `survival_runs.milk`), jamais achetables. Bouton « Drink
+  partie **si l'option Milk est cochée** (décochée par défaut, voir
+  « Survival à plusieurs » : classement à part) (`MILK`,
+  `survival_runs.milk`), jamais achetables. Bouton « Drink
   Milk · N left » sur la carte de la potion lancée (après le GIF) ; il
   annule la potion de la manche suivante (`api/survival/milk`, gardée dans
   `survival_guesses.milked`). Bu comme dans Minecraft (recherche : 32 ticks
@@ -534,16 +536,27 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   site + parties Survival de la bêta) : par manche, ~9 pour le dixième le
   plus fort, ~5,5 pour le joueur médian, ~4 pour le quart le plus faible,
   presque constant de la manche 1 à 20 (la zone rétrécit, mais les gains
-  suivent). D'où les prix **5 / 10 / 15** : Mining Fatigue, Swiftness 5 ;
-  Wither, Nausea, Blindness, lait 10 ; Darkness, Regeneration 15. À revoir
-  après de vraies parties (étape 4).
+  suivent). Prix d'abord 5 / 10 / 15 (une potion par manche) ; après la
+  première vraie partie (Yasuro et Ragus, 2026-10-18 : « right now only one
+  is kinda boring ») : **au plus 3 achats par joueur et par boutique**
+  (`SHOP_MAX`, « so someone don't buy all the effects for the other ») et
+  des prix pour en acheter deux ou trois : Mining Fatigue, Swiftness **2** ;
+  Wither, Nausea, Blindness **3** ; lait **4** ; Darkness **5** ;
+  Regeneration **6**. Qui a fait ses 3 achats est prêt d'office.
+- **Lait : une option, décochée par défaut** (Yasuro : distinguer les parties
+  avec lait des autres), en solo (2 seaux offerts) comme à plusieurs (vendu
+  en boutique, 2 par joueur). Choisie avec la difficulté (`difficulty.html`),
+  gardée par la partie (`survival_runs.milk_on`, `rooms.milk`) et par le
+  score (`scores.milk`) : **les parties avec lait ont leur propre classement**
+  (filtre « Milk : Off / On » du Survival), le profil écrit « · Milk ». Les
+  scores d'avant l'option : comptent avec lait seulement les parties où un
+  seau a été bu (avoir des seaux sans les boire n'aidait pas).
 - **Choix faits en codant, à confirmer avec Yasuro si besoin** :
-  - **dernier appel** comme dans les autres salons : dès qu'un vivant a
-    deviné, les autres ont 15 s (`LAST_CALL`), ou moins si leur propre
-    chrono (Swiftness) finit avant. Yasuro : « we don't want other players
-    to troll and lock the other player forever » (j'avais d'abord proposé
-    tout le chrono pour tous). Qui n'a pas deviné à la fermeture reçoit une
-    ligne sans épingle (le creeper) avec le temps qu'il a eu, pour Wither ;
+  - **pas de dernier appel** : chacun a tout son chrono, comme en solo. Un
+    dernier appel de 15 s a été ajouté puis **retiré le même jour** : Yasuro
+    avait mal compris ma question (« I misunderstood … we should keep that
+    out ! »). Qui n'a pas deviné à la fermeture reçoit une ligne sans
+    épingle (le creeper) avec le temps qu'il a eu, pour Wither ;
   - la manche 1 a aussi ses 5 s de chargement ;
   - les potions **au hasard sont publiques** dès la révélation (lancées à
     l'étape 1) ; les **achats restent secrets** jusqu'à la fermeture de la
@@ -626,6 +639,22 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
     `templates/difficulty.html` : le choix de difficulté, partagé par le
     menu solo et le salon (son script ne montre « Rounds » qu'en Classic,
     sinon Duel le réaffichait). Émeraude dessinée par `tools/potions.py`.
+  - **Panneau des joueurs** (retour de Yasuro : trop chargé) : sur
+    ordinateur, les joueurs quittent le panneau de la manche pour un
+    panneau à eux, pendu à droite, un par ligne, cœurs (PV, vies) alignés
+    à droite ; plus de « … » pour qui n'a pas deviné, une coche pour qui a
+    deviné ; sur téléphone ils restent dans le panneau de la manche
+    (`roundPlayers()`, tous les modes de salon).
+  - **Piège payé** : la page redessine la boutique à chaque interrogation
+    (1 s) ; l'infobulle d'une potion survolée disparaissait au bout d'une
+    seconde. Elle suit désormais la potion sous la souris (`shopHover`),
+    sinon la potion choisie.
+  - **Creeper** (« absent from the multiplayer game », 2026-10-18) : non
+    reproduit. Le sifflement part à 3 s pour qui devine encore, l'explosion
+    à 0 pour qui n'a pas d'épingle, comme en solo ; vérifié en navigateur
+    (sans épingle, et épingle posée jusqu'au bout). Dans leurs parties,
+    Yasuro devinait presque toujours tôt : pas de creeper pour lui.
+    Question posée : l'entendre aussi après avoir deviné ?
   - Pièges de test payés : `wait_for_selector(state='hidden')` sur le
     couvercle répond tout de suite hors de l'écran de manche (son écran
     parent est caché) : attendre `s.phase == 'guess'` ; les boutons sont

@@ -12,6 +12,14 @@
                 <p class="setting-note difficulty-rules" data-difficulty="hard" hidden>5 hearts, 40 seconds a round, more potions.</p>
                 <p class="setting-note difficulty-rules" data-difficulty="hardcore" hidden>1 heart, 30 seconds a round, even more potions.</p>
             </fieldset>
+            <fieldset class="setting" id="milk" hidden>
+                <h3 class="setting-name">Milk</h3>
+                <div class="chips">
+                    <input type="checkbox" name="milk" id="milk-on">
+                    <label class="chip" for="milk-on">Milk Buckets</label>
+                </div>
+                <p class="setting-note">{{ "In the shop, 2 each: one cancels every potion of a round." if friends else "2 buckets: each one cancels a potion." }} Runs with milk have their own leaderboard.</p>
+            </fieldset>
             <script>
                 // Survival has no settings but its difficulty (the number of rounds is classic's only)
                 document.addEventListener('modechange', function (e) {
@@ -19,6 +27,7 @@
                     ['provinces', 'timer', 'look'].forEach(function (id) { document.getElementById(id).hidden = survival; });
                     document.getElementById('rounds').hidden = e.detail != 'classic';
                     document.getElementById('difficulty').hidden = !survival;
+                    document.getElementById('milk').hidden = !survival;
                 });
                 // only the chosen difficulty says what it does
                 function showDifficulty() {
