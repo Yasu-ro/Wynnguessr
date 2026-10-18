@@ -720,10 +720,21 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
 - **Lancer de potion** : `potion-throw.webp`, les mêmes pixels et les mêmes
   durées image par image que le GIF de Yasuro (vérifié), 930 ko au lieu de
   1,6 Mo ; le GIF reste dans git comme original.
-- Reste : la qualité des photos des lieux (le plus lourd), à choisir par
-  Yasuro sur une comparaison. La base de WynnGuessr **n'est pas dans le
-  coffre** (`coffre.sh` ne sauvegarde que `dispo.db`) : seulement les
-  copies faites à la main avant chaque mise en prod.
+- **Photos des lieux en WebP 90** (choix de Yasuro sur une comparaison
+  côte à côte : JPEG 90 actuel 6,0 Mo pour le premier regard d'un lieu,
+  JPEG 80 4,3, **WebP 90 4,1**, WebP 80 2,5 mais la pierre et le bois
+  lissés) : `tools/webp_tiles.py` écrit un `.webp` à côté de chaque `.jpg`
+  (service `wynnguessr-webp`, 4 processus au plus bas, ~3 h pour ~765 000
+  tuiles, reprend où il s'est arrêté) ; les nouvelles captures écrivent les
+  deux (`make_tiles`). Les pages ne demandent le WebP qu'une fois tout
+  converti ; les JPEG restent jusque-là (le vrai site les lit).
+- **Piège payé** : la carte en tuiles grandit sous la souris (CSS) sans que
+  Leaflet le sache, il ne chargeait que les tuiles de l'ancienne taille
+  (moitié noire). `mapTiles()` le lui dit (`ResizeObserver` →
+  `invalidateSize({pan: false})`). La base de WynnGuessr n'était pas dans le coffre :
+  **ajoutée le 2026-10-18** (`coffre.sh`, chaque nuit à 4 h : les deux bases
+  en copie cohérente, gardées 7 jours, les photos de profil, les secrets ;
+  pas de bundle git, l'historique pèse 4,6 Go et vit sur GitHub).
 
 Mesures du 2026-10-18 pour la vitesse : la carte `map-2026.webp` pèse
 **8,7 Mo** (chargée avant la première partie) ; un lieu, ~4,6 Mo pour le
