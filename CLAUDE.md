@@ -1014,6 +1014,20 @@ Ordre proposé : sons → chat → spectateur → modes → Survival. Méthode :
 isolée, vraies parties à plusieurs, téléphone et Firefox, puis **bêta** pour
 les testeurs avant la prod (changements trop gros pour aller direct).
 
+### Mise en prod du 2026-10-18
+
+Accord de Yasuro (« let's push it »). Tout le travail des 17-18 octobre :
+profils, sons, salons (exclure/passer la main), animations, Survival refait
+(mode principal), anti-triche Classic, page About. Fusion `--ff-only` de
+`beta` dans `main`, `HUP`, sons copiés de la bêta (`static/sounds/`, hors
+git). Sauvegarde de la base juste avant :
+`/data/wynnguessr-live-before-survival-2026-10-18.db`. Les colonnes
+(`fog_url`, `scores.difficulty/points`) se sont créées au démarrage.
+**Les photos brouillard n'arrivent sur le vrai site qu'au prochain Push**
+(`review_push` les copie) : avant, Blindness n'y tombe jamais.
+Le même jour, quelqu'un a sondé une injection HTML par `game?rounds=` :
+échappée par Jinja, et `rounds` est validé côté serveur (`SOLO_ROUNDS`).
+
 ### Où on en est (2026-10-17, fin de session)
 
 - Flux : mod → tri sur la bêta → Push. **2026-10-17 au soir, mis en prod**
