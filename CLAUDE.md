@@ -1232,19 +1232,33 @@ git). Sauvegarde de la base juste avant :
 Le même jour, quelqu'un a sondé une injection HTML par `game?rounds=` :
 échappée par Jinja, et `rounds` est validé côté serveur (`SOLO_ROUNDS`).
 
-### Prochaine mise en prod (Survival à plusieurs)
+### Mise en prod du Survival à plusieurs (2026-10-18, 15 h 24)
 
-- **Piège évité** (2026-10-18, rejoué sur une copie de la base du vrai
-  site) : la colonne `survival_runs.milk` créée avec `DEFAULT 2` aurait
-  donné deux seaux aux 34 parties solo en cours du vrai site et rangé leurs
-  scores au classement « avec lait ». Défaut ramené à 0 (sans effet sur la
-  bêta, où la colonne existait déjà). Les salons Battle Royale jamais
-  lancés deviennent Classic (leur page ne trouvait plus le mode).
-- À faire : sauvegarde de la base, copier les nouveaux sons de la bêta
-  (`drink`, `trader`, `sold`, `refused`, `pickup`), fusion, `HUP`.
-- **Photos brouillard** : 0 sur 741 sur le vrai site le 2026-10-18 ; tant
-  que Yasuro n'a pas appuyé sur Push, Blindness n'y existe pas (ni tirée,
-  ni vendue) et les salons Survival y prennent tous les lieux.
+Accord de Yasuro (« yes you can push ! »). Lait en solo, Survival à
+plusieurs (moteur, salon, Potion Merchant), lait en option, Battle Royale
+retiré de la création. Sauvegarde juste avant :
+`/data/wynnguessr-live-before-survival-multi-2026-10-18.db` ; 16 sons
+copiés de la bêta (`drink`, `trader`, `sold`, `refused`, `pickup`) ;
+fusion `--ff-only` puis `HUP` dans la même commande. Vérifié après : toutes
+les colonnes et tables, **aucune partie solo en cours avec du lait** (34
+en cours ; voir le piège ci-dessous), aucun score passé au classement avec
+lait, plus aucun salon Battle Royale en attente, 244 comptes ; Chromium et
+Firefox sans erreur sur le vrai site (menu, classement, une partie).
+
+- **Piège évité**, trouvé en rejouant les migrations sur une copie de la
+  base du vrai site : la colonne `survival_runs.milk` créée avec
+  `DEFAULT 2` aurait donné deux seaux aux parties solo en cours et rangé
+  leurs scores au classement avec lait. Défaut ramené à 0 (sans effet sur
+  la bêta, où la colonne existait déjà). **Méthode à garder** : avant une
+  mise en prod qui ajoute des colonnes, importer `app.py` sur une copie
+  (`sqlite3.backup`) de la base du vrai site et regarder ce que les
+  migrations ont fait.
+- L'annonce Discord de la première mise en prod a été postée par Yasuro à
+  12 h 21 ; pour celle-ci, un court journal des nouveautés.
+- **Reste côté Yasuro** : appuyer sur Push (`/review` de la bêta) pour
+  envoyer les 741 photos brouillard au vrai site (0 le 2026-10-18) : sans
+  elles, Blindness n'y existe pas. Question ouverte : le creeper entendu
+  aussi par qui a déjà deviné ?
 
 ### Où on en est (2026-10-17, fin de session)
 
