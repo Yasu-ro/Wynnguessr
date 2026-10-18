@@ -9,7 +9,7 @@
 {% include "share.html" %}
 </head>
 
-<body class="game-page survival-page" data-difficulty="{{ difficulty }}" data-throw="{{ asset('potion-throw.gif') }}">
+<body class="game-page survival-page" data-difficulty="{{ difficulty }}" data-throw="{{ asset('potion-throw.gif') }}" data-test="{{ 1 if test else 0 }}">
     <nav class="navbar">
         <a class="nav-logo" href="./" title="Home"><img src="static/wynnlogo.png" alt="WynnGuessr" width="40" height="40"></a>
         <a class="nav-btn" href="./"><i class="material-icons">home</i><span>Home</span></a>
@@ -47,6 +47,17 @@
         </div>
     </div>
 
+    {% if test %}
+    <details class="test-panel" id="test-panel" open>
+        <summary>Test</summary>
+        <div class="test-row"><select id="t-potion" class="field small" aria-label="Potion"></select><button type="button" class="chip small" data-t="potion">Use</button></div>
+        <p class="test-note">During a round: right now. On a result: for the next round.</p>
+        <div class="test-row"><input id="t-hp" class="field small" type="number" min="0.5" max="10" step="0.5" value="10" aria-label="Hearts"><button type="button" class="chip small" data-t="hearts">Hearts</button></div>
+        <div class="test-row"><input id="t-round" class="field small" type="number" min="1" max="200" value="20" aria-label="Round"><button type="button" class="chip small" data-t="round">Round</button></div>
+        <div class="test-row"><button type="button" class="chip small" data-t="creeper">Creeper in 4 s</button></div>
+        <p class="test-note">Test run: never on the leaderboard.</p>
+    </details>
+    {% endif %}
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
     <script src="{{ asset('js/sound.js') }}"></script>

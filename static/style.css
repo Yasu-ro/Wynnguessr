@@ -1256,7 +1256,7 @@ button, input {
     width: 24px;
     height: 24px;
     vertical-align: middle;
-    background: url("potions.png") calc(var(--i) * -24px) 0 / 168px 24px no-repeat;
+    background: url("potions.png") calc(var(--i) * -24px) 0 / 264px 24px no-repeat;
     image-rendering: pixelated;
 }
 .sv-effect {
@@ -1296,7 +1296,7 @@ button, input {
     width: 48px;
     height: 48px;
     background-position: calc(var(--i) * -48px) 0;
-    background-size: 336px 48px;
+    background-size: 528px 48px;
 }
 .potion-card b {
     display: block;
@@ -1319,6 +1319,45 @@ button, input {
     25% { transform: scale(1.26) rotate(3deg) translateX(12px); }
     50% { transform: scale(1.22) rotate(-1deg); }
     75% { transform: scale(1.26) rotate(-3deg) translateX(-12px); }
+}
+/* Mirror: the world flipped left to right (still: no motion, no lag) */
+#game-panorama.mirror {
+    transform: scaleX(-1);
+}
+/* the beta's test panel */
+.test-panel {
+    position: fixed;
+    top: calc(var(--nav) + 10px);
+    right: 10px;
+    z-index: 2500;
+    width: 230px;
+    padding: 8px 12px 10px;
+    font-size: 14px;
+    background: var(--paper);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .3);
+}
+.test-panel summary {
+    font-weight: 700;
+    cursor: pointer;
+}
+.test-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+.test-row .field.small {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 3px 6px;
+    font-size: 14px;
+}
+.test-note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
 }
 /* Darkness: after a few seconds, the picture goes black */
 .sv-dark {

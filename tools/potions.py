@@ -5,10 +5,12 @@ are in survival.js.) Run: python3 tools/potions.py"""
 import os
 from PIL import Image
 
-POTIONS = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness']
+POTIONS = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness',
+           'shaky', 'spin', 'tunnel', 'mirror']   # the last four: candidates to replace Nausea
 COLOUR = {   # Minecraft's effect colours, a little brighter where they were too dark to read
     'swiftness': (124, 175, 198), 'mining_fatigue': (110, 98, 40), 'wither': (92, 74, 68),
     'regeneration': (205, 92, 171), 'nausea': (125, 45, 110), 'darkness': (70, 66, 80), 'blindness': (45, 45, 55),
+    'shaky': (78, 147, 49), 'spin': (186, 150, 220), 'tunnel': (61, 61, 140), 'mirror': (196, 204, 214),
 }
 BOTTLE = """
 ....oooo....

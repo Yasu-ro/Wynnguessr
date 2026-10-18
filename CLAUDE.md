@@ -379,6 +379,24 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   sans son nom, et les points s'effacent pendant la manche : le menu
   débordait).
 - Cœurs espacés d'un pixel du dessin (demande de Yasuro).
+- **Panneau de test** (demande de Yasuro : « give me a way to test
+  everything easly ») : `beta.wynndle.com/survival?difficulty=normal&test=1`
+  (ou hard, hardcore), connecté avec un compte de `REVIEWERS`, et seulement
+  là où `capture_key` existe (la bêta). Une partie de test
+  (`survival_runs.test`) n'entre jamais au classement ni dans l'XP. Le
+  panneau : boire une potion (pendant une manche : tout de suite, la
+  manche repart sous elle ; sur un résultat : pour la manche suivante),
+  régler les cœurs, sauter à une manche (sentir la zone de la manche 20),
+  lancer le creeper dans 4 s. Replié sur téléphone.
+- **Nausea jugée ratée** par Yasuro (« super easy », et elle faisait ramer :
+  un panorama 3D animé en CSS se recalcule à chaque image). Quatre
+  remplaçantes à comparer, buvables seulement depuis le panneau de test
+  (`TEST_POTIONS`), en attente de son choix : Shaky Hands (le serveur
+  décale l'épingle de 20 à 60 blocs, la révélation montre le point visé
+  et le point tombé : la seule que la page ne peut pas défaire), Dizziness
+  (la vue tourne seule, -9 °/s, non maîtrisable), Tunnel Vision (champ fixé
+  à 35°), Mirror (image retournée gauche-droite, transformation fixe donc
+  sans coût). Flacons dessinés dans `tools/potions.py`.
 - **Score** = lieux survécus, départage = total des points (formule
   Classic). Un classement par difficulté, plus aucune option (toutes les
   provinces, vue libre), anciens scores Survival effacés.

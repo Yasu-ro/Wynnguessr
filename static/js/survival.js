@@ -18,9 +18,16 @@ var POTIONS = {
     wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
     regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
     nausea: ['Nausea', 'The world sways.'],
-    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.']
+    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.'],
+    // candidates to replace Nausea, only from the beta's test panel for now
+    shaky: ['Shaky Hands', 'Your pin lands a little off from where you click.'],
+    spin: ['Dizziness', "The view turns by itself, and you can't stop it."],
+    tunnel: ['Tunnel Vision', 'You only see a small part of the picture.'],
+    mirror: ['Mirror', 'The world is flipped, like in a mirror.']
 };
-var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
+var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness',
+               'shaky', 'spin', 'tunnel', 'mirror'];
+var TEST = document.body.dataset.test == '1';   // the beta's test panel (reviewers only, runs off the leaderboard)
 // static/potion-throw.gif, Yasuro's (97 frames): someone runs in and throws
 // the bottle, which bursts over the screen. The sounds on its frames
 var THROW_MS = 3070;    // its length
@@ -80,7 +87,7 @@ function show(state) {
 }
 
 function start() {
-    api('/start', {difficulty: DIFFICULTY}).done(show);
+    api('/start', {difficulty: DIFFICULTY, test: TEST ? 1 : 0}).done(show);
 }
 
 // ---------- a round ----------
@@ -126,7 +133,16 @@ function guessScreen() {
     if (viewer) {
         viewer.destroy();
     }
-    viewer = pannellum.viewer('game-panorama', panoramaConfig(s.url, {autoLoad: true}));
+    var view = {autoLoad: true};
+    if (s.effect == 'spin') {
+        // Dizziness: the view turns by itself, and the player cannot hold it
+        view = {autoLoad: true, autoRotate: -9, draggable: false, mouseZoom: false, keyboardZoom: false,
+                disableKeyboardCtrl: true, showControls: false};
+    } else if (s.effect == 'tunnel') {
+        // Tunnel Vision: a third of the usual field, no zooming out
+        view = {autoLoad: true, hfov: 35, minHfov: 35, maxHfov: 35};
+    }
+    viewer = pannellum.viewer('game-panorama', panoramaConfig(s.url, view));
     if (map) {
         map.remove();
     }
@@ -158,7 +174,7 @@ function guessScreen() {
 function effects() {
     var e = s.effect, spent = s.time - s.time_left;
     $('#sv-effect').prop('hidden', !e).html(e ? potionIcon(e) + '<span>' + POTIONS[e][0] + '</span>' : '');
-    $('#game-panorama').toggleClass('nausea', e == 'nausea');
+    $('#game-panorama').toggleClass('nausea', e == 'nausea').toggleClass('mirror', e == 'mirror');
     clearTimeout(darkTimer);
     $('#sv-dark').prop('hidden', true);
     if (e == 'darkness') {
@@ -285,6 +301,15 @@ function resultScreen(before) {
         L.circle(answer, {radius: r.safe, color: '#2f7a22', weight: 2, fillColor: '#88cc42', fillOpacity: .22, interactive: false}).addTo(scoreMap);
         drop(L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(scoreMap), true);
         var spots = [answer, L.latLng(answer.lat + r.safe, answer.lng + r.safe), L.latLng(answer.lat - r.safe, answer.lng - r.safe)];
+        if (r.aim_x !== null && r.aim_x !== undefined) {
+            // Shaky Hands: where the pin was aimed, before it landed off
+            var aimed = blockSpot(r.aim_x, r.aim_z);
+            L.circleMarker(aimed, {radius: 6, color: '#3f2724', weight: 2, fillColor: '#ffffff', fillOpacity: .8, interactive: false}).addTo(scoreMap);
+            if (r.x !== null) {
+                L.polyline([aimed, blockSpot(r.x, r.z)], {color: '#3f2724', weight: 2, dashArray: '2 5', interactive: false}).addTo(scoreMap);
+            }
+            spots.push(aimed);
+        }
         if (r.x !== null) {
             var mine = blockSpot(r.x, r.z);
             drop(L.marker(mine, {icon: pin(MINE)}).addTo(scoreMap), true);
@@ -393,9 +418,42 @@ $('#again-button').on('click', function () {
 // a run in progress at this difficulty goes on (a reload brings back the same
 // round and its clock); otherwise a new one starts
 api('').done(function (r) {
-    if (r.success && r.phase != 'over' && r.difficulty == DIFFICULTY) {
+    if (r.success && r.phase != 'over' && r.difficulty == DIFFICULTY && r.test == TEST) {
         show(r);
     } else {
         start();
     }
 }).fail(start);
+
+// ---------- the beta's test panel ----------
+// any potion now (or for the next round, from a result), the hearts, the
+// round (to feel the zone of round 20), the creeper in 4 seconds
+
+if (TEST) {
+    if (window.innerWidth < 700) {
+        document.getElementById('test-panel').open = false;   // folded on a phone: it would hide the picture
+    }
+    $('#t-potion').html("<option value=''>None</option>" + Object.keys(POTIONS).map(function (k) {
+        return "<option value='" + k + "'>" + POTIONS[k][0] + '</option>';
+    }).join(''));
+    var test = function (data) {
+        api('/test', data).done(function (r) {
+            if (r.success) {
+                s = null;   // what follows is drawn as a fresh screen, not as the answer to a guess
+                show(r);
+            }
+        });
+    };
+    $('#test-panel').on('click', '[data-t]', function () {
+        var what = $(this).data('t');
+        if (what == 'potion') {
+            test({'do': 'potion', potion: $('#t-potion').val()});
+        } else if (what == 'hearts') {
+            test({'do': 'hearts', hp: Math.round(parseFloat($('#t-hp').val()) * 2)});
+        } else if (what == 'round') {
+            test({'do': 'round', round: $('#t-round').val()});
+        } else {
+            test({'do': 'creeper'});
+        }
+    });
+}

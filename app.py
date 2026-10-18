@@ -1687,6 +1687,9 @@ POTION_RATE = {'normal': 1 / 5, 'hard': 1 / 4, 'hardcore': 1 / 3}
 # name: weight (Regeneration, the only good one, comes half as often).
 # Blindness waits for the fog pictures (CLAUDE.md, "Survival")
 POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkness': 2, 'regeneration': 1}
+# drunk only from the test panel, to be compared before one replaces Nausea
+TEST_POTIONS = ['shaky', 'spin', 'tunnel', 'mirror']
+SHAKE = (20, 60)           # Shaky Hands: the pin lands this many blocks off, in any direction
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
 
@@ -1743,6 +1746,13 @@ with connect() as c:
     # the potion thrown at the player with a result, for the round after it
     if 'next_effect' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
         c.execute("ALTER TABLE survival_runs ADD COLUMN next_effect TEXT")
+    # test runs (the beta's test panel), never on the leaderboard; where a
+    # Shaky Hands guess was aimed before it landed off
+    if 'test' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
+        c.execute("ALTER TABLE survival_runs ADD COLUMN test INTEGER DEFAULT 0")
+    if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(survival_guesses)")]:
+        c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_x REAL")
+        c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_z REAL")
     if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN difficulty TEXT")
         c.execute("ALTER TABLE scores ADD COLUMN points INTEGER")
@@ -1768,7 +1778,7 @@ def run_tx():
 def survival_record(c, run):
     # the run on the leaderboard as it stands, from the first location found
     # on (updated each round: a run left half-way keeps its score)
-    if not run['user_id'] or not run['survived']:
+    if not run['user_id'] or not run['survived'] or run['test']:
         return
     if run['score_id']:
         c.execute("UPDATE scores SET score = ?, points = ?, time = ? WHERE id = ?",
@@ -1818,6 +1828,12 @@ def survival_settle(c, run, x = None, z = None):
     loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (run['location_id'],)).fetchone()
     spent = max(0, min(now, run['deadline']) - run['round_start'])
     wither = int(spent // WITHER_EVERY) if effect == 'wither' else 0
+    aim_x, aim_z = x, z
+    if effect == 'shaky' and x is not None:
+        # the hand shakes: the pin lands somewhere around where it was aimed
+        angle = secrets.randbelow(360000) / 1000 * math.pi / 180
+        off = SHAKE[0] + secrets.randbelow((SHAKE[1] - SHAKE[0]) * 1000) / 1000
+        x, z = round(x + off * math.cos(angle)), round(z + off * math.sin(angle))
     if x is None:
         d, damage, points = None, zone(n, effect)[2], 0
     else:
@@ -1835,9 +1851,10 @@ def survival_settle(c, run, x = None, z = None):
         close = 0
     hp_after = min(DIFFICULTIES[run['difficulty']], hp_after + heal) if hp_after > 0 else 0
     survived = run['survived'] + (1 if hp_after > 0 else 0)
-    c.execute("""INSERT INTO survival_guesses (run_id, round, location_id, x, z, distance, hp, damage, wither, heal, points, effect, time, at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (run['id'], n, loc['location_id'], x, z, d, hp, damage, wither, heal if hp_after > 0 else 0, points, effect, spent, now))
+    c.execute("""INSERT INTO survival_guesses (run_id, round, location_id, x, z, distance, hp, damage, wither, heal, points, effect,
+            time, at, aim_x, aim_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (run['id'], n, loc['location_id'], x, z, d, hp, damage, wither, heal if hp_after > 0 else 0, points, effect, spent, now,
+             aim_x if effect == 'shaky' else None, aim_z if effect == 'shaky' else None))
     c.execute("""UPDATE survival_runs SET hp = ?, close = ?, survived = ?, points = points + ?, time = time + ?,
             phase = ?, next_effect = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over',
             potion(run['difficulty'], n + 1, effect) if hp_after > 0 else None, run['id']))
@@ -1857,7 +1874,7 @@ def survival_state(c, run):
     # what the page may know: never the answer of a round still open
     out = {"success": True, "difficulty": run['difficulty'], "max": DIFFICULTIES[run['difficulty']],
            "hp": run['hp'], "round": run['round'], "survived": run['survived'], "points": run['points'],
-           "phase": run['phase']}
+           "phase": run['phase'], "test": bool(run['test'])}
     if run['phase'] == 'over':
         # the end screen: the XP the run brought, or a word to log in and keep it
         if run['user_id']:
@@ -1877,15 +1894,55 @@ def survival_state(c, run):
         out['result'] = {"X": loc[0], "Z": loc[1], "x": g['x'], "z": g['z'], "distance": g['distance'],
                          "damage": g['damage'], "wither": g['wither'], "heal": g['heal'], "points": g['points'],
                          "effect": g['effect'], "creeper": g['x'] is None, "safe": safe, "far": far,
-                         "kill": kill_radius(g['round'], g['effect'], g['hp'] - g['wither'])}
+                         "kill": kill_radius(g['round'], g['effect'], g['hp'] - g['wither']),
+                         "aim_x": g['aim_x'], "aim_z": g['aim_z']}
         if run['phase'] == 'result':
             out['potion'] = run['next_effect']   # thrown now, for the next round
     return out
 
+def survival_tester():
+    # the test panel: on the beta only (where capture_key exists), for the
+    # reviewers; its runs never reach the leaderboard
+    return is_reviewer()
+
 @app.route("/survival")
 def survival_page():
     difficulty = request.args.get('difficulty')
-    return render_template('survival.html', difficulty = difficulty if difficulty in DIFFICULTIES else 'normal')
+    return render_template('survival.html', difficulty = difficulty if difficulty in DIFFICULTIES else 'normal',
+                           test = request.args.get('test') == '1' and survival_tester())
+
+@app.route("/api/survival/test", methods=['POST'])
+def survival_test():
+    # the test panel's buttons, on a test run only
+    c = run_tx()
+    try:
+        run = my_run(c)
+        if not run or not run['test'] or not survival_tester() or run['phase'] == 'over':
+            c.execute("ROLLBACK")
+            return jsonify({"success": False})
+        form, now = request.form, time.time()
+        what = form.get('do')
+        if what == 'potion' and form.get('potion', '') in [''] + list(POTIONS) + TEST_POTIONS:
+            name = form['potion'] or None
+            if run['phase'] == 'guess':
+                # drunk now: the round starts again under it (same place, its clock)
+                seconds = SWIFT_TIME if name == 'swiftness' else ROUND_TIME[run['difficulty']]
+                c.execute("UPDATE survival_runs SET effect = ?, round_start = ?, deadline = ? WHERE id = ?",
+                          (name, now, now + seconds, run['id']))
+            else:
+                c.execute("UPDATE survival_runs SET next_effect = ? WHERE id = ?", (name, run['id']))
+        elif what == 'hearts' and form.get('hp', '').isdigit():
+            c.execute("UPDATE survival_runs SET hp = ? WHERE id = ?",
+                      (max(1, min(DIFFICULTIES[run['difficulty']], int(form['hp']))), run['id']))
+        elif what == 'round' and form.get('round', '').isdigit():
+            c.execute("UPDATE survival_runs SET round = ? WHERE id = ?", (max(1, min(200, int(form['round']))), run['id']))
+        elif what == 'creeper' and run['phase'] == 'guess':
+            c.execute("UPDATE survival_runs SET deadline = ? WHERE id = ?", (now + 4, run['id']))
+        out = survival_state(c, c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone())
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
 
 @app.route("/api/survival/start", methods=['POST'])
 def survival_start():
@@ -1902,8 +1959,9 @@ def survival_start():
         if uid:
             for r in c.execute("SELECT * FROM survival_runs WHERE user_id = ? AND phase != 'over'", (uid,)).fetchall():
                 survival_end(c, r)
-        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started) VALUES (?, ?, ?, 'new', ?)",
-                        (uid, difficulty, DIFFICULTIES[difficulty], time.time())).lastrowid
+        test = request.form.get('test') == '1' and survival_tester()
+        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started, test) VALUES (?, ?, ?, 'new', ?, ?)",
+                        (uid, difficulty, DIFFICULTIES[difficulty], time.time(), int(test))).lastrowid
         run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone()
         survival_next(c, run)
         session['survival'] = rid
