@@ -733,6 +733,17 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
   ont répondu, ou au délai : chrono éventuel, raccourci à `LAST_CALL`=15 s après
   le premier guess. `GRACE`=1 s de tolérance réseau.
 - Hôte absent `HOST_AWAY`=30 s dans la salle d'attente → la main passe.
+- **Piège payé (2026-10-18, partie de Yasuro et yolo)** : une page qui
+  n'interrogeait plus depuis `AWAY`=10 s n'était plus attendue, et la manche
+  se fermait dès que l'autre devinait. Or un onglet en arrière-plan peut
+  rester muet presque une minute (Firefox endort ses minuteries : yolo,
+  parti lire Discord, n'a rien envoyé pendant ~50 s) : il revenait sur la
+  manche suivante (« it skips round 2 »). Désormais une manche (et la
+  boutique) attend un joueur muet jusqu'à `GONE`=60 s, donc il a son
+  dernier appel ; `AWAY` ne sert plus qu'à l'affichage et au départ. Un
+  onglet qui revient au premier plan interroge tout de suite. Le bouton
+  « Next Round » de l'hôte ne part plus qu'une fois (il envoyait une
+  requête par clic : 11 dans la même seconde).
 - Rejoindre avant la fin = jouer en direct (même en cours) ; un salon Classic
   terminé se rejoue en différé, même classement.
 - « Play Again » : nouveau salon (`next_code`), tout le monde suit.

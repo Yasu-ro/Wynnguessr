@@ -832,7 +832,11 @@ ROUNDS = ['3', '5', '10', '25']
 MODES = ['classic', 'duel', 'survival']   # royale: no new games
 LAST_CALL = 15   # once someone guessed, the others have this long
 REVEAL = 10      # the answer stays on screen this long before the next round
-AWAY = 10        # a page that stopped polling this long is not waited for
+AWAY = 10        # a page that stopped polling this long is shown away
+GONE = 60        # ...and this long, no round waits for it any more. A tab in the
+                 # background can stay silent most of a minute (browsers put its
+                 # timers to sleep): with 10 s a player reading Discord lost the
+                 # round as soon as someone else guessed (2026-10-18)
 HOST_AWAY = 30   # a host gone this long hands the room over (else nobody could start)
 GRACE = 1        # guesses still accepted this long after the deadline (network lag)
 CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'  # no 0/O or 1/I/L to mistype
@@ -1045,7 +1049,7 @@ def tick(c, r):
         return survival_room_tick(c, r)
     if r['round_end'] is None:
         deadline, _ = round_deadline(c, r)
-        here = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], now - AWAY))}
+        here = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], now - GONE))}
         done = {g[0] for g in c.execute("SELECT user_id FROM room_guesses WHERE code = ? AND round = ?", (r['code'], r['round']))}
         if (guessers(c, r) & here) - done and (deadline is None or now < deadline + GRACE):
             return r
@@ -2458,7 +2462,8 @@ def shopping(c, r, uid, s):
     return bool(prices) and s['emeralds'] >= min(prices) and bought(c, r, uid) < SHOP_MAX
 
 def present(c, r):
-    return {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], time.time() - AWAY))}
+    # who a round or the shop still waits for
+    return {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], time.time() - GONE))}
 
 def shop_shut(c, r, st):
     # the shop closes after SHOP seconds, or once everyone here is ready;

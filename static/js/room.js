@@ -16,6 +16,7 @@ var submitted = false;
 var deadline = null;     // when the round closes, local clock
 var shownAt = 0;         // when the round appeared, local clock
 var nextAt = null;       // when the next round starts by itself, local clock
+var nextSent = null;     // the reveal whose "Next" the host already clicked
 var polling = false, pollAgain = false, pollTimer = null;
 var heard = null;        // players already known to have guessed this round
 var lastSecond = null;   // last whole second of the clock shown
@@ -28,6 +29,12 @@ $(document).ready(function () {
     setInterval(clocks, 200);
 });
 $(window).on('resize', setNav);
+// a tab coming back to the front asks at once: its timers were asleep
+document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+        poll();
+    }
+});
 
 // leaving in the middle of a game (closing the tab, a menu link, back, reload)
 // asks first; the page's own moves (next room, reload on error) do not
@@ -890,7 +897,8 @@ function nextButton() {
     }
     var left = nextAt === null ? 0 : Math.max(0, Math.ceil((nextAt - Date.now()) / 1000));
     if (s.host) {
-        b.prop('disabled', false).text(label + ' (' + left + ')');
+        // clicked once is enough (the button used to send a request per click)
+        b.prop('disabled', nextSent == view).text(label + ' (' + left + ')');
     } else {
         b.prop('disabled', true).text(label + ' in ' + left + ' s');
     }
@@ -902,6 +910,7 @@ $('#next-button').on('click', function () {
     }
     if (s.live) {
         $(this).prop('disabled', true);
+        nextSent = view;
         send('start');
     } else if (s.round >= s.rounds) {
         finished = true;
