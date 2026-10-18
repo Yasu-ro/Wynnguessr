@@ -13,10 +13,26 @@ function mapTiles(m) {
     if (window.ResizeObserver) {
         new ResizeObserver(function () { m.invalidateSize({pan: false}); }).observe(m.getContainer());
     }
+    // the map's credit only (not Leaflet's flag and link), in another tab:
+    // a click on it never leaves the game
+    if (m.attributionControl) {
+        m.attributionControl.setPrefix(false);
+    }
     return L.tileLayer('static/map-2026/{z}/{x}_{y}.webp', {
         tileSize: 256, minZoom: -3, maxZoom: 5, minNativeZoom: -3, maxNativeZoom: 0, bounds: MAP_BOUNDS, noWrap: true,
-        attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'
+        attribution: '<a href="https://wynntils.com/" target="_blank" rel="noopener">Wynntils Map</a>'
     }).addTo(m);
+}
+
+// The compass of the panoramas: N, E, S, W on the horizon (Yasuro: for the
+// players who need it). Every location comes from the mod, which takes its
+// pictures facing north: the cube's front is north, its right east. New
+// objects for each panorama: Pannellum writes into them
+function compass() {
+    return [['N', 0], ['E', 90], ['S', 180], ['W', -90]].map(function (d) {
+        return {pitch: 0, yaw: d[1], cssClass: 'compass-mark' + (d[0] == 'N' ? ' north' : ''),
+                createTooltipFunc: function (div) { div.textContent = d[0]; }};
+    });
 }
 
 // the block under a point of the map

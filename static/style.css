@@ -3116,6 +3116,21 @@ body.room-playing {
 .pnlm-zoom-out {
     border-top: 2px solid var(--line);
 }
+/* a right click on the panorama: Pannellum's link to its site, not in a game */
+.pnlm-about-msg {
+    display: none !important;
+}
+/* the compass of the panoramas (block.js): N, E, S, W on the horizon, in the
+   outlined letters of the game's numbers, never in the way of a drag */
+.compass-mark {
+    font: 700 26px/1 var(--sans);
+    color: #fff;
+    text-shadow: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink), 0 4px 0 var(--ink);
+    pointer-events: none;
+}
+.compass-mark.north {
+    color: var(--gold);
+}
 
 /* ---------- Narrow screens ---------- */
 

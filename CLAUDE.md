@@ -289,7 +289,9 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
 - Flux : `/auth/wynncraft` (state en session) → Wynncraft → `/callback` →
   `POST /v3/oauth/token` → `GET /v3/oauth/me` → profil `primary`.
   Joueur identifié par **UUID** ; `mc_name` rafraîchi à chaque connexion.
-  Connecté → liaison du compte ; sinon création/connexion du compte Minecraft.
+  Connecté → liaison du compte ; sinon création/connexion du compte Minecraft
+  (une création passe par les contrôles de `register()` : adresse bannie,
+  5 comptes par adresse ; trou trouvé par l'ultrareview du 2026-10-19).
 - **Pièges payés** :
   - leur générateur d'URL produit `redirect_uri=[object Object]` : l'URL
     d'autorisation est construite par nous (`authorize_url` du JSON) ;
@@ -821,7 +823,8 @@ max), journal d'audit avec la raison. D'où :
   récente), sinon un « #1 » automatique (`top_tags()`, premier de Survival
   Normal/Hard/Hardcore sans lait, de Classic réglages standard, des
   niveaux, des victoires ; recalculé toutes les 2 min par processus :
-  0,23 s sur une copie du vrai site). Onglet Tags de Moderation : un Admin
+  0,23 s sur une copie du vrai site, **jamais sous le verrou d'un salon**,
+  voir « Ultrareview »). Onglet Tags de Moderation : un Admin
   fait une étiquette (20 caractères, couleurs de la palette `TAG_COLORS`,
   aperçu en direct) ou la range (cachée partout, pas effacée) ; un
   Moderator la donne ou la reprend (règle d'en dessous) ; tout au journal.
@@ -865,7 +868,8 @@ max), journal d'audit avec la raison. D'où :
   - **Filtre** : `bad_words.txt` (dans git, à la racine, format expliqué en
     tête), une seule regex : chaque lettre répétée, en chiffres ou signes
     (`sh1t`, `@ss`), coupée par `. - _` ; mot seul, mot+suite, ou n'importe
-    où dans un mot. Masque en `****` à l'envoi, l'original dans
+    où dans un mot (cherché seul, puis élargi au mot qui l'entoure : voir
+    « Ultrareview », point 2 ; jamais un nombre). Masque en `****` à l'envoi, l'original dans
     `room_chat.raw` pour l'équipe. Insultes, sexuel, injures racistes et
     homophobes, « kys », un peu de français ; **les mots légers (damn, hell,
     crap) restent**. Vérifié contre Scunthorpe, class, assassin, cocktail,
@@ -914,9 +918,10 @@ max), journal d'audit avec la raison. D'où :
   choisit (inscription, invité, page `account`, « Use my Minecraft name »,
   Rename de l'équipe). Le même `bad_words.txt`, **aussi sur le nom coupé à
   ses majuscules** (« BigWord » → « Big Word » : les pseudos sont souvent
-  d'un seul tenant), et des noms réservés : nulle part `admin`, `moderator`,
-  `wynnguessr`, `wynndle` ; seuls `mod`, `owner`, `staff`, `helper`,
-  `system`, `server`. Essayé sur les 289 noms du vrai site : **2 refusés,
+  d'un seul tenant), et des noms réservés : nulle part `moderator`,
+  `wynnguessr`, `wynndle` ; `admin` au début d'aucun mot du pseudo
+  (Badminton passe, depuis l'ultrareview) ; seuls `mod`, `owner`, `staff`,
+  `helper`, `system`, `server`. Essayé sur les 289 noms du vrai site : **2 refusés,
   aucun à tort** — le compte n° 9 « Fuck YammIa » et l'invité n° 134
   « fag ». Les noms déjà pris ne changent pas d'eux-mêmes : à renommer
   depuis Players après la 3.0.0 si Yasuro le veut. Test : `t_names.py`.
@@ -1043,6 +1048,104 @@ premier regard (niveaux 1-3), 11 Mo de plus au zoom ; le GIF du lancer
 1,6 Mo ; Cloudflare ne garde que 12 % (les tuiles passent par des jetons
 privés, uniques par partie) : 144 Go servis en 24 h, tous par la connexion
 de la maison. Le serveur : 1 processus gunicorn, 8 fils, 12 cœurs libres.
+
+### Ultrareview et retours de Yasuro (2026-10-19, bêta)
+
+**L'ultrareview** (lancée par Yasuro sur une PR de revue `review` →
+`review-base` du fork, sans les 711 images) a trouvé 10 problèmes, tous
+dans `app.py`, tous corrigés :
+1. **Log in with Wynncraft** créait un compte neuf sans les contrôles de
+   `register()` : un banni contournait le ban d'adresse avec un autre compte
+   Minecraft. Maintenant `place_note()` + 5 comptes par adresse (`done`).
+2. **Le filtre du chat pouvait bloquer tout le site** : pour un `*mot*`, la
+   regex commençait par « n'importe quelles lettres » puis le mot, et
+   revenait en arrière sans fin sur une suite de lettres (200 « f » :
+   59 ms, sous le verrou d'écriture du salon, donc tous les salons
+   attendaient). Désormais le mot est cherché seul et **élargi en Python**
+   au mot qui l'entoure (`filtered`), et le filtre tourne **avant** le
+   verrou. Pire cas mesuré sur 1 806 messages longs : 1,2 ms. Comparé à
+   l'ancien filtre sur 20 000 messages au hasard : mêmes étoiles partout
+   (sauf les nombres, point 7).
+3. **Les « #1 »** (`top_tags`) se recalculaient sous le verrou d'un salon
+   (0,2 s pour 124 comptes, plus avec chaque joueur, ×4 workers). Jamais
+   plus sur une connexion en transaction (`c.in_transaction`) ;
+   `room_state` les calcule avant de prendre le verrou.
+4. **Rang à un compte qui porte le nom d'un ancien invité** (« Bob » joue
+   en invité puis crée le compte « Bob ») : la fiche d'un joueur envoie
+   l'**id** ; par nom (onglet de l'équipe), le compte passe avant l'invité.
+5. **Worlds, deux joueurs du même nom** (des invités « Steve ») : le second
+   était renvoyé sans fin vers le lobby du premier. `open_world()` saute
+   les lobbies où son nom est déjà pris (`name_clash`), et un lien vers un
+   tel lobby mène à un autre du même monde. Au passage, le lobby suivant
+   doit avoir **de la place pour tout le groupe** qui y passe (avant, les
+   derniers arrivés d'un groupe de 8 dans un lobby de 10 restaient seuls).
+6. **Worlds, un joueur prêt qui ferme l'onglet** comptait présent 60 s
+   (`GONE`) : assis dans la partie, cœurs perdus au creeper, défaite,
+   série cassée sans avoir joué. Réduire `GONE` au départ a été écarté
+   (piège de yolo : un onglet en arrière-plan reste muet presque une
+   minute). À la place, **la page le dit en partant** : `pagehide` →
+   `sendBeacon` `gone=1` → `last_seen = 0`, seulement dans un lobby de
+   monde en attente. Un rechargement le remet présent aussitôt (`room()`
+   rafraîchit `last_seen`). Une coupure réseau ou un plantage restent dans
+   les 60 s : rare.
+7. Le filtre masquait les **nombres** (« 455 », « 4.55 » = « ass ») : un
+   morceau fait seulement de chiffres et de `. - _` n'est plus masqué
+   (« a55 » et « @ss » le restent).
+8. **« admin » interdit partout** dans un pseudo (Badminton, Sadmin) :
+   maintenant interdit seulement **au début d'un mot** du pseudo (après un
+   non-lettre, ou une majuscule après une minuscule), lettres séparées ou
+   non : Admin, SuperAdmin, AdMin, Ad_min refusés.
+9. **Chat** : 2 ou 3 requêtes par message dans le verrou (étiquette et rang
+   de chaque auteur). Une seule recherche pour tous (`ranks_of`) : 48
+   messages de 6 joueurs partis, 18 requêtes en tout pour le poll.
+10. **`api/multiplayer`** (toutes les 5 s par page) recalculait 30 jours de
+   parties pour l'ordre, qui ne bouge pas : `world_counts()` ne renvoie que
+   les nombres.
+
+**Les retours de Yasuro le même jour**, faits :
+- **Nombre de joueurs sur la page Play** : « 3 playing » en vert sous
+  Multiplayer = présents dans les mondes (en attente + en partie), pas les
+  salons privés (on ne peut pas les rejoindre) ; rien à 0 ; fixe au
+  chargement.
+- **Clic droit sur le panorama** : Pannellum montrait son lien
+  pannellum.org. Caché en CSS (licence MIT : la mention est dans le code,
+  pas à l'écran).
+- **« Leaflet » et le drapeau sous la carte** (capture de Yasuro) : retirés
+  (`setPrefix(false)` dans `mapTiles`) ; reste « Wynntils Map », leur
+  carte, ouvert dans un nouvel onglet (un clic ne quitte plus la partie).
+- **« On voit les dégâts avant la fin de la manche »** : à la révélation
+  d'un salon, la ligne « −5 ♥ », le tableau et les zones de la carte
+  apparaissaient d'emblée, pendant que les épingles tombaient. Ils
+  attendent maintenant la fin du décompte des points (le verdict) ; avant,
+  « … » dans le tableau et les cœurs d'avant la manche. Survival et Duel.
+- **N, E, S, W dans le panorama** (« pour les joueurs en besoin ») :
+  quatre points chauds Pannellum sur l'horizon (`compass()` dans
+  `block.js`), N doré, lettres cerclées d'encre comme les chiffres d'XP.
+  **Toujours affichés** : version minimale, à mettre en interrupteur si
+  Yasuro le veut. Le mod prend chaque photo face au nord (face `f`),
+  l'est à droite (`r`) : **vérifié** sur le lieu (1296, −3536), au bord de
+  la mer : à l'ouest la mer et des îlots, à l'est les montagnes, comme sur
+  la carte. Tous les lieux jouables viennent du mod (les 622 d'origine
+  sont supprimés) ; un lieu venu d'ailleurs n'aurait pas ce nord-là.
+- **Sons du Ready** : une note de bloc musical (pling) à chaque joueur qui
+  se dit prêt, plus aiguë à mesure que le lobby se remplit (`SCALE`), et
+  la cloche quand le compte à rebours part.
+- **Chat** : « any key on the keyboard starts typing in the chat » : une
+  touche n'importe où va dans le chat (sauf dans un champ, et l'espace sur
+  un bouton ou un lien, qui le clique) ; un chat replié s'ouvre. La carte
+  et le panorama des salons n'écoutent plus le clavier (`keyboard: false`,
+  `disableKeyboardCtrl`) : « wasd » ou « -6+ » vont au chat sans tourner
+  ni zoomer. Et qui tape **garde le clavier quand l'écran change** (lobby
+  → manche…). **Piège payé** : masquer le lobby fait perdre le clavier à
+  la boîte avant même qu'elle soit déplacée ; `show()` le note donc tout
+  au début, et rend le clavier après avoir montré l'emplacement du chat.
+- Tests : `t_review.py` (40), `t_review_worlds.py` (9, horloge à la main),
+  `t_review_page.py` (navigateur, 20 dans Chromium et Firefox). Mis à jour
+  pour le 59dd06e (onglet Players refait, message de rang) : `t_ranks`, et
+  la fin de `t_xss_page` (pseudos piégés dans Players : rien ne s'exécute).
+- **Pas fait, en attente de Yasuro** : le pied de page (sombre, comme le
+  décor de wynncraft.com) ne ressemble pas à la barre du haut ; proposé de
+  le passer en sable comme le menu, pas de réponse encore.
 
 ## Niveaux, XP et séries de victoires
 

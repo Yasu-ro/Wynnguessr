@@ -45,6 +45,13 @@ window.addEventListener('beforeunload', function (e) {
         e.returnValue = '';
     }
 });
+// leaving a world's lobby (the tab closed, another page) says so as it goes:
+// the lobby stops counting this player at once, who gets no seat in its game
+window.addEventListener('pagehide', function () {
+    if (s && s.world && s.live && s.state == 'waiting' && navigator.sendBeacon) {
+        navigator.sendBeacon('api/room/' + code + '/lobby', new URLSearchParams({gone: 1}));
+    }
+});
 
 // ---------- server ----------
 
@@ -169,6 +176,8 @@ function setNav() {
 }
 
 function show(id) {
+    // someone typing keeps typing: a hidden or moved box loses the keyboard
+    var typing = document.activeElement == $('#chat-input')[0];
     ['lobby', 'guess-screen', 'reveal-screen', 'shop-screen', 'results'].forEach(function (x) {
         $('#' + x).prop('hidden', x != id);
     });
@@ -183,6 +192,9 @@ function show(id) {
         $('#room-chat').appendTo(slot).toggleClass('folded', id == 'guess-screen' && window.innerWidth <= 800);
     }
     $('#chat-slot-game').prop('hidden', id != 'guess-screen');
+    if (typing && !$('#room-chat').hasClass('folded')) {
+        $('#chat-input')[0].focus({preventScroll: true});
+    }
     chatPlace();
     if (playing) {
         window.scrollTo(0, 0);
@@ -239,8 +251,9 @@ function pin(fill, star) {
     });
 }
 
+// (no keys: they all go to the chat)
 function makeMap(id, zoom) {
-    var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
+    var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5, keyboard: false});
     mapTiles(m);
     crisp(m);
     m.setView([3072, -256], zoom);
@@ -414,6 +427,22 @@ $('.room-chat-head').on('click', function (e) {
     chatPlace();
     unread = 0;
     $('#chat-title').text('Chat');
+});
+
+// a key pressed anywhere starts a message (Yasuro: the game needs no keys;
+// the map and the panorama listen to none here). A folded chat opens. The
+// key itself lands in the box: it goes where the focus is once this has run.
+// (Not a space on a button or a link: that one still clicks it)
+document.addEventListener('keydown', function (e) {
+    var input = $('#chat-input');
+    if (!e.key || e.key.length != 1 || (e.ctrlKey || e.metaKey || e.altKey) && !e.getModifierState('AltGraph')
+            || $(e.target).is('input, textarea, select') || e.key == ' ' && $(e.target).is('button, a') || input.prop('disabled')) {
+        return;
+    }
+    if ($('#room-chat').hasClass('folded')) {
+        $('.room-chat-head').click();
+    }
+    input[0].focus({preventScroll: true});
 });
 
 // ---------- modes ----------
@@ -610,9 +639,21 @@ $('#start-button').on('click', function () {
 
 var worldStart = null;     // when the game starts, local clock
 var worldNext = null;      // after the results: when everyone moves on to the next lobby
+var readySeen = null;      // who was ready at the last look
 
 function worldLobby() {
+    var wasCounting = worldStart != null;
     worldStart = s.starts_in != null ? Date.now() + s.starts_in * 1000 : null;
+    // a note block for each player who gets ready, higher as the lobby
+    // fills up; the bell once the countdown starts
+    var ready = s.players.filter(function (p) { return p.lobby_ready; }).map(function (p) { return p.name; });
+    if (readySeen && ready.some(function (n) { return readySeen.indexOf(n) < 0; })) {
+        Sfx.play('good', noteBlock(SCALE[Math.min(ready.length, SCALE.length) - 1]));
+    }
+    if (readySeen && worldStart && !wasCounting) {
+        Sfx.play('warn');
+    }
+    readySeen = ready;
     $('#start-button').prop('disabled', false).toggleClass('wood', !!s.ready)
         .text(s.ready ? 'Ready! Click if you need more time' : "I'm Ready");
     worldStatus();
@@ -860,8 +901,10 @@ function reveal() {
                 Sfx.play('note', noteBlock(SCALE[Math.min(i, SCALE.length - 1)]));
             }, DROP * (i + 1));
         });
-        if (s.mode == 'survival') {
-            zones(answer, spots);
+        // your zone shows with the verdict (count), but the map frames it now
+        var safe = s.mode == 'survival' && me().result && me().result.safe;
+        if (safe) {
+            spots.push(L.latLng(answer.lat + safe, answer.lng + safe), L.latLng(answer.lat - safe, answer.lng - safe));
         }
         revealMap.fitBounds(L.latLngBounds(spots), {padding: [60, 60], maxZoom: 1});
         // then your points count up, and one sound says how it went
@@ -878,7 +921,11 @@ function reveal() {
         line = 'Bullseye! ' + line;
     }
     var bad = "<span class='room-loss'> · ", good = "<span class='room-gain'> · ";
-    if (s.mode == 'survival' && you.seat && (you.out == null || you.out == s.round)) {
+    // what the round cost waits for the verdict: the pins land, the points
+    // count, then the damage (it used to show at once, before all that)
+    if (!counted) {
+        // the points only, for now
+    } else if (s.mode == 'survival' && you.seat && (you.out == null || you.out == s.round)) {
         line = survivalLine(you, guessed ? line : 'Boom! No guess in time', bad, good);
     } else if (s.mode != 'classic' && you.seat && (you.out == null || you.out == s.round)) {
         if (you.out == s.round) {
@@ -926,23 +973,25 @@ function reveal() {
     });
     var knock = counting && counting.key == key && counting.done && !counting.knocked;
     var html = rows.map(function (r) {
+        // before the verdict, everyone as the round found them
+        var p = counted || s.mode == 'classic' ? r.p : $.extend({}, r.p, {left: r.p.left - (r.p.delta || 0), delta: 0, out: null});
         var gone = r.p.out != null && r.p.out < s.round, last;
         var round = r.score >= 0 ? '+' + r.score.toLocaleString('en-US') : '-';
         if (s.mode == 'survival') {
-            round = gone ? '-' : roundCost(r.p);
+            round = gone ? '-' : counted ? roundCost(r.p) : '…';
         }
         if (s.mode == 'classic') {
             last = r.total.toLocaleString('en-US');
         } else if (gone) {
             last = 'Out';
-        } else if (r.p.out == s.round) {
+        } else if (p.out == s.round) {
             last = (s.mode == 'royale' ? hearts(0) + ' ' : '') + "<span class='room-loss'>Out!</span>";
         } else if (s.mode == 'duel') {
-            last = '<div>' + r.p.left.toLocaleString('en-US') + change(r.p) + '</div>' + health(r.p);
+            last = '<div>' + p.left.toLocaleString('en-US') + change(p) + '</div>' + health(p);
         } else if (s.mode == 'survival') {
-            last = lifeLeft(r.p.left);
+            last = lifeLeft(p.left);
         } else {
-            last = hearts(r.p.left) + change(r.p);
+            last = hearts(p.left) + change(p);
         }
         var hit = knock && !gone && s.mode != 'classic' && (r.p.out == s.round || r.p.delta < 0);
         var heal = knock && !gone && s.mode == 'royale' && r.p.delta > 0;
@@ -986,7 +1035,11 @@ function count() {
     var t = (Date.now() - c.from) / COUNT, el = document.getElementById('reveal-count');
     if (t >= 1) {
         c.done = true;
-        // the line and the table as they end: "Bullseye!" stamps, health takes the knock
+        // the line and the table as they end: "Bullseye!" stamps, health takes
+        // the knock, the zone appears around the answer
+        if (s.mode == 'survival') {
+            zones(blockSpot(s.reveal.X, s.reveal.Z));
+        }
         reveal();
         if (c.verdict == 'perfect') {
             replay(document.getElementById('reveal-mine'), 'stamp');
@@ -1210,6 +1263,9 @@ function panoramaConfig(url, options) {
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
             extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
+    // N E S W on the horizon (block.js); no keys: they all go to the chat
+    config.hotSpots = compass();
+    config.disableKeyboardCtrl = true;
     for (var k in options) config[k] = options[k];
     return config;
 }
@@ -1542,9 +1598,10 @@ function clocksSurvival() {
     }
 }
 
-// the reveal: your zone around the answer (green, no damage; yellow, damage;
-// red, death with the hearts you had), and where the Nausea pins were aimed
-function zones(answer, spots) {
+// the reveal, once your points are counted: your zone around the answer
+// (green, no damage; yellow, damage; red, death with the hearts you had),
+// and where the Nausea pins were aimed
+function zones(answer) {
     var you = me(), r = you && you.result;
     if (r) {
         L.circle(answer, {radius: r.kill || r.far, color: '#c9a227', weight: 2, fillColor: '#ffd75e', fillOpacity: .14, interactive: false}).addTo(revealMap);
@@ -1552,7 +1609,6 @@ function zones(answer, spots) {
             L.circle(answer, {radius: r.kill, color: '#b3302a', weight: 3, dashArray: '10 6', fill: false, interactive: false}).addTo(revealMap);
         }
         L.circle(answer, {radius: r.safe, color: '#2f7a22', weight: 2, fillColor: '#88cc42', fillOpacity: .22, interactive: false}).addTo(revealMap);
-        spots.push(L.latLng(answer.lat + r.safe, answer.lng + r.safe), L.latLng(answer.lat - r.safe, answer.lng - r.safe));
     }
     s.players.forEach(function (p) {
         var g = p.result;

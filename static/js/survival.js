@@ -56,6 +56,7 @@ function panoramaConfig(url, options) {
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
             extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
+    config.hotSpots = compass();   // N E S W on the horizon (block.js)
     for (var k in options) config[k] = options[k];
     return config;
 }

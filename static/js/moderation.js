@@ -268,7 +268,8 @@ $(function () {
         }
         banArmed = 0;
         if (what == 'rank') {
-            $.post('api/mod/rank', {name: card.find('h2').text(), rank: card.find('[name=rank]').val(), reason: card.find('[name=reason]').val()})
+            // by id: a guest may have had the same name before the account
+            $.post('api/mod/rank', {id: shown, rank: card.find('[name=rank]').val(), reason: card.find('[name=reason]').val()})
                 .done(function (r) { r.success ? player(shown) : $('#player-note').prop('hidden', false).addClass('bad').text(r.error); })
                 .fail(function (x) { $('#player-note').prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused'); });
             return;

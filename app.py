@@ -215,7 +215,12 @@ def index():
 
 @app.route("/mode")
 def play():
-    return render_template('mode.html')
+    # the Multiplayer card says how many are in the worlds right now
+    online = 0
+    if not request.args.get('play'):
+        with connect() as c:
+            online = sum(w['waiting'] + w['playing'] for w in world_counts(c).values())
+    return render_template('mode.html', online = online)
 
 @app.route("/leaderboard")
 def leaderboard():
@@ -953,8 +958,14 @@ def wynn_back():
             uid = owner[0]
         elif c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
             return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
+        elif place_note(c) or too_often('account'):
+            # a new account, as on the register page: never from a banned
+            # address (another Minecraft account would get round the ban),
+            # nor one more than an address may make
+            return wynn_fail(place_note(c) or "Too many new accounts from here: wait a few minutes")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
+            done(c, 'account')
         note = log_in(c, uid, wynn = True)
     if note:
         return wynn_fail(note)
@@ -1220,6 +1231,14 @@ def member(c, code):
     me = r and uid and c.execute("SELECT * FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()
     return (r, me) if me else (None, None)
 
+def name_clash(c, code, uids):
+    # names tell players apart on screen: is someone else in this room named
+    # like one of these players?
+    marks = ','.join('?' * len(uids))
+    return bool(c.execute(f'''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id
+        WHERE p.code = ? AND p.user_id NOT IN ({marks})
+        AND u.username COLLATE NOCASE IN (SELECT username FROM users WHERE id IN ({marks}))''', [code] + uids + uids).fetchone())
+
 @app.route("/room/create", methods=['POST'])
 def room_create():
     if not session.get('user_id'):
@@ -1250,25 +1269,28 @@ def room():
             if ban['why'] == 'away':
                 return redirect('multiplayer?missed=1')
             return render_template('apology.html', message = "The host removed you from this room")
+        clash = name_clash(c, r['code'], [session['user_id']])
         if r['world'] and not c.execute("SELECT 1 FROM room_players WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone() \
-                and (r['state'] != 'waiting' or world_here(c, r['code']) >= WORLD_MAX):
+                and (r['state'] != 'waiting' or world_here(c, r['code']) >= WORLD_MAX or clash):
+            # started, full, or someone there has this name: another lobby of the same world
             return redirect('multiplayer?join=' + r['world'])
-        # names tell players apart on screen: two of the same in a room would mix up
-        clash = c.execute('''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id, users me
-            WHERE p.code = ? AND me.id = ? AND p.user_id != me.id AND u.username = me.username COLLATE NOCASE''',
-            (r['code'], session['user_id'])).fetchone()
         if clash:
             return render_template('apology.html', message = "Someone in this room already has your name: pick another nickname")
         # joining before the end means playing live, even mid-game; a finished
         # classic room can still be played alone, the other modes only looked at
         c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen, joined) VALUES (?, ?, ?, ?, ?)",
                   (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time(), time.time()))
+        # (here at once: a reload comes after the page it replaces said it was gone)
+        c.execute("UPDATE room_players SET last_seen = ? WHERE code = ? AND user_id = ?", (time.time(), r['code'], session['user_id']))
         seen(c, session['user_id'])
     return render_template('room.html', code = r['code'], world = r['world'] and world_info(r['world']),
                            guest = not session.get('loggedin'))
 
 @app.route("/api/room/<code>")
 def room_state(code):
+    # the "#1" tags, when due, before the room's write lock: never while holding it
+    if time.time() - TOPS['at'] > TOPS_EVERY:
+        top_tags(connect())
     with room_tx() as c:
         r, me = member(c, code)
         if not r:
@@ -1326,11 +1348,14 @@ def room_state(code):
             WHERE m.code = ? AND m.id > ? AND m.hidden_by IS NULL ORDER BY m.id DESC LIMIT 50''',
             (r['code'], int(since) if since.isnumeric() else 0)).fetchall()) if m['uid'] not in ignored]
         # players keep their id: the host's tools (make host, kick) name them by it;
-        # a message does not, but the staff learns which ones it may hide
-        rank = my_rank(c)
+        # a message does not, but the staff learns which ones it may hide.
+        # (Who wrote and has left the room: looked up all at once, not message by message)
+        rank, writers = my_rank(c), {p['uid'] for p in out['chat']}
+        tags.update(tag_of(c, writers - set(tags)))
+        ranks = ranks_of(c, writers) if rank >= MAY['hide'] else {}
         for p in out['chat']:
-            p['tag'] = tags.get(p['uid']) or tag_of(c, [p['uid']]).get(p['uid'])
-            if rank >= MAY['hide'] and rank_of(c, p['uid']) < rank:
+            p['tag'] = tags.get(p['uid'])
+            if rank >= MAY['hide'] and ranks[p['uid']] < rank:
                 p['hide'] = True
             del p['uid']
         # hidden after the page showed them: it takes them away
@@ -1377,6 +1402,7 @@ def room_state(code):
 @app.route("/api/room/<code>/chat", methods=['POST'])
 def room_chat(code):
     text = ' '.join(request.form.get('text', '').split())[:200]
+    shown = filtered(text)   # before the room's write lock, which every room waits for
     with room_tx() as c:
         r, me = member(c, code)
         if not r or not text:
@@ -1387,7 +1413,6 @@ def room_chat(code):
         last = c.execute("SELECT MAX(at) FROM room_chat WHERE code = ? AND user_id = ?", (r['code'], me['user_id'])).fetchone()[0]
         if last and time.time() - last < 0.7:
             return jsonify({"success": False, "error": "Slow down a little"})
-        shown = filtered(text)
         c.execute("INSERT INTO room_chat (code, user_id, at, text, raw) VALUES (?, ?, ?, ?, ?)",
                   (r['code'], me['user_id'], time.time(), shown, text if shown != text else None))
     return jsonify({"success": True})
@@ -3023,13 +3048,15 @@ def world_settings(key):
 def world_here(c, code):
     return c.execute("SELECT COUNT(*) FROM room_players WHERE code = ? AND last_seen > ?", (code, time.time() - GONE)).fetchone()[0]
 
-def open_world(c, key):
-    # the lobby of this kind to send a player to: the fullest with room left,
-    # so that people gather; else a new one
+def open_world(c, key, uids):
+    # the lobby of this kind to send these players to: the fullest with room
+    # for them, so that people gather, and nobody there named like one of
+    # them (its door would turn the second Steve away, again and again);
+    # else a new one
     best = None
     for (code,) in c.execute("SELECT code FROM rooms WHERE world = ? AND state = 'waiting' ORDER BY rowid DESC", (key,)).fetchall():
         n = world_here(c, code)
-        if n < WORLD_MAX and (best is None or n > best[1]):
+        if n + len(uids) <= WORLD_MAX and (best is None or n > best[1]) and not name_clash(c, code, uids):
             best = (code, n)
     return best[0] if best else new_room(c, None, world_settings(key), world = key)
 
@@ -3064,43 +3091,61 @@ def world_tick(c, r):
                           (now + (PREP if r['mode'] == 'survival' else 0), code))
         return find_room(c, code)
     if r['state'] == 'finished' and not r['next_code'] and now >= (r['round_end'] or now) + REVEAL + WORLD_RESULTS:
-        c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (open_world(c, r['world']), code))
+        # everyone still on the results moves on together
+        come = [u for (u,) in c.execute("SELECT user_id FROM room_players WHERE code = ? AND live = 1 AND last_seen > ?",
+                                        (code, now - GONE))]
+        c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (open_world(c, r['world'], come), code))
         return find_room(c, code)
     return r
 
 @app.route("/api/room/<code>/lobby", methods=['POST'])
 def room_lobby(code):
-    # Ready, or not any more, in a world's lobby
+    # Ready, or not any more, in a world's lobby. Or gone: the page closed
+    # (or left for another), which says so as it goes. Else the lobby would
+    # count it here for GONE more seconds, and a player who was ready would
+    # get a seat in the game: hearts lost to the creeper, a loss, the streak
+    # broken, without having played
     with room_tx() as c:
         r, me = member(c, code)
         if not r or not r['world'] or r['state'] != 'waiting':
             return jsonify({"success": False})
-        c.execute("UPDATE room_players SET lobby_ready = ? WHERE code = ? AND user_id = ?",
-                  (int(request.form.get('ready') == '1'), r['code'], me['user_id']))
+        if request.form.get('gone'):
+            c.execute("UPDATE room_players SET last_seen = 0 WHERE code = ? AND user_id = ?", (r['code'], me['user_id']))
+        else:
+            c.execute("UPDATE room_players SET lobby_ready = ? WHERE code = ? AND user_id = ?",
+                      (int(request.form.get('ready') == '1'), r['code'], me['user_id']))
         world_tick(c, find_room(c, r['code']))
     return jsonify({"success": True})
 
-def world_list(c, ordered = True):
-    # every kind of world: who waits (and their heads), how many play, how much
-    # it was played lately; best first, the most played marked
-    now, rows = time.time(), []
+def world_counts(c):
+    # each kind of world now: who waits (and the heads of the first five),
+    # how many play. {key: {waiting, playing, heads}}
+    now, out = time.time(), {}
     for key in WORLDS:
         waiting = c.execute('''SELECT u.id, u.avatar, u.mc_uuid FROM room_players p JOIN rooms r ON r.code = p.code JOIN users u ON u.id = p.user_id
             WHERE r.world = ? AND r.state = 'waiting' AND p.last_seen > ? ORDER BY p.rowid''', (key, now - GONE)).fetchall()
         playing = c.execute('''SELECT COUNT(*) FROM room_players p JOIN rooms r ON r.code = p.code
             WHERE r.world = ? AND r.state = 'playing' AND p.last_seen > ?''', (key, now - GONE)).fetchone()[0]
+        out[key] = {'waiting': len(waiting), 'playing': playing, 'heads': [avatar_url(u) for u in waiting[:5]]}
+    return out
+
+def world_list(c):
+    # every kind of world, as world_counts, and how much it was played
+    # lately: best first, the most played marked
+    now, rows, counts = time.time(), [], world_counts(c)
+    for key in WORLDS:
         lately = sum(n * .5 ** ((now - t) / 86400 / WORLD_HALF_LIFE) for t, n in c.execute(
             '''SELECT r.round_start, COUNT(*) FROM rooms r JOIN room_players p ON p.code = r.code
             WHERE r.world = ? AND r.state != 'waiting' AND r.round_start > ? GROUP BY r.code''', (key, now - 30 * 86400)))
         since = WORLDS[key][4]
         fresh = since and max(0, 1 - (date.today() - date.fromisoformat(since)).days / NEW_FOR)
-        rows.append(dict(world_info(key), waiting = len(waiting), playing = playing, lately = lately, new = bool(fresh),
-                         heads = [avatar_url(u) for u in waiting[:5]],
-                         score = 100 * len(waiting) + 40 * playing + lately + 60 * (fresh or 0)))
+        w = counts[key]
+        rows.append(dict(world_info(key), **w, lately = lately, new = bool(fresh),
+                         score = 100 * w['waiting'] + 40 * w['playing'] + lately + 60 * (fresh or 0)))
     most = max(rows, key = lambda w: w['lately'])
     if most['lately'] >= 1:
         most['most'] = True
-    return sorted(rows, key = lambda w: -w['score']) if ordered else rows
+    return sorted(rows, key = lambda w: -w['score'])
 
 @app.route("/multiplayer")
 def multiplayer():
@@ -3112,7 +3157,7 @@ def multiplayer():
         if not session.get('user_id'):
             return redirect('guest?next=' + quote('multiplayer?join=' + key))
         with room_tx() as c:
-            code = open_world(c, key)
+            code = open_world(c, key, [session['user_id']])
         return redirect('room?code=' + code)
     with connect() as c:
         worlds = world_list(c)
@@ -3120,10 +3165,10 @@ def multiplayer():
 
 @app.route("/api/multiplayer")
 def multiplayer_counts():
-    # the page's numbers, every few seconds (its order stays: cards do not jump)
+    # the page's numbers, every few seconds: only the counts (its order stays,
+    # cards do not jump, so the month of games behind it is not added up again)
     with connect() as c:
-        return jsonify({"success": True, "worlds": {w['key']: {k: w[k] for k in ('waiting', 'playing', 'heads')}
-                                                    for w in world_list(c, ordered = False)}})
+        return jsonify({"success": True, "worlds": world_counts(c)})
 
 # ---------- Moderation ----------
 # Staff ranks, as Wynncraft's chat tags ([Admin], [Mod]...), each with its
@@ -3158,6 +3203,15 @@ def rank_of(c, uid):
     row = c.execute("SELECT rank FROM staff WHERE user_id = ?", (uid,)).fetchone()
     return row[0] if row else 0
 
+def ranks_of(c, uids):
+    # rank_of for many players in one look: {id: rank}
+    uids = list(uids)
+    out = {u: 0 for u in uids}
+    out.update(c.execute(f"SELECT user_id, rank FROM staff WHERE user_id IN ({','.join('?' * len(uids))})", uids).fetchall())
+    if OWNER in out:
+        out[OWNER] = 4
+    return out
+
 def my_rank(c):
     return rank_of(c, session['user_id']) if session.get('loggedin') else 0
 
@@ -3187,8 +3241,12 @@ with connect() as c:
     ''')
 
 def top_tags(c):
-    # who leads each board: {user id: ["#1 Survival Hard", ...]}
-    if time.time() - TOPS['at'] > TOPS_EVERY:
+    # who leads each board: {user id: ["#1 Survival Hard", ...]}. Worked out
+    # again when due, but never on a connection that holds the write lock
+    # (a room's, a write already made): the levels take long to add up
+    # (0.2 s for the 124 accounts of October 2026, more with every player),
+    # and every room would wait. room_state asks before taking its lock
+    if time.time() - TOPS['at'] > TOPS_EVERY and not c.in_transaction:
         tops = {}
         boards = [('#1 Survival ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
         boards.append(('#1 Classic', board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'})))
@@ -3264,12 +3322,17 @@ def mod_staff():
 @app.route("/api/mod/rank", methods=['POST'])
 def mod_rank():
     # give, change or take a rank (0 takes it): only below one's own, only to
-    # someone below one's own, never the owner, never a guest
+    # someone below one's own, never the owner, never a guest. A player's card
+    # names the player by id; the team tab by name: then the account first,
+    # never an older guest of the same name ("Bob" played as a guest, then
+    # made the account "Bob")
     name, reason = ' '.join(request.form.get('name', '').split()), request.form.get('reason', '').strip()[:200]
-    new = request.form.get('rank', type = int)
+    new, uid = request.form.get('rank', type = int), request.form.get('id', type = int)
     with room_tx() as c:
         r = my_rank(c)
-        user = c.execute("SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone()
+        user = (c.execute("SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE id = ?", (uid,)) if uid else
+                c.execute("""SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE username = ? COLLATE NOCASE
+                    ORDER BY COALESCE(guest, 0), id""", (name,))).fetchone()
         if r < MAY['staff']:
             return jsonify({"success": False, "error": "Only an Admin can change the team"}), 403
         if not user:
@@ -3421,31 +3484,57 @@ with connect() as c:
     ''')
 
 def word_filter():
-    # bad_words.txt, one regex: each letter repeated, in digits or signs, split by . - _
-    words = []
+    # bad_words.txt, one regex: each letter repeated, in digits or signs, split
+    # by . - _. A *word* is found by itself, then widened to the word around
+    # it (filtered): written in the regex, "any letters, then the word" went
+    # back and forth without end on a run of letters (200 "f": 59 ms, under
+    # the room's write lock, while every room waited)
+    inside, alone = [], []
     with open('bad_words.txt', encoding = 'utf-8') as f:
         for line in f:
             w = line.split('#')[0].strip().lower()
             if w:
                 body = '[._-]*'.join(r'\s+' if ch == ' ' else '[%s]+' % re.escape(LEET.get(ch, ch)) for ch in w.strip('*'))
-                words.append(('(?:[a-z][._-]?)*' if w.startswith('*') else r'(?<![a-z0-9@$])') + body +
-                             ('(?:[._-]?[a-z])*' if w.endswith('*') else r'(?![a-z0-9])'))
-    return re.compile('|'.join(words), re.IGNORECASE)
+                end = '(?:[._-]?[a-z])*' if w.endswith('*') else r'(?![a-z0-9])'
+                if w.startswith('*'):
+                    inside.append(body + end)
+                else:
+                    alone.append(r'(?<![a-z0-9@$])' + body + end)
+    return re.compile('(?P<inside>%s)|%s' % ('|'.join(inside) or '(?!)', '|'.join(alone) or '(?!)'), re.IGNORECASE)
 
 BAD_WORDS = word_filter()
 
 def filtered(text):
-    return BAD_WORDS.sub(lambda m: '*' * len(m.group()), text)
+    # each match in stars, as long as it is; a *word* with the whole word
+    # around it (letters, maybe split by . - _); never a number: "455" or
+    # "4.55" are coordinates, not "ass"
+    hide = [False] * len(text)
+    letter = lambda i: 'a' <= text[i].lower() <= 'z'
+    for m in BAD_WORDS.finditer(text):
+        a, b = m.span()
+        if re.fullmatch(r'[\d\s._-]+', m.group()):
+            continue
+        if m.group('inside'):
+            while a and (letter(a - 1) or text[a - 1] in '._-' and a > 1 and letter(a - 2)):
+                a -= 1
+        hide[a:b] = [True] * (b - a)
+    return ''.join('*' if h else ch for ch, h in zip(text, hide))
 
 # Names: the same words, also inside a name written in one piece (BigWord:
 # "Big Word"), and none that would pass for the site or its staff
-RESERVED = ('admin', 'moderator', 'wynnguessr', 'wynndle')         # nowhere in a name
+RESERVED = ('moderator', 'wynnguessr', 'wynndle')                  # nowhere in a name
+RESERVED_START = ('admin',)                                         # starting no word of it
 RESERVED_ALONE = ('mod', 'owner', 'staff', 'helper', 'system', 'server')
 
 def name_rule(name):
     split = re.sub(r'([a-z])([A-Z])', r'\1 \2', name).replace('_', ' ')
     plain = re.sub(r'[^a-z]', '', name.lower())
-    if filtered(name) != name or filtered(split) != split or any(w in plain for w in RESERVED) or plain in RESERVED_ALONE:
+    # a word starts at a letter after anything else, or at a capital after a
+    # small letter (BigWord): "admin" may start none, its letters apart or
+    # not (Admin, SuperAdmin, AdMin, Ad_min), but Badminton is fine
+    starts = [m.start() for m in re.finditer(r'(?<![A-Za-z])[A-Za-z]|(?<=[a-z])[A-Z]', name)]
+    if (filtered(name) != name or filtered(split) != split or any(w in plain for w in RESERVED) or plain in RESERVED_ALONE
+            or any(re.sub(r'[^a-z]', '', name[i:].lower()).startswith(w) for i in starts for w in RESERVED_START)):
         return "This name is not allowed: pick another one"
 
 def reports_waiting(c):
