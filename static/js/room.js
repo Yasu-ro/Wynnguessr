@@ -483,8 +483,13 @@ function lobby() {
                 : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") : '');
         tools = tools ? "<span class='room-tools'>" + tools + '</span>' : '';
         return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) + tagHtml(p.tag) +
-            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + tools + "</div>";
+            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') +
+            (s.world && p.lobby_ready ? "<i class='material-icons room-ready' title='Ready'>check</i>" : '') + tools + "</div>";
     }).join(''));
+    if (s.world) {
+        worldLobby();
+        return;
+    }
     if (!pending && JSON.stringify(s.settings) != settingsKey) {
         settingsKey = JSON.stringify(s.settings);
         showSettings(s.settings);
@@ -587,12 +592,54 @@ $('#room-settings').on('change', function () {
 
 $('#start-button').on('click', function () {
     $(this).prop('disabled', true);
+    if (s && s.world) {
+        send('lobby', {ready: s.ready ? 0 : 1});
+        return;
+    }
     send('start').done(function (r) {
         if (!r.success && r.error) {
             $('#settings-error').text(r.error);
         }
     });
 });
+
+// ---------- a world's lobby ----------
+// No host: everyone says Ready. Half of them ready (2 at least) starts a
+// countdown, everyone ready cuts it short; whoever is not ready when it ends
+// is left out of the game (app.py, "Multiplayer: worlds").
+
+var worldStart = null;     // when the game starts, local clock
+var worldNext = null;      // after the results: when everyone moves on to the next lobby
+
+function worldLobby() {
+    worldStart = s.starts_in != null ? Date.now() + s.starts_in * 1000 : null;
+    $('#start-button').prop('disabled', false).toggleClass('wood', !!s.ready)
+        .text(s.ready ? 'Ready! Click if you need more time' : "I'm Ready");
+    worldStatus();
+}
+
+function worldStatus() {
+    var here = s.players.filter(function (p) { return p.here; }).length;
+    var ready = s.players.filter(function (p) { return p.lobby_ready; }).length;
+    var text, hurry = false;
+    if (worldStart) {
+        var left = Math.max(0, Math.ceil((worldStart - Date.now()) / 1000));
+        text = left ? 'Starting in ' + left + ' s' : 'Starting!';
+        if (!s.ready && left) {
+            text += ': not ready, you will be left out';
+            hurry = true;
+        }
+        if (left && left <= 3 && left != lastSecond) {
+            Sfx.play('tick', [1.5, 1.26, 1.06][left - 1]);
+        }
+        lastSecond = left;
+    } else if (here < 2) {
+        text = 'Waiting for one more player...';
+    } else {
+        text = 'Starts when half the players are ready (' + ready + '/' + here + ')';
+    }
+    $('#world-status').prop('hidden', false).text(text).toggleClass('urgent', hurry);
+}
 
 // ---------- a round ----------
 
@@ -740,6 +787,13 @@ $('#guess-button').on('click', function () { submit(false); });
 function clocks() {
     if (!s) {
         return;
+    }
+    if (s.world && view == 'lobby') {
+        worldStatus();
+    }
+    if (s.world && view == 'results' && worldNext) {
+        var wait = Math.max(0, Math.ceil((worldNext - Date.now()) / 1000));
+        $('#results-hint').text(wait ? 'Next game in ' + wait + ' s' : 'Off to the next game...');
     }
     if (s.mode == 'survival') {
         return clocksSurvival();
@@ -1070,6 +1124,11 @@ function results() {
     }
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives', survival: 'Hearts'}[s.mode]);
     $('#again-button').prop('hidden', !(s.live && s.host));
+    if (s.world) {
+        // a world goes on by itself: everyone moves on to its next lobby
+        worldNext = s.next_in != null ? Date.now() + s.next_in * 1000 : null;
+        return;
+    }
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
 }

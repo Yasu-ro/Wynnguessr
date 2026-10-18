@@ -97,7 +97,7 @@ def no_tricks(response):
 def next_page():
     # where to go after logging in: only a page of this site, e.g. "room?code=ABC234"
     page = request.args.get('next', '')
-    return page if re.fullmatch(r'[a-z]+(\?(code|play)=[A-Za-z0-9_-]+)?', page) else './'
+    return page if re.fullmatch(r'[a-z]+(\?(code|play|join)=[A-Za-z0-9_-]+)?', page) else './'
 
 # The solo Classic game is played on the server (section "Solo" below): the
 # browser never had to know where the locations are. The old routes that
@@ -148,8 +148,9 @@ def board(c, form, user_id = None):
         FROM scores s JOIN users u ON u.id = s.user_id WHERE COALESCE(s.mode, 'classic') = ?'''
     params = [mode]
     if mode == 'classic':
+        # the whole map only: choosing provinces is for custom games
         query += " AND s.provinces = ? AND s.nolook = ? AND s.rounds = ?"
-        params += [form.get('provinces', ''), form.get('nolook', 'No'), form.get('rounds', '')]
+        params += [str(PROVINCES), form.get('nolook', 'No'), form.get('rounds', '')]
         order = " ORDER BY s.score DESC, s.time ASC"
     else:
         query += " AND s.difficulty = ? AND COALESCE(s.milk, 0) = ?"
@@ -321,10 +322,8 @@ def game():
         if form.get('mode') in ('duel', 'royale'):
             return render_template('apology.html', message = "This mode is played with friends: create a room")
         mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-        #if there are no provinces selected, return apology
-        if form.getlist('province') == []:
-            return render_template('apology.html', message = "Please select at least one province")
-        provinces = form.getlist('province')
+        # always the whole map: choosing provinces is for custom games
+        provinces = PROVINCES
         #if time limit is not selected, set time limit to -1
         if form.get('time-limit-checkbox') == None:
             time_limit = -1
@@ -1080,17 +1079,19 @@ def pick_locations(c, s):
         (*s['provinces'], s['rounds']))]
     return json.dumps(ids) if len(ids) == s['rounds'] else None
 
-def new_room(c, host, s):
+def new_room(c, host, s, world = None):
+    # a world (see "Multiplayer: worlds") has no host, and nobody in it yet
     locations = pick_locations(c, s)
     if not locations:
         return None
     code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
     while find_room(c, code):
         code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
-    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty, milk)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?, ?)''',
-        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], s['milk']))
-    c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
+    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty, milk, world)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?, ?, ?)''',
+        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], s['milk'], world))
+    if host:
+        c.execute("INSERT INTO room_players (code, user_id, live, last_seen, joined) VALUES (?, ?, 1, ?, ?)", (code, host, time.time(), time.time()))
     return code
 
 PERFECT = 2      # a guess this close (in blocks) is a perfect 5,000; game.js has the same
@@ -1182,6 +1183,8 @@ def next_round(c, r):
 def tick(c, r):
     # close the round once nobody is left to wait for, then move on after the reveal
     now = time.time()
+    if r['world'] and r['state'] != 'playing':
+        return world_tick(c, r)
     if r['state'] != 'playing':
         host = c.execute("SELECT last_seen FROM room_players WHERE code = ? AND user_id = ?", (r['code'], r['host_id'])).fetchone()
         if host and host[0] > now - HOST_AWAY:
@@ -1235,8 +1238,15 @@ def room():
         r = find_room(c, code)
         if not r:
             return render_template('apology.html', message = "No room with the code " + code)
-        if c.execute("SELECT 1 FROM room_bans WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone():
+        ban = c.execute("SELECT why FROM room_bans WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone()
+        if ban:
+            # not ready when a world's game started: back to the worlds, with a word why
+            if ban['why'] == 'away':
+                return redirect('multiplayer?missed=1')
             return render_template('apology.html', message = "The host removed you from this room")
+        if r['world'] and not c.execute("SELECT 1 FROM room_players WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone() \
+                and (r['state'] != 'waiting' or world_here(c, r['code']) >= WORLD_MAX):
+            return redirect('multiplayer?join=' + r['world'])
         # names tell players apart on screen: two of the same in a room would mix up
         clash = c.execute('''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id, users me
             WHERE p.code = ? AND me.id = ? AND p.user_id != me.id AND u.username = me.username COLLATE NOCASE''',
@@ -1245,10 +1255,11 @@ def room():
             return render_template('apology.html', message = "Someone in this room already has your name: pick another nickname")
         # joining before the end means playing live, even mid-game; a finished
         # classic room can still be played alone, the other modes only looked at
-        c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, ?, ?)",
-                  (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time()))
+        c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen, joined) VALUES (?, ?, ?, ?, ?)",
+                  (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time(), time.time()))
         seen(c, session['user_id'])
-    return render_template('room.html', code = r['code'])
+    return render_template('room.html', code = r['code'], world = r['world'] and world_info(r['world']),
+                           guest = not session.get('loggedin'))
 
 @app.route("/api/room/<code>")
 def room_state(code):
@@ -1271,7 +1282,7 @@ def room_state(code):
             if request.args.get('round', '').isnumeric():
                 n = max(1, min(n, int(request.args['round'])))
         players = c.execute('''SELECT p.user_id AS uid, u.username AS name, p.user_id = ? AS you, p.user_id = ? AS host,
-                p.seat, p.last_seen > ? AS here, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
+                p.seat, p.last_seen > ? AS here, p.lobby_ready, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
                 COALESCE(MAX(g.round = ?), 0) AS guessed
             FROM room_players p JOIN users u ON u.id = p.user_id
             LEFT JOIN room_guesses g ON g.code = p.code AND g.user_id = p.user_id
@@ -1288,6 +1299,13 @@ def room_state(code):
                             "time_limit": r['time_limit'], "look": bool(r['look'])},
                # the colour of a player is their place in the join order
                "players": [dict(p, color = i, **st.get(p['uid'], {})) for i, p in enumerate(players)]}
+        if r['world']:
+            out['world'] = world_info(r['world'])
+            out['ready'] = bool(me['lobby_ready'])
+            if r['state'] == 'waiting' and r['starts_at']:
+                out['starts_in'] = max(0, r['starts_at'] - now)
+            if r['state'] == 'finished' and not r['next_code']:
+                out['next_in'] = max(0, (r['round_end'] or now) + REVEAL + WORLD_RESULTS - now)
         # the tag next to each name (Moderation: staff rank, a tag, a "#1")
         tags = tag_of(c, [p['uid'] for p in players])
         for p in out['players']:
@@ -1894,17 +1912,15 @@ def my_solo(c):
     return game
 
 def solo_settings(form):
-    # the settings of the mode page, checked: provinces in the order of
-    # PROVINCES (the leaderboard compares them as text), rounds, time, view
-    chosen = form.getlist('province')
-    provinces = [p for p in PROVINCES if p in chosen]
+    # the settings of the mode page, checked: rounds, time, view. Always the
+    # whole map: choosing provinces is for custom games (Yasuro, 2026-10-18)
     try:
         rounds, limit = int(form.get('rounds', '')), int(form.get('time_limit', -1))
     except ValueError:
         return None
-    if not provinces or rounds not in SOLO_ROUNDS or not (limit == -1 or 1 <= limit <= 1800):
+    if rounds not in SOLO_ROUNDS or not (limit == -1 or 1 <= limit <= 1800):
         return None
-    return {'provinces': provinces, 'rounds': rounds, 'time_limit': limit, 'look': form.get('look') == 'true'}
+    return {'provinces': PROVINCES, 'rounds': rounds, 'time_limit': limit, 'look': form.get('look') == 'true'}
 
 def solo_next(c, game):
     provinces = json.loads(game['provinces'])
@@ -2928,6 +2944,180 @@ def room_milk(code):
             return jsonify({"success": False})
         c.execute("INSERT OR IGNORE INTO room_milk (code, round, user_id, at) VALUES (?, ?, ?, ?)", (r['code'], n, uid, now))
     return jsonify({"success": True})
+
+# ---------- Multiplayer: worlds ----------
+# Public games, no code to share (Yasuro: "super duper easy for players to
+# quickly play with others"), named after Wynncraft's worlds. One kind of
+# world per card of the Multiplayer page, and always a lobby open for each:
+# full (WORLD_MAX) or under way, another opens at once (open_world). Nobody
+# hosts: the settings are the card's, every province (choosing them is for
+# custom games), and the game starts by itself WORLD_COUNTDOWN seconds after
+# half the players are ready (2 at least), WORLD_ALL_READY once all are; the
+# countdown never stops for someone changing their mind, only when fewer
+# than 2 are left. Whoever is not ready then is out of the world (Yasuro:
+# "anyone who didn't click ready and missed the game should be kicked"),
+# back on the Multiplayer page with a word why; except who came in the
+# last WORLD_GRACE seconds, who plays. After the results everyone goes on
+# together to the open lobby, where Ready is asked again: the check comes
+# back every game. A lobby counts a player for GONE seconds after their last
+# poll, not AWAY: a tab in the background stays silent most of a minute, and
+# someone ready reading Discord would have been thrown out (see GONE).
+# The cards are ordered for who is there now, then how much each was played
+# lately (a game counts half as much every WORLD_HALF_LIFE days), and a new
+# kind (since) is helped up for its first NEW_FOR days, so it is not buried
+# under the old ones.
+
+WORLDS = {   # key: (title, line under it, settings, (rank, suit) of its card, since)
+    'survival-normal': ('Survival', 'Normal', {'mode': 'survival', 'difficulty': 'normal', 'milk': 0}, (10, 'hearts'), None),
+    'survival-hard': ('Survival', 'Hard', {'mode': 'survival', 'difficulty': 'hard', 'milk': 0}, (5, 'hearts'), None),
+    'survival-hardcore': ('Survival', 'Hardcore', {'mode': 'survival', 'difficulty': 'hardcore', 'milk': 0}, (1, 'hardcore'), None),
+    'classic': ('Classic', '5 rounds', {'mode': 'classic', 'rounds': 5}, (5, 'pins'), None),
+    'survival-normal-milk': ('Survival', 'Normal · Milk', {'mode': 'survival', 'difficulty': 'normal', 'milk': 1}, (10, 'hearts'), None),
+    'survival-hard-milk': ('Survival', 'Hard · Milk', {'mode': 'survival', 'difficulty': 'hard', 'milk': 1}, (5, 'hearts'), None),
+    'survival-hardcore-milk': ('Survival', 'Hardcore · Milk', {'mode': 'survival', 'difficulty': 'hardcore', 'milk': 1}, (1, 'hardcore'), None),
+}
+# how each lies on the table (tilt, wear), the same wherever the order puts it
+WORLD_LOOKS = [(-1.5, 0), (1, 1), (2, 3), (-0.5, 2), (-2, 1), (1.5, 0), (-1, 2)]
+WORLD_MAX = 16          # players in a lobby, then another opens
+WORLD_COUNTDOWN = 15    # seconds from half ready to the start
+WORLD_ALL_READY = 3     # ...cut to this once everyone is
+WORLD_GRACE = 10        # who came in this late before the start plays, ready or not
+WORLD_RESULTS = 20      # seconds on the results, then on to the next lobby
+WORLD_HALF_LIFE = 3     # days: a game played that long ago counts half
+NEW_FOR = 14            # days a new kind of world is helped up the page
+RULES = {
+    'survival': "The same place for everyone. Guess close to keep your hearts, earn emeralds, throw potions at the others. The last one standing wins.",
+    'classic': "Five places, the same for everyone. The closer you guess, the more points. The most points wins.",
+}
+
+with connect() as c:
+    if 'world' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
+        c.execute("ALTER TABLE rooms ADD COLUMN world TEXT")         # the kind of world, None: a custom game
+        c.execute("ALTER TABLE rooms ADD COLUMN starts_at REAL")     # a world's countdown
+    if 'lobby_ready' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
+        c.execute("ALTER TABLE room_players ADD COLUMN lobby_ready INTEGER DEFAULT 0")
+        c.execute("ALTER TABLE room_players ADD COLUMN joined REAL")
+    if 'why' not in [col[1] for col in c.execute("PRAGMA table_info(room_bans)")]:
+        c.execute("ALTER TABLE room_bans ADD COLUMN why TEXT")       # 'away': not ready when a world started
+    c.execute("CREATE INDEX IF NOT EXISTS rooms_world ON rooms (world, state)")
+
+def world_info(key):
+    title, line, settings, (rank, suit), since = WORLDS[key]
+    return {'key': key, 'title': title, 'line': line, 'rank': rank, 'suit': suit, 'milk': bool(settings.get('milk')),
+            'rules': RULES[settings['mode']], 'look': WORLD_LOOKS[list(WORLDS).index(key)]}
+
+def world_settings(key):
+    s = WORLDS[key][2]
+    if s['mode'] == 'survival':
+        return {'mode': 'survival', 'provinces': PROVINCES, 'rounds': SURVIVAL_ROUNDS, 'time_limit': -1, 'look': 0,
+                'difficulty': s['difficulty'], 'milk': s['milk']}
+    return {'mode': s['mode'], 'provinces': PROVINCES, 'rounds': s['rounds'], 'time_limit': -1, 'look': 0,
+            'difficulty': None, 'milk': 0}
+
+def world_here(c, code):
+    return c.execute("SELECT COUNT(*) FROM room_players WHERE code = ? AND last_seen > ?", (code, time.time() - GONE)).fetchone()[0]
+
+def open_world(c, key):
+    # the lobby of this kind to send a player to: the fullest with room left,
+    # so that people gather; else a new one
+    best = None
+    for (code,) in c.execute("SELECT code FROM rooms WHERE world = ? AND state = 'waiting' ORDER BY rowid DESC", (key,)).fetchall():
+        n = world_here(c, code)
+        if n < WORLD_MAX and (best is None or n > best[1]):
+            best = (code, n)
+    return best[0] if best else new_room(c, None, world_settings(key), world = key)
+
+def world_tick(c, r):
+    # a world's lobby: the countdown and the start; once finished: the next lobby
+    now, code = time.time(), r['code']
+    if r['state'] == 'waiting':
+        here = c.execute("SELECT user_id, lobby_ready, joined FROM room_players WHERE code = ? AND last_seen > ?",
+                         (code, now - GONE)).fetchall()
+        ready = sum(p['lobby_ready'] for p in here)
+        start = r['starts_at']
+        if len(here) < 2:
+            start = None
+        elif start is None and ready >= max(2, math.ceil(len(here) / 2)):
+            start = now + WORLD_COUNTDOWN
+        if start is not None and ready == len(here):
+            start = min(start, now + WORLD_ALL_READY)
+        if start != r['starts_at']:
+            c.execute("UPDATE rooms SET starts_at = ? WHERE code = ?", (start, code))
+        if start is not None and now >= start:
+            playing = {p['user_id'] for p in here if p['lobby_ready'] or (p['joined'] or 0) > now - WORLD_GRACE}
+            if len(playing) < 2:
+                c.execute("UPDATE rooms SET starts_at = NULL WHERE code = ?", (code,))
+            else:
+                # the game starts without whoever was not ready: out of the world
+                for (uid,) in c.execute("SELECT user_id FROM room_players WHERE code = ?", (code,)).fetchall():
+                    if uid not in playing:
+                        c.execute("DELETE FROM room_players WHERE code = ? AND user_id = ?", (code, uid))
+                        c.execute("INSERT OR REPLACE INTO room_bans (code, user_id, why) VALUES (?, ?, 'away')", (code, uid))
+                c.execute("UPDATE room_players SET seat = 1 WHERE code = ?", (code,))
+                c.execute("UPDATE rooms SET state = 'playing', round = 1, round_start = ?, round_end = NULL WHERE code = ?",
+                          (now + (PREP if r['mode'] == 'survival' else 0), code))
+        return find_room(c, code)
+    if r['state'] == 'finished' and not r['next_code'] and now >= (r['round_end'] or now) + REVEAL + WORLD_RESULTS:
+        c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (open_world(c, r['world']), code))
+        return find_room(c, code)
+    return r
+
+@app.route("/api/room/<code>/lobby", methods=['POST'])
+def room_lobby(code):
+    # Ready, or not any more, in a world's lobby
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or not r['world'] or r['state'] != 'waiting':
+            return jsonify({"success": False})
+        c.execute("UPDATE room_players SET lobby_ready = ? WHERE code = ? AND user_id = ?",
+                  (int(request.form.get('ready') == '1'), r['code'], me['user_id']))
+        world_tick(c, find_room(c, r['code']))
+    return jsonify({"success": True})
+
+def world_list(c, ordered = True):
+    # every kind of world: who waits (and their heads), how many play, how much
+    # it was played lately; best first, the most played marked
+    now, rows = time.time(), []
+    for key in WORLDS:
+        waiting = c.execute('''SELECT u.id, u.avatar, u.mc_uuid FROM room_players p JOIN rooms r ON r.code = p.code JOIN users u ON u.id = p.user_id
+            WHERE r.world = ? AND r.state = 'waiting' AND p.last_seen > ? ORDER BY p.rowid''', (key, now - GONE)).fetchall()
+        playing = c.execute('''SELECT COUNT(*) FROM room_players p JOIN rooms r ON r.code = p.code
+            WHERE r.world = ? AND r.state = 'playing' AND p.last_seen > ?''', (key, now - GONE)).fetchone()[0]
+        lately = sum(n * .5 ** ((now - t) / 86400 / WORLD_HALF_LIFE) for t, n in c.execute(
+            '''SELECT r.round_start, COUNT(*) FROM rooms r JOIN room_players p ON p.code = r.code
+            WHERE r.world = ? AND r.state != 'waiting' AND r.round_start > ? GROUP BY r.code''', (key, now - 30 * 86400)))
+        since = WORLDS[key][4]
+        fresh = since and max(0, 1 - (date.today() - date.fromisoformat(since)).days / NEW_FOR)
+        rows.append(dict(world_info(key), waiting = len(waiting), playing = playing, lately = lately, new = bool(fresh),
+                         heads = [avatar_url(u) for u in waiting[:5]],
+                         score = 100 * len(waiting) + 40 * playing + lately + 60 * (fresh or 0)))
+    most = max(rows, key = lambda w: w['lately'])
+    if most['lately'] >= 1:
+        most['most'] = True
+    return sorted(rows, key = lambda w: -w['score']) if ordered else rows
+
+@app.route("/multiplayer")
+def multiplayer():
+    # the worlds as cards; ?join=<kind>: straight into its open lobby
+    key = request.args.get('join')
+    if key:
+        if key not in WORLDS:
+            return redirect('multiplayer')
+        if not session.get('user_id'):
+            return redirect('guest?next=' + quote('multiplayer?join=' + key))
+        with room_tx() as c:
+            code = open_world(c, key)
+        return redirect('room?code=' + code)
+    with connect() as c:
+        worlds = world_list(c)
+    return render_template('multiplayer.html', worlds = worlds, missed = request.args.get('missed'))
+
+@app.route("/api/multiplayer")
+def multiplayer_counts():
+    # the page's numbers, every few seconds (its order stays: cards do not jump)
+    with connect() as c:
+        return jsonify({"success": True, "worlds": {w['key']: {k: w[k] for k in ('waiting', 'playing', 'heads')}
+                                                    for w in world_list(c, ordered = False)}})
 
 # ---------- Moderation ----------
 # Staff ranks, as Wynncraft's chat tags ([Admin], [Mod]...), each with its

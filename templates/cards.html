@@ -1,0 +1,69 @@
+{# Playing cards: a real deck, handled a little (tools/cards.py draws the
+   pips, the back and the wear). Rank and suit sit in two corners, the bottom
+   one upside down; the pips are laid out as on any deck, and those below
+   the middle are printed upside down. Each card means its game: Survival
+   Normal is the 10 of hearts (10 hearts to start), Hard the 5, Hardcore the
+   Ace (one Hardcore heart); Classic the 5 of pins (5 rounds); Duel the 6 of
+   swords (6,000 health). In the Play menu: Solo the Ace of pins (the maker's
+   mark, as on an Ace of Spades), Online the Joker (plays with anyone),
+   Custom the King (the host makes the rules). #}
+
+{# where the pips go: x across (0 left column, 0.5 middle, 1 right), y down #}
+{% set PIPS = {
+    2: [(0.5, 0), (0.5, 1)],
+    3: [(0.5, 0), (0.5, 0.5), (0.5, 1)],
+    4: [(0, 0), (1, 0), (0, 1), (1, 1)],
+    5: [(0, 0), (1, 0), (0.5, 0.5), (0, 1), (1, 1)],
+    6: [(0, 0), (1, 0), (0, 0.5), (1, 0.5), (0, 1), (1, 1)],
+    7: [(0, 0), (1, 0), (0.5, 0.25), (0, 0.5), (1, 0.5), (0, 1), (1, 1)],
+    8: [(0, 0), (1, 0), (0.5, 0.25), (0, 0.5), (1, 0.5), (0.5, 0.75), (0, 1), (1, 1)],
+    9: [(0, 0), (1, 0), (0, 0.333), (1, 0.333), (0.5, 0.5), (0, 0.667), (1, 0.667), (0, 1), (1, 1)],
+    10: [(0, 0), (1, 0), (0.5, 0.167), (0, 0.333), (1, 0.333), (0, 0.667), (1, 0.667), (0.5, 0.833), (0, 1), (1, 1)],
+} %}
+{# the order of the letters in card-ranks.png #}
+{% set GLYPHS = 'AKQJOER0123456789' %}
+{# the frame of each piece in cards.png #}
+{% set SPRITE = {'hearts': 0, 'hardcore': 1, 'pins': 2, 'swords': 3, 'crown': 4, 'milk': 5} %}
+
+{% macro pip(suit, cls = '', style = '') -%}
+<i class="pip {{ cls }}" style="--s: {{ SPRITE[suit] }};{{ style }}"></i>
+{%- endmacro %}
+
+{% macro index(text, suit, milk, flip = False) -%}
+<span class="pcard-index{{ ' flip' if flip }}{{ ' word' if text|length > 2 }}">
+    <span class="pcard-rank{{ ' tight' if text|length == 2 }}">{% for ch in text %}<i class="glyph" style="--g: {{ GLYPHS.index(ch) }}"></i>{% endfor %}</span>
+    {%- if suit %}{{ pip(suit) }}{% endif %}{% if milk %}{{ pip('milk') }}{% endif -%}
+</span>
+{%- endmacro %}
+
+{# a card's face. rank: 1 to 10, 'K' or 'JOKER'; suit: hearts, hardcore
+   (hearts, the Hardcore one), pins, swords; tilt in degrees, wear 0 to 3 #}
+{% macro card(rank, suit, milk = False, tilt = 0, wear = 0) -%}
+{% set shown = 'A' if rank == 1 else rank|string %}
+{% set corner = 'hearts' if suit == 'hardcore' else suit %}
+<span class="pcard {{ corner }}" style="--tilt: {{ tilt }}deg; --wear: {{ wear }}">
+    {{ index(shown, corner if rank != 'JOKER' else None, milk) }}
+    {% if rank == 1 and suit == 'pins' %}
+    <img class="pcard-mark" src="{{ asset('wynnlogo.png') }}" alt="">
+    {% elif rank == 1 %}
+    {{ pip(suit, 'big', 'left: 50%; top: 50%') }}
+    {% elif rank == 'K' %}
+    <span class="pcard-court">{{ pip('crown', 'court', 'left: 50%; top: 27%') }}{{ pip('crown', 'court flip', 'left: 50%; top: 73%') }}</span>
+    {% elif rank == 'JOKER' %}
+    <span class="pcard-joker">
+        <i class="pip" style="--s: 6; left: 36%; top: 42%; --r: -14deg"></i>
+        <i class="pip" style="--s: 7; left: 62%; top: 36%; --r: 9deg"></i>
+        <i class="pip" style="--s: 8; left: 44%; top: 63%; --r: 4deg"></i>
+        <i class="pip" style="--s: 9; left: 67%; top: 60%; --r: -6deg"></i>
+    </span>
+    {% else %}
+    {% for x, y in PIPS[rank] %}{{ pip(suit, 'flip' if y > 0.5 else '', 'left: %.1f%%; top: %.1f%%' % (31.5 + x * 37, 18 + y * 64)) }}{% endfor %}
+    {% endif %}
+    {{ index(shown, corner if rank != 'JOKER' else None, milk, True) }}
+</span>
+{%- endmacro %}
+
+{# the back, the same on every card: the lattice, the maker's mark in a medallion #}
+{% macro back(tilt = 0, wear = 0) -%}
+<span class="pcard back" style="--tilt: {{ tilt }}deg; --wear: {{ wear }}"><img class="pcard-medal" src="{{ asset('wynnlogo.png') }}" alt=""></span>
+{%- endmacro %}

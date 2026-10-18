@@ -70,7 +70,6 @@ $(function () {
         }
         var mode = form.find('[name=mode]:checked').val();
         var ladder = mode == 'levels' || mode == 'wins';
-        var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
         form.find('.filters').prop('hidden', ladder);
         // Survival has no settings but its difficulty and the milk: one board for each
         form.find('.board-group').prop('hidden', mode == 'survival');
@@ -79,7 +78,6 @@ $(function () {
         asking = ladder ? {mode: mode}
             : mode == 'survival' ? {mode: mode, difficulty: form.find('[name=difficulty]:checked').val(), milk: form.find('[name=milk]:checked').val()} : {
             mode: mode,
-            provinces: "['" + provinces.join("', '") + "']",
             rounds: form.find('[name=rounds]:checked').val(),
             nolook: form.find('[name=nolook]:checked').val()
         };

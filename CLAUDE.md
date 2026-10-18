@@ -721,7 +721,58 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
     `style.css`) : chaque carte veut dire son jeu (Survival Normal = 10 de
     cœur, Hard = 5, Hardcore = As ; Classic = 5 de punaises ; Duel = 6
     d'épées ; Solo = As de punaises avec notre logo, Online = Joker,
-    Custom = Roi). **Montré à Yasuro, en attente de son avis.**
+    Custom = Roi). Montré à Yasuro : « I really like it », avec trois
+    retouches, faites : (1) la page Play ne montre que les trois cartes
+    (Solo → page solo, **Multiplayer** → les mondes, Custom Game → comme
+    avant) ; (2) cartes « lifeless, bland » → **tapis de feutre vert** cadré
+    de bois (tout était beige sur beige), **rangs en pixel art** (police 5×7
+    à nous, `card-ranks.png` : une police d'ordinateur à côté d'enseignes en
+    pixels faisait plat, comme dans Balatro tout est pixel), la carte
+    **penche vers la souris** (`cards.js`, souris seulement, jamais en
+    mouvement réduit), **les têtes de qui attend** sur la fiche ; (3) « hard
+    to understand what to click » → une **fiche de papier glissée sous
+    chaque carte**, avec son nom et un bouton vert Play/Join (marche au
+    doigt, sans survol). **Quick Play retiré** (Yasuro n'en voyait pas
+    l'effet) : l'ordre met déjà en premier la carte où des joueurs
+    attendent, c'était « cliquer la première carte » avec moins d'info.
+  - **Décisions** : classement Classic **carte entière seulement** (filtre
+    des provinces retiré : « unclutter the page ») ; **Duel reste en Custom**
+    pour l'instant (sa refonte d'abord).
+- **Phase 3 faite sur la bêta (2026-10-18)** — section « Multiplayer:
+  worlds » d'`app.py`, page `multiplayer`, `multiplayer.js`, lobby du salon :
+  - Un monde = un salon `rooms.world` (type), **sans hôte**, réglages de la
+    carte, carte entière. 7 types (Survival ×3 difficultés ×lait, Classic 5
+    manches). `open_world()` : le lobby **le plus plein** qui a de la place
+    (16, `WORLD_MAX`), sinon un neuf : il y en a toujours un ouvert.
+    `multiplayer?join=<type>` y envoie (un nouveau venu passe d'abord par le
+    choix du pseudo, `next_page` accepte `join`).
+  - Lobby : bouton **I'm Ready** ; moitié des présents prêts (2 au moins) →
+    **15 s** (`starts_at`), tous prêts → 3 s ; se raviser ne l'arrête pas,
+    moins de 2 présents si. Au départ, **qui n'est pas prêt sort du monde**
+    (`room_bans.why = 'away'`) et retombe sur Multiplayer avec « The game
+    started without you » ; sauf arrivé depuis moins de 10 s
+    (`WORLD_GRACE`, `room_players.joined`) : il joue. Un joueur compte
+    présent **60 s** (`GONE`), pas 10 : piège de yolo, un onglet en
+    arrière-plan aurait été jeté alors qu'il était prêt.
+  - Fin : résultats 20 s (« Next game in N s », bouton Leave), puis tout le
+    monde passe ensemble au lobby ouvert (`next_code`), où Ready est
+    redemandé : le contrôle anti-AFK revient à chaque partie.
+  - Page : ordre = joueurs en attente ×100 + en partie ×40 + parties
+    récentes (une partie compte moitié tous les 3 jours) + coup de pouce
+    d'un type nouveau (`since`, 14 jours, étiquette « New » Legendary) ;
+    « Most played » (Mythic) au plus joué. Ordre figé au chargement, les
+    nombres et têtes se rafraîchissent toutes les 5 s (`api/multiplayer`).
+  - Invités acceptés ; dans le lobby : « Without an account, your scores
+    don't go on the leaderboard ». Scores comme les salons (Classic → carte
+    entière, 5 manches ; Survival → sa difficulté et son lait).
+  - Solo : plus de provinces (`/game` et `solo_settings` prennent toutes).
+    **Piège payé** : le script de `difficulty.html` cachait `#provinces`,
+    absent en solo → erreur JS, la difficulté de Survival ne s'affichait
+    plus (attrapé par `t_sv_page`).
+  - Tests : `t_worlds.py` (33, horloge à la main), `t_worlds_page.py`
+    (navigateur : Play → Multiplayer → Join, invité, Ready, partie
+    complète, lobby suivant, AFK sorti). Tout le reste rejoué vert.
+  - À faire avant la 3.0.0 : test de charge (50 joueurs).
 - **Sortie : tout d'un coup, en version 3.0.0** (Yasuro, 2026-10-18 : « I
   would rather push everything at once as a big 3.0.0 version ») : **plus
   aucune mise en prod partielle** ; le vrai site reste en 2.3 jusque-là.

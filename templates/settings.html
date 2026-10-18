@@ -1,3 +1,4 @@
+{% if not solo %}{# choosing provinces is for custom games #}
             <fieldset class="setting" id="provinces">
                 <h3 class="setting-name">Provinces</h3>
                 <div class="chips">
@@ -15,6 +16,7 @@
                     <label class="chip" for="fruma-province">Fruma</label>
                 </div>
             </fieldset>
+{% endif %}
             <fieldset class="setting" id="timer">
                 <h3 class="setting-name">Time Limit</h3>
                 <div class="chips">

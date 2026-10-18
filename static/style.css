@@ -1278,6 +1278,304 @@ button, input {
     margin-top: 16px;
 }
 
+/* ---------- Playing cards ----------
+   The card table: green felt in a wooden frame, the cards lying on it, a
+   paper slip tucked under each saying what it is, with its button. */
+.card-table {
+    --card-w: 168px;
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 38px 30px;
+    padding: 38px 24px 34px;
+    border-radius: 6px;
+    box-shadow: var(--frame);
+}
+.card-table::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: #2e603e url("felt.png") 0 0 / 128px 128px;
+    image-rendering: pixelated;
+}
+/*
+   A real deck, handled a little (templates/cards.html, tools/cards.py): the
+   pips are pixel art (--px: one pixel of a pip), each card lies a little
+   crooked (--tilt) and wears in its own way (--wear: one of four), and the
+   one under the mouse is picked up: it straightens and rises, its shadow
+   growing with the height. Shadows stay hard, as everywhere on the site. */
+.pcard-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--ink);
+    text-decoration: none;
+}
+.pcard-slot:hover {
+    color: var(--ink);
+}
+/* the slip: its top under the card, which uncovers it a little when lifted */
+.pcard-slip {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: calc(var(--card-w, 190px) * 1.04);
+    margin-top: -22px;
+    padding: 30px 10px 12px;
+    text-align: center;
+    line-height: 1.25;
+    background: var(--paper-light);
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px var(--ink), 0 4px 0 2px rgba(0, 0, 0, .35);
+    rotate: var(--slip, 0deg);
+}
+.pcard-slip b {
+    font-size: 19px;
+}
+.pcard-slip small {
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+.pcard-slip .live {
+    font-weight: 700;
+    color: #3d7a16;
+}
+.pcard-slip .btn {
+    min-height: 34px;
+    margin-top: 8px;
+    padding: 4px 22px;
+    font-size: 15px;
+}
+/* who is there: their heads, one over the other */
+.pcard-heads {
+    display: flex;
+    justify-content: center;
+    margin: 5px 0 2px;
+}
+.pcard-heads img {
+    width: 24px;
+    height: 24px;
+    margin-left: -5px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--ink);
+    image-rendering: pixelated;
+}
+.pcard-heads img:first-child {
+    margin-left: 0;
+}
+.pcard {
+    --w: var(--card-w, 190px);
+    --px: 3px;
+    --gpx: 3px;           /* one pixel of the rank's letters */
+    position: relative;
+    z-index: 1;
+    display: block;
+    flex: none;
+    width: var(--w);
+    aspect-ratio: 5 / 7;
+    border-radius: calc(var(--w) * .053);
+    background: var(--card, #f4edd9);
+    box-shadow: 0 0 0 1px rgba(63, 39, 36, .55), 0 3px 0 rgba(63, 39, 36, .3);
+    rotate: var(--tilt, 0deg);
+    /* leaning toward the mouse (cards.js), as a card turned in the hand */
+    transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: rotate .15s ease-out, translate .15s ease-out, box-shadow .15s ease-out, transform .1s ease-out;
+}
+/* the wear, over the print */
+.pcard::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: url("card-wear.webp") calc(var(--wear, 0) * 100% / 3) 0 / 400% 100%;
+    pointer-events: none;
+}
+a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:checked + label .pcard {
+    rotate: 0deg;
+    translate: 0 -8px;
+    box-shadow: 0 0 0 1px rgba(63, 39, 36, .55), 0 11px 0 rgba(63, 39, 36, .16);
+}
+.pip {
+    position: absolute;
+    width: calc(9 * var(--px));
+    height: calc(9 * var(--px));
+    background: url("cards.png") calc(var(--s) * -9 * var(--px)) 0 / calc(90 * var(--px)) calc(9 * var(--px));
+    image-rendering: pixelated;
+    translate: -50% -50%;
+    rotate: var(--r, 0deg);
+}
+.pip.flip {
+    rotate: 180deg;
+}
+.pip.big {
+    --px: 7px;
+}
+/* rank over suit, in two corners */
+.pcard-index {
+    position: absolute;
+    top: 4.5%;
+    left: 5%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 17%;
+}
+.pcard-index.flip {
+    top: auto;
+    left: auto;
+    right: 5%;
+    bottom: 4.5%;
+    rotate: 180deg;
+}
+.pcard-index .pip {
+    --px: 2px;
+    position: static;
+    translate: none;
+}
+.pcard-rank {
+    display: flex;
+    gap: var(--gpx);
+}
+.pcard-index.word .pcard-rank {
+    flex-direction: column;
+}
+/* two figures (10): no gap, the 1 has its own */
+.pcard-rank.tight {
+    gap: 0;
+}
+.glyph {
+    display: block;
+    width: calc(5 * var(--gpx));
+    height: calc(7 * var(--gpx));
+    background: url("card-ranks.png") calc(var(--g) * -5 * var(--gpx)) calc(var(--row, 1) * -7 * var(--gpx)) / calc(85 * var(--gpx)) calc(14 * var(--gpx));
+    image-rendering: pixelated;
+}
+/* the red row (--row, not --ink: that one is the site's ink colour) */
+.pcard.hearts .glyph {
+    --row: 0;
+}
+.pcard-index.word {
+    --gpx: 2px;
+}
+/* the maker's mark: the Ace of pins, and the back's medallion */
+.pcard-mark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 46%;
+    translate: -50% -50%;
+}
+/* the King: a framed picture, the same both ways, as court cards are */
+.pcard-court {
+    position: absolute;
+    inset: 15% 18%;
+    background: #ecdcb0;
+    border: 2px solid var(--ink);
+    border-radius: 2px;
+}
+.pcard-court::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 2px solid var(--ink);
+}
+.pcard-court .pip {
+    --px: 5px;
+}
+.pcard-joker .pip {
+    --px: 4px;
+}
+/* the back: a lattice inside a white border, and the mark in a medallion */
+.pcard.back::before {
+    content: '';
+    position: absolute;
+    inset: 6.5%;
+    border-radius: calc(var(--w) * .022);
+    background: url("card-back.png") 0 0 / calc(var(--px) * 16 / 3) calc(var(--px) * 16 / 3);
+    image-rendering: pixelated;
+    box-shadow: inset 0 0 0 2px #6f1a16;
+}
+.pcard-medal {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 40%;
+    padding: 6%;
+    translate: -50% -50%;
+    background: #f4edd9;
+    border: 2px solid #6f1a16;
+    border-radius: 50%;
+}
+/* a deck: the back, and the edges of the cards under it */
+.pcard-deck .pcard {
+    box-shadow: 0 0 0 1px rgba(63, 39, 36, .55), 2px 2px 0 0 #e9dfc6, 2px 2px 0 1px rgba(63, 39, 36, .45),
+                4px 4px 0 0 #e9dfc6, 4px 4px 0 1px rgba(63, 39, 36, .45), 4px 8px 0 1px rgba(63, 39, 36, .28);
+}
+/* a world's lobby: its card on a little felt, its rules, how it starts */
+.world-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    text-align: center;
+}
+.card-table.world-table {
+    --card-w: 150px;
+    padding: 26px 40px;
+    margin: 18px;
+}
+.world-rules {
+    max-width: 380px;
+    margin: 0;
+}
+.world-status {
+    margin: 22px 0 -8px;
+    text-align: center;
+    font-weight: 700;
+}
+.world-status.urgent {
+    color: var(--red);
+}
+.room-player .material-icons.room-ready {
+    color: #3d7a16;
+}
+/* the Play page: three bigger cards, side by side even on a phone */
+.card-table.play-table {
+    --card-w: 210px;
+    gap: 30px 44px;
+}
+/* the Multiplayer page, back from a game that started without you */
+.world-missed {
+    max-width: 560px;
+    margin: 0 auto 22px;
+    padding: 10px 14px;
+    text-align: center;
+    font-weight: 700;
+    background: var(--paper-light);
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px var(--ink);
+}
+/* Wynncraft's item tiers, darkened to read on paper: the most played is
+   Mythic, a new game Legendary */
+.tier {
+    font: 400 17px/1.3 var(--hand);
+}
+.tier.mythic {
+    color: #7a0f86;
+}
+.tier.legendary {
+    color: #0b7680;
+}
+
 /* ---------- Leaderboard ---------- */
 
 .board {
@@ -3773,6 +4071,58 @@ body.room-playing {
     #score-container #next-button {
         min-width: 0;
         width: 90%;
+    }
+}
+
+/* smaller cards, pixels a little smaller too */
+@media (max-width: 600px) {
+    .card-table {
+        --card-w: 140px;
+    }
+    .pcard {
+        --px: 2px;
+        --gpx: 2px;
+    }
+    .pcard-index.word {
+        --gpx: 1.5px;
+    }
+    .card-table {
+        gap: 30px 12px;
+        padding: 28px 10px 26px;
+    }
+    .pcard-slip b {
+        font-size: 17px;
+    }
+    .pcard-index .pip {
+        --px: 1.5px;
+    }
+    .pip.big {
+        --px: 5px;
+    }
+    .pcard-court .pip {
+        --px: 4px;
+    }
+    .pcard-joker .pip {
+        --px: 3px;
+    }
+    .pcard-slip small {
+        font-size: 14px;
+    }
+    .card-table.play-table {
+        --card-w: 98px;
+        flex-wrap: nowrap;
+        gap: 10px;
+        padding-inline: 8px;
+    }
+    .play-table .pcard {
+        --px: 1.5px;
+        --gpx: 1.5px;
+    }
+    .play-table .pcard-slip small {
+        display: none;
+    }
+    .play-table .pcard-slip .btn {
+        padding-inline: 10px;
     }
 }
 
