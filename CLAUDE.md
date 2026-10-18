@@ -353,6 +353,12 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   se joue alors sur un tel lieu ; jamais d'imitation (si le seul lieu
   brouillard est déjà vu, la manche part sans potion). Elle vient donc
   d'elle-même, au fur et à mesure des photos.
+  **Les 740 photos brouillard faites le 2026-10-18** (vérifié : toutes
+  rattachées, tuiles présentes, mêmes places que les photos normales). À
+  distance 6 (~100 blocs), le lointain et les nuages disparaissent mais le
+  proche reste net : Blindness forte sur les paysages ouverts, presque
+  nulle dans les rues et lieux fermés. Proposé à Yasuro : refaire la
+  tournée à distance 2 si on la veut forte partout.
 - **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
   (dégâts), rouge (au-delà, mort avec les cœurs qui restaient). Dégâts
   écrits « −6.5 » + un cœur (demande de Yasuro, pas « 6½ hearts »).
