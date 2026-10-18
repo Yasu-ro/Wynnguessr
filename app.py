@@ -794,8 +794,14 @@ def history(c, uid):
     games = []
     for r in c.execute('''SELECT r.* FROM rooms r JOIN room_players p ON p.code = r.code
             WHERE p.user_id = ? AND r.state = 'finished' ''', (uid,)).fetchall():
-        totals = dict(c.execute("SELECT user_id, SUM(score) FROM room_guesses WHERE code = ? GROUP BY user_id", (r['code'],)).fetchall())
-        when = c.execute("SELECT MAX(at) FROM room_guesses WHERE code = ?", (r['code'],)).fetchone()[0]
+        # only who played it live: a finished classic room can be replayed
+        # alone later, and that score once moved the win to someone else after
+        # the fact (Yasuro: "we all seem to lose our streak randomly")
+        live = """SELECT g.user_id, SUM(g.score), MAX(g.at) FROM room_guesses g JOIN room_players p ON p.code = g.code AND p.user_id = g.user_id
+            WHERE g.code = ? AND p.live = 1 GROUP BY g.user_id"""
+        rows = c.execute(live, (r['code'],)).fetchall()
+        totals = {u: t for u, t, _ in rows}
+        when = max((at for _, _, at in rows if at), default = None)   # (the oldest guesses have no time)
         if r['mode'] == 'classic':
             st = {}
             players = list(totals)

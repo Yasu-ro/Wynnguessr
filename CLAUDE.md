@@ -1079,6 +1079,15 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
 - **Sons** : l'orbe de Minecraft à hauteur aléatoire toutes les 100 ms
   pendant le remplissage (comme le jeu : 0,55 à 1,25), son « level up » à
   chaque niveau, plus fort tous les 5 niveaux. Voir « Sons » plus bas.
+- **Séries : piège payé (2026-10-18)**, Yasuro : « on perd notre série au
+  hasard, sûrement en jouant en solo ». Le solo n'a jamais compté (seules
+  les parties à plusieurs). La vraie cause : un salon Classic **fini peut se
+  rejouer seul en différé**, et ce score était classé avec ceux du direct :
+  un joueur venu après coup pouvait prendre la victoire, et la série du
+  gagnant cassait des jours plus tard (8 salons touchés sur le vrai site).
+  `history()` ne classe plus que les joueurs **en direct** (`live = 1`).
+  Pour le reste, les séries cassent sur de vraies défaites (gagner = finir
+  1er, dur à 5 joueurs) : vérifié sur les parties de Yasuro.
 - **Séries de victoires** (salons) : `best`, le record, toujours affiché (plaque
   du profil, colonne du classement) ; `streak`, la série en cours, seulement à
   partir de 2 (flamme sur le profil, dans l'onglet Wins, en fin de salon gagné).
