@@ -360,7 +360,8 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   à mettre sous le même nom, en réglant `THROW_MS` (sa durée) et
   `SPLASH_MS` (le moment où la bouteille casse) dans `survival.js`. Les
   flacons (`static/potions.png`, couleurs des effets de Minecraft) sont à
-  nous. Un rechargement montre la carte sans le lancer.
+  nous. Un rechargement montre la carte sans le lancer. Le lancer prend tout
+  l'écran (demande de Yasuro), par-dessus le résultat.
 - Effets côté page : Mining Fatigue (zoom de la carte bloqué), Nausea (le
   panorama tangue, agrandi ×1,22 : à moins, un bord blanc apparaissait ;
   coupé par le mouvement réduit), Darkness (noir après 10 s, Yasuro : 5 était trop court ; même après un

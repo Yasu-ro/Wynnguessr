@@ -1262,8 +1262,21 @@ button, input {
 .sv-effect {
     gap: 6px;
 }
+/* the throw takes the whole screen (Yasuro), over the result, then goes */
+.potion-throw {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
 .potion-throw img {
     display: block;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
     image-rendering: pixelated;
 }
 .potion-card {
