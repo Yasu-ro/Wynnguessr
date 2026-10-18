@@ -53,8 +53,8 @@
                     {% else %}{{ g.left }} {{ 'life' if g.left == 1 else 'lives' }}{% endif %}</td>
             {% else %}
                 <td><span class="result solo">Solo</span></td>
-                <td>{{ names[g.mode] }}{% if g.rounds %}<small>{{ g.rounds }} rounds</small>{% endif %}</td>
-                <td class="num">{% if g.mode == 'survival' %}Streak {{ g.score }}{% else %}{{ '{:,}'.format(g.score) }} pts{% endif %}</td>
+                <td>{{ names[g.mode] }}{% if g.rounds %}<small>{{ g.rounds }} rounds</small>{% elif g.difficulty %}<small>{{ g.difficulty | capitalize }}</small>{% endif %}</td>
+                <td class="num">{% if g.mode == 'survival' %}{{ g.score }} {{ 'location' if g.score == 1 else 'locations' }}{% else %}{{ '{:,}'.format(g.score) }} pts{% endif %}</td>
             {% endif %}
                 <td class="num board-more">{{ g.day }}</td>
             </tr>

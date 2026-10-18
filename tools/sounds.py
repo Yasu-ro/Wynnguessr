@@ -29,6 +29,8 @@ SOUNDS = {
     'bad': ['note/bass'],
     'bubble': ['ui/hud/hud_bubble'],
     'toast': ['ui/toast/in'],
+    'fuse': ['random/fuse'],
+    'boom': ['random/explode1', 'random/explode2', 'random/explode3', 'random/explode4'],
 }
 
 def get(url):

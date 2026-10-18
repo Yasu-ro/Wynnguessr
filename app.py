@@ -97,10 +97,9 @@ def solo_game(form):
     if not score.isnumeric():
         return None
     if mode == 'survival':
-        # the score is the number of locations found in a row
-        rounds = None
-        if int(score) > 1000:
-            return None
+        # Survival is played on the server (api/survival): a score sent from
+        # the browser could be anything
+        return None
     else:
         mode = 'classic'
         rounds = form.get('rounds')
@@ -137,6 +136,9 @@ def adopt(c, uid):
     game = session.pop('pending', None)
     if game:
         save_solo(c, uid, game)
+    rid = session.get('survival')
+    if rid and c.execute("UPDATE survival_runs SET user_id = ? WHERE id = ? AND user_id IS NULL", (uid, rid)).rowcount:
+        survival_record(c, c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone())
     old = session.get('user_id')
     if session.get('loggedin') or not old or old == uid:
         return
@@ -154,17 +156,23 @@ def adopt(c, uid):
 
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
+    # Survival: one board per difficulty, the most locations survived, then the most points
     mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-    query = '''SELECT u.id, u.username AS name, u.mc_name AS mc, u.avatar, u.mc_uuid, s.score, s.time, s.date FROM scores s JOIN users u ON u.id = s.user_id
-        WHERE s.provinces = ? AND s.nolook = ? AND COALESCE(s.mode, 'classic') = ?'''
-    params = [form.get('provinces', ''), form.get('nolook', 'No'), mode]
+    query = '''SELECT u.id, u.username AS name, u.mc_name AS mc, u.avatar, u.mc_uuid, s.score, s.points, s.time, s.date
+        FROM scores s JOIN users u ON u.id = s.user_id WHERE COALESCE(s.mode, 'classic') = ?'''
+    params = [mode]
     if mode == 'classic':
-        query += " AND s.rounds = ?"
-        params.append(form.get('rounds', ''))
+        query += " AND s.provinces = ? AND s.nolook = ? AND s.rounds = ?"
+        params += [form.get('provinces', ''), form.get('nolook', 'No'), form.get('rounds', '')]
+        order = " ORDER BY s.score DESC, s.time ASC"
+    else:
+        query += " AND s.difficulty = ?"
+        params.append(form.get('difficulty', 'normal'))
+        order = " ORDER BY s.score DESC, s.points DESC, s.time ASC"
     if user_id:
         query += " AND s.user_id = ?"
         params.append(user_id)
-    return [dict(row) for row in c.execute(query + " ORDER BY s.score DESC, s.time ASC", params)]
+    return [dict(row) for row in c.execute(query + order, params)]
 
 def ladder(c, mode):
     # levels: the most XP first; wins (players who won at least once): the most
@@ -219,6 +227,9 @@ def leaderboard():
 def game():
     # the mode page sends its settings in the address, so "Play Again" is a plain reload
     form = request.values
+    if form.get('mode') == 'survival':
+        # Survival has its own page (and no settings but the difficulty)
+        return redirect('survival?' + urlencode({'difficulty': form.get('difficulty', 'normal')}))
     session['provinces'] = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
     if 'rounds' in form:
         if form.get('mode') in ('duel', 'royale'):
@@ -609,14 +620,14 @@ def history(c, uid):
         games.append({'multi': True, 'code': r['code'], 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
                       'score': totals.get(uid, 0), 'rounds': r['round'], 'when': when or 0,
                       'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out')})
-    for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode FROM scores
+    for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode, difficulty FROM scores
             WHERE user_id = ? AND room IS NULL''', (uid,)).fetchall():
         try:
             when = time.mktime(time.strptime(g['date'], '%Y-%m-%d'))
         except (TypeError, ValueError):
             when = 0
         games.append({'multi': False, 'mode': g['mode'], 'score': g['score'], 'rounds': g['rounds'],
-                      'time': g['time'], 'when': when})
+                      'difficulty': g['difficulty'], 'time': g['time'], 'when': when})
     for g in games:
         g['day'] = time.strftime('%b %d, %Y', time.localtime(g['when'])) if g['when'] else ''
     return sorted(games, key = lambda g: g['when'], reverse = True)
@@ -1480,6 +1491,318 @@ def review_one(lid):
         else:
             return jsonify({"success": False})
     return jsonify({"success": True})
+
+# ---------- Survival ----------
+# Solo only. Hearts as in Minecraft (counted in half-hearts), a zone that
+# shrinks every round, and the potions. The whole run lives here, never in
+# the browser: the page gets a picture, sends a guess and is told what it
+# cost. Against cheating:
+# - no answer leaves the server before its guess, and no picture's real
+#   address: tiles go through survival/tile/<token>/, a new random token for
+#   every round (old addresses, learnt from the reveals of earlier games,
+#   lead nowhere);
+# - the clock is the server's: a guess later than the deadline (plus a
+#   little lag) counts as no guess, and a round left open is settled as
+#   such at the next request;
+# - one run at a time per player (session and account): starting another
+#   ends it, as it stands; a reload brings back the same round, with the
+#   time already spent;
+# - each guess names its round: a second one, or one from an old tab, is
+#   refused;
+# - every guess is kept (survival_guesses), time included, for checking.
+# Known limits: what only the page draws (Darkness, Nausea, Mining Fatigue)
+# can be undone by someone who edits the page; a script that recognises
+# the pictures themselves cannot be stopped from here.
+
+DIFFICULTIES = {'normal': 20, 'hard': 10, 'hardcore': 2}   # half-hearts
+ROUND_TIME = {'normal': 60, 'hard': 40, 'hardcore': 30}    # seconds
+SWIFT_TIME = 20
+SWIFT_ZONE = 1.5           # Swiftness: a zone this much wider
+NEAR = 10                  # blocks: a near-perfect guess; two in a row give back half a heart
+LATE = 2                   # seconds a guess may come after the deadline (network lag)
+FIRST_POTION = 4           # no potion before this round
+POTION_RATE = {'normal': 1 / 5, 'hard': 1 / 4, 'hardcore': 1 / 3}
+POTIONS = {}               # name: weight; each one is added once the page knows how to draw it
+WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
+REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
+
+def zone(n, effect = None):
+    # round n: no damage within `safe` blocks, the most a guess can cost from
+    # `far` on, and that most (`cap`, in half-hearts). Calibrated on the real
+    # guesses of the rooms (CLAUDE.md, "Survival")
+    safe = max(25, 150 * (50 / 150) ** ((n - 1) / 19))
+    far = max(500, 2000 * (800 / 2000) ** ((n - 1) / 19))
+    cap = min(20, 10 + round(10 * (n - 1) / 19))
+    if effect == 'swiftness':
+        safe, far = safe * SWIFT_ZONE, far * SWIFT_ZONE
+    return safe, far, cap
+
+def hurt(d, n, effect = None):
+    # half-hearts a guess d blocks away costs in round n
+    safe, far, cap = zone(n, effect)
+    if d <= safe:
+        return 0
+    if d >= far:
+        return cap
+    return min(cap, 1 + math.floor(19 * ((d - safe) / (far - safe)) ** 1.5))
+
+def kill_radius(n, effect, hp):
+    # from how far a guess would have killed (the red circle), or None if
+    # nothing could; the damage only grows with the distance
+    safe, far, cap = zone(n, effect)
+    if cap < hp:
+        return None
+    low, high = safe, far
+    for _ in range(40):
+        mid = (low + high) / 2
+        if hurt(mid, n, effect) >= hp:
+            high = mid
+        else:
+            low = mid
+    return high
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS survival_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, difficulty TEXT, hp INTEGER,
+            round INTEGER DEFAULT 0, phase TEXT, location_id INTEGER, token TEXT, effect TEXT,
+            round_start REAL, deadline REAL, close INTEGER DEFAULT 0, survived INTEGER DEFAULT 0,
+            points INTEGER DEFAULT 0, time REAL DEFAULT 0, used TEXT DEFAULT '[]', score_id INTEGER,
+            started REAL, ended REAL);
+        CREATE TABLE IF NOT EXISTS survival_guesses (
+            run_id INTEGER, round INTEGER, location_id INTEGER, x REAL, z REAL, distance REAL,
+            hp INTEGER, damage INTEGER, wither INTEGER, heal INTEGER, points INTEGER, effect TEXT,
+            time REAL, at REAL, PRIMARY KEY (run_id, round));
+    ''')
+    # the new Survival has a leaderboard per difficulty, broken ties on points;
+    # the old one's scores (other rules) go, once
+    if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
+        c.execute("ALTER TABLE scores ADD COLUMN difficulty TEXT")
+        c.execute("ALTER TABLE scores ADD COLUMN points INTEGER")
+        c.execute("DELETE FROM scores WHERE mode = 'survival'")
+
+def my_run(c):
+    # the run this page plays: the session's, as long as it is not someone
+    # else's account (a run played without one belongs to its session)
+    rid = session.get('survival')
+    run = rid and c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone()
+    me = session.get('user_id') if session.get('loggedin') else None
+    if not run or (run['user_id'] is not None and run['user_id'] != me):
+        return None
+    return run
+
+def run_tx():
+    # like rooms: one request at a time moves a run forward
+    c = connect()
+    c.isolation_level = None
+    c.execute("BEGIN IMMEDIATE")
+    return c
+
+def survival_record(c, run):
+    # the run on the leaderboard as it stands, from the first location found
+    # on (updated each round: a run left half-way keeps its score)
+    if not run['user_id'] or not run['survived']:
+        return
+    if run['score_id']:
+        c.execute("UPDATE scores SET score = ?, points = ?, time = ? WHERE id = ?",
+                  (run['survived'], run['points'], round(run['time'], 2), run['score_id']))
+    else:
+        sid = c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points)
+                VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?)""",
+                (run['user_id'], run['survived'], date.today(), round(run['time'], 2), run['difficulty'], run['points'])).lastrowid
+        c.execute("UPDATE survival_runs SET score_id = ? WHERE id = ?", (sid, run['id']))
+
+def survival_end(c, run):
+    c.execute("UPDATE survival_runs SET phase = 'over', ended = ? WHERE id = ?", (time.time(), run['id']))
+
+def survival_next(c, run):
+    # a new round: a location not seen in this run, maybe a potion, the clock starts
+    used = json.loads(run['used'])
+    left = [l[0] for l in c.execute(f"SELECT location_id FROM locations WHERE review IN {PLAYABLE}")
+            if l[0] not in used]
+    if not left:
+        return survival_end(c, run)   # every location found: nothing left to play
+    lid = secrets.choice(left)
+    n = run['round'] + 1
+    effect = None
+    # never two in a row: drawn more often after a round without one, so
+    # that potions really come once every 5, 4 or 3 rounds (r / (1 - r))
+    rate = POTION_RATE[run['difficulty']]
+    if POTIONS and n >= FIRST_POTION and not run['effect'] and secrets.randbelow(10 ** 6) < rate / (1 - rate) * 10 ** 6:
+        names = list(POTIONS)
+        pick = secrets.randbelow(sum(POTIONS.values()) * 100) / 100
+        for name in names:
+            pick -= POTIONS[name]
+            if pick < 0:
+                effect = name
+                break
+    now = time.time()
+    seconds = SWIFT_TIME if effect == 'swiftness' else ROUND_TIME[run['difficulty']]
+    c.execute("""UPDATE survival_runs SET round = ?, phase = 'guess', location_id = ?, token = ?, effect = ?,
+            round_start = ?, deadline = ?, used = ? WHERE id = ?""",
+            (n, lid, secrets.token_hex(16), effect, now, now + seconds, json.dumps(used + [lid]), run['id']))
+
+def survival_settle(c, run, x = None, z = None):
+    # the round's guess (x and z, or None: no pin when the clock ran out, the creeper)
+    now = time.time()
+    n, effect, hp = run['round'], run['effect'], run['hp']
+    loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (run['location_id'],)).fetchone()
+    spent = max(0, min(now, run['deadline']) - run['round_start'])
+    wither = int(spent // WITHER_EVERY) if effect == 'wither' else 0
+    if x is None:
+        d, damage, points = None, zone(n, effect)[2], 0
+    else:
+        d = math.hypot(loc['x_position'] - x, loc['z_position'] - z)
+        damage, points = hurt(d, n, effect), guess_score(x, z, loc)
+    hp_after = hp - damage - wither
+    heal, close = 0, run['close']
+    if hp_after > 0 and d is not None:
+        if effect == 'regeneration' and d <= zone(n, effect)[0]:
+            heal += REGEN
+        close = close + 1 if d <= NEAR else 0
+        if close == 2:
+            heal, close = heal + 1, 0
+    else:
+        close = 0
+    hp_after = min(DIFFICULTIES[run['difficulty']], hp_after + heal) if hp_after > 0 else 0
+    survived = run['survived'] + (1 if hp_after > 0 else 0)
+    c.execute("""INSERT INTO survival_guesses (run_id, round, location_id, x, z, distance, hp, damage, wither, heal, points, effect, time, at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (run['id'], n, loc['location_id'], x, z, d, hp, damage, wither, heal if hp_after > 0 else 0, points, effect, spent, now))
+    c.execute("""UPDATE survival_runs SET hp = ?, close = ?, survived = ?, points = points + ?, time = time + ?,
+            phase = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over', run['id']))
+    run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
+    if hp_after <= 0:
+        c.execute("UPDATE survival_runs SET ended = ? WHERE id = ?", (now, run['id']))
+    survival_record(c, run)
+    return run
+
+def survival_tick(c, run):
+    # a round whose time is up and which nobody answered: the creeper
+    if run['phase'] == 'guess' and time.time() > run['deadline'] + LATE:
+        run = survival_settle(c, run)
+    return run
+
+def survival_state(c, run):
+    # what the page may know: never the answer of a round still open
+    out = {"success": True, "difficulty": run['difficulty'], "max": DIFFICULTIES[run['difficulty']],
+           "hp": run['hp'], "round": run['round'], "survived": run['survived'], "points": run['points'],
+           "phase": run['phase']}
+    if run['phase'] == 'over':
+        # the end screen: the XP the run brought, or a word to log in and keep it
+        if run['user_id']:
+            out.update({"xp": progress(c, run['user_id'])['xp'], "gained": run['survived'] * SPOT_XP})
+        else:
+            out['pending'] = run['survived'] > 0
+    if run['phase'] == 'guess':
+        out.update({"url": 'survival/tile/' + run['token'] + '/', "effect": run['effect'],
+                    "time": run['deadline'] - run['round_start'], "time_left": max(0, run['deadline'] - time.time())})
+        return out
+    g = c.execute("SELECT * FROM survival_guesses WHERE run_id = ? AND round = ?", (run['id'], run['round'])).fetchone()
+    if g:
+        loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (g['location_id'],)).fetchone()
+        safe, far, cap = zone(g['round'], g['effect'])
+        # the circles of the reveal: green, no damage; yellow, damage; red,
+        # death with the hearts that were left (Wither's share already taken)
+        out['result'] = {"X": loc[0], "Z": loc[1], "x": g['x'], "z": g['z'], "distance": g['distance'],
+                         "damage": g['damage'], "wither": g['wither'], "heal": g['heal'], "points": g['points'],
+                         "effect": g['effect'], "creeper": g['x'] is None, "safe": safe, "far": far,
+                         "kill": kill_radius(g['round'], g['effect'], g['hp'] - g['wither'])}
+    return out
+
+@app.route("/survival")
+def survival_page():
+    difficulty = request.args.get('difficulty')
+    return render_template('survival.html', difficulty = difficulty if difficulty in DIFFICULTIES else 'normal')
+
+@app.route("/api/survival/start", methods=['POST'])
+def survival_start():
+    difficulty = request.form.get('difficulty')
+    if difficulty not in DIFFICULTIES:
+        return jsonify({"success": False})
+    uid = session.get('user_id') if session.get('loggedin') else None
+    c = run_tx()
+    try:
+        # one run at a time: the one this session played, and any other of this account
+        old = my_run(c)
+        if old and old['phase'] != 'over':
+            survival_end(c, old)
+        if uid:
+            for r in c.execute("SELECT * FROM survival_runs WHERE user_id = ? AND phase != 'over'", (uid,)).fetchall():
+                survival_end(c, r)
+        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started) VALUES (?, ?, ?, 'new', ?)",
+                        (uid, difficulty, DIFFICULTIES[difficulty], time.time())).lastrowid
+        run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone()
+        survival_next(c, run)
+        session['survival'] = rid
+        out = survival_state(c, c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone())
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/survival")
+def survival_get():
+    c = run_tx()
+    try:
+        run = my_run(c)
+        out = survival_state(c, survival_tick(c, run)) if run else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/survival/guess", methods=['POST'])
+def survival_guess():
+    c = run_tx()
+    try:
+        run = my_run(c)
+        ok = run and run['phase'] == 'guess' and request.form.get('round') == str(run['round'])
+        if ok:
+            x = z = None
+            if time.time() <= run['deadline'] + LATE and request.form.get('x'):
+                try:
+                    x, z = float(request.form['x']), float(request.form['z'])
+                except ValueError:
+                    x = z = None
+                if x is not None and not (math.isfinite(x) and math.isfinite(z)):
+                    x = z = None
+            run = survival_settle(c, run, x, z)
+        out = survival_state(c, run) if ok else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/survival/next", methods=['POST'])
+def survival_go():
+    c = run_tx()
+    try:
+        run = my_run(c)
+        ok = run and run['phase'] == 'result' and request.form.get('round') == str(run['round'])
+        if ok:
+            survival_next(c, run)
+            run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
+        out = survival_state(c, run) if ok else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/survival/tile/<token>/<path:name>")
+def survival_tile(token, name):
+    # the pictures of the round being played, under an address that only means
+    # something during that round
+    with connect() as c:
+        run = c.execute("""SELECT l.image_url FROM survival_runs r JOIN locations l ON l.location_id = r.location_id
+                WHERE r.token = ? AND r.phase = 'guess'""", (token,)).fetchone()
+    if not run or not run[0].startswith('static/tiles/'):
+        return '', 404
+    response = send_from_directory(os.path.join(TILES_DIR, run[0][len('static/tiles/'):].strip('/')), name, max_age = 600)
+    # kept by the browser, never by Cloudflare: the address must die with the round
+    response.cache_control.private = True
+    return response
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)

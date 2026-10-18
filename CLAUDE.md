@@ -321,7 +321,7 @@ Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
 - Seules les parties Classic (solo et salon) vont au classement ; les comptes
   invités jamais.
 
-## Survival, refonte (2026-10-18, en cours)
+## Survival, refonte (2026-10-18)
 
 Retours des joueurs : « far too lenient », « 500 blocks is huge, 100 max,
 honestly 50 ». Classic (solo et salons) ne change pas : ce sont les modes
@@ -355,8 +355,34 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   provinces, vue libre), anciens scores Survival effacés.
 - **Cœurs dessinés** d'après une capture de l'ancien pack Wynncraft fournie
   par Yasuro (9×9 façon Minecraft) : plein, demi, vide, Hardcore.
-- **Anti-triche complète** demandée : la partie vit sur le serveur (voir
-  le code et les tests de l'étape 2).
+- **Anti-triche complète** demandée : la partie vit sur le serveur
+  (section « Survival » d'`app.py`, son en-tête liste les parades et les
+  limites). Tables `survival_runs` (une partie, `phase` guess / result /
+  over) et `survival_guesses` (chaque guess, temps compris, pour vérifier).
+  Les tuiles passent par `survival/tile/<jeton>/`, un jeton neuf par
+  manche, mort dès le guess (`Cache-Control: private` : **piège payé**,
+  Cloudflare gardait la tuile et le jeton mort répondait encore). La
+  migration efface les anciens scores Survival une fois, et `api/score`
+  refuse désormais tout score Survival envoyé par le navigateur (on
+  pouvait poster « 500 »).
+- **Limite connue** : le solo Classic envoie encore toutes les coordonnées
+  et adresses des lieux (`api/locations`) ; un script pourrait reconnaître
+  une image du Survival en comparant ses tuiles. Rendre le Classic solo
+  « serveur » fermerait ce trou (proposé à Yasuro).
+- Page `survival` (`survival.html`, `survival.js`) : menu solo → Survival →
+  difficulté (les autres réglages se cachent), `/game?mode=survival`
+  redirige. Recharger reprend la même manche et son chrono ; une partie en
+  cours d'une autre difficulté est terminée par la nouvelle. Une partie
+  jouée sans compte passe au compte à la connexion (`adopt`). Score
+  inscrit dès le premier lieu et mis à jour à chaque manche (une partie
+  abandonnée garde le sien).
+- Classement : onglet Survival = trois tableaux (Normal, Hard, Hardcore),
+  colonnes Locations / Points / Date, départage aux points. Profil :
+  « N locations » et la difficulté.
+- Tests (scratchpad, à refaire) : moteur par le client de test Flask avec
+  une horloge déplacée à la main (47 vérifications, dont chaque technique
+  de triche) ; page par Playwright (menu, cœurs, cercles, creeper, mort,
+  reprise), classement (ordre, une seule partie par joueur).
 
 ## Niveaux, XP et séries de victoires
 

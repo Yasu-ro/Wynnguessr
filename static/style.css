@@ -1182,6 +1182,99 @@ button, input {
     margin-top: 6px;
 }
 
+/* ---------- Survival ---------- */
+
+/* the hearts (tools/hearts.py draws them: full, half, empty, then Hardcore's),
+   in a row as in Minecraft, each one over the edge of the one before */
+.hearts {
+    display: flex;
+    line-height: 0;
+}
+.heart {
+    flex: none;
+    width: 27px;
+    height: 27px;
+    margin-right: -3px;
+    background: url("hearts.png") 0 0 / 162px 27px no-repeat;
+    image-rendering: pixelated;
+}
+.heart.half { background-position: -27px 0; }
+.heart.empty { background-position: -54px 0; }
+.heart.hc { background-position: -81px 0; }
+.heart.hc.half { background-position: -108px 0; }
+.heart.hc.empty { background-position: -135px 0; }
+/* on the picture, bottom left, where Minecraft keeps them */
+#hearts {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    z-index: 400;
+    filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45));
+}
+.hearts.small .heart {
+    width: 18px;
+    height: 18px;
+    margin-right: -2px;
+    background-size: 108px 18px;
+}
+.hearts.small .heart.half { background-position: -18px 0; }
+.hearts.small .heart.empty { background-position: -36px 0; }
+.hearts.small .heart.hc { background-position: -54px 0; }
+.hearts.small .heart.hc.half { background-position: -72px 0; }
+.hearts.small .heart.hc.empty { background-position: -90px 0; }
+.hearts.hurt {
+    animation: knock .32s both;
+}
+.survival-page .score-screen {
+    display: flex;
+}
+#sv-time.urgent {
+    color: #fff;
+    background: var(--red);
+}
+#sv-verdict {
+    font: 700 26px/1.2 var(--sans);
+}
+#sv-verdict.bad {
+    color: var(--red);
+}
+.sv-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+}
+.sv-actions .next-button {
+    min-width: 280px;
+}
+/* the creeper: a white flash and the screen shakes */
+.boom {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: #fff;
+    pointer-events: none;
+    animation: boom .8s ease-out both;
+}
+@keyframes boom {
+    from {
+        opacity: .95;
+    }
+    to {
+        opacity: 0;
+    }
+}
+.shake {
+    animation: shake .45s both;
+}
+@keyframes shake {
+    15% { translate: -9px 4px; }
+    30% { translate: 8px -5px; }
+    45% { translate: -6px -3px; }
+    60% { translate: 5px 4px; }
+    80% { translate: -2px 1px; }
+}
+
 /* the map to guess on, in the corner; it grows under the mouse */
 .map-container {
     position: absolute;
@@ -2200,6 +2293,21 @@ body.room-playing {
         width: 44vw;
         height: 34vh;
     }
+    #hearts {
+        left: 10px;
+        bottom: 14px;
+    }
+    #hearts .heart {
+        width: 15px;
+        height: 15px;
+        margin-right: -1px;
+        background-size: 90px 15px;
+    }
+    #hearts .heart.half { background-position: -15px 0; }
+    #hearts .heart.empty { background-position: -30px 0; }
+    #hearts .heart.hc { background-position: -45px 0; }
+    #hearts .heart.hc.half { background-position: -60px 0; }
+    #hearts .heart.hc.empty { background-position: -75px 0; }
     .map-container:hover {
         width: calc(100vw - 28px);
         height: 62vh;

@@ -8,7 +8,7 @@ $(function () {
     // per tab: the columns after # and Player; the last one is left out on a phone
     var columns = {
         classic: ['Score', 'Time', 'Date'],
-        survival: ['Streak', 'Time', 'Date'],
+        survival: ['Locations', 'Points', 'Date'],
         levels: ['Level', 'XP', 'Games'],
         wins: ['Wins', 'Best streak', 'Games']
     };
@@ -54,6 +54,9 @@ $(function () {
         if (mode == 'wins') {
             return [number(row.wins), number(row.best), number(row.played)];
         }
+        if (mode == 'survival') {
+            return [number(row.score), number(row.points || 0), day(row.date)];
+        }
         return [number(row.score), duration(row.time), day(row.date)];
     }
 
@@ -62,9 +65,13 @@ $(function () {
         var ladder = mode == 'levels' || mode == 'wins';
         var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
         form.find('.filters').prop('hidden', ladder);
+        // Survival has no settings but its difficulty: one board for each
+        form.find('.board-group').prop('hidden', mode == 'survival');
+        $('#board-difficulty').prop('hidden', mode != 'survival');
         $('#board-rounds').prop('hidden', mode != 'classic');
         var ask = ++asked;
-        $.ajax({url: board.data('api'), type: 'POST', dataType: 'json', data: ladder ? {mode: mode} : {
+        $.ajax({url: board.data('api'), type: 'POST', dataType: 'json', data: ladder ? {mode: mode}
+                : mode == 'survival' ? {mode: mode, difficulty: form.find('[name=difficulty]:checked').val()} : {
             mode: mode,
             provinces: "['" + provinces.join("', '") + "']",
             rounds: form.find('[name=rounds]:checked').val(),

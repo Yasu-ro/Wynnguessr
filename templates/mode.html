@@ -9,7 +9,27 @@
     <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     <form action="game" class="panel settings" method="get">
 {% with modes = [('classic', 'Classic'), ('survival', 'Survival')] %}{% include "modes.html" %}{% endwith %}
+            <fieldset class="setting" id="difficulty" hidden>
+                <h3 class="setting-name">Difficulty</h3>
+                <div class="chips">
+                    <input type="radio" name="difficulty" id="difficulty-normal" value="normal" checked>
+                    <label class="chip" for="difficulty-normal">Normal</label>
+                    <input type="radio" name="difficulty" id="difficulty-hard" value="hard">
+                    <label class="chip" for="difficulty-hard">Hard</label>
+                    <input type="radio" name="difficulty" id="difficulty-hardcore" value="hardcore">
+                    <label class="chip" for="difficulty-hardcore">Hardcore</label>
+                </div>
+                <p class="setting-note">Normal: 10 hearts · Hard: 5 hearts, less time · Hardcore: 1 heart</p>
+            </fieldset>
 {% include "settings.html" %}
+            <script>
+                // Survival has no settings but its difficulty
+                document.addEventListener('modechange', function (e) {
+                    var survival = e.detail == 'survival';
+                    ['provinces', 'timer', 'look', 'rounds'].forEach(function (id) { document.getElementById(id).hidden = survival; });
+                    document.getElementById('difficulty').hidden = !survival;
+                });
+            </script>
         <button type="submit" class="btn big wide" id="mode-submit-button">Play</button>
     </form>
     <script>showRules();</script>

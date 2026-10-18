@@ -7,11 +7,11 @@
 // name: how many versions (one is picked at random each time). Same names
 // and counts as tools/sounds.py
 var SOUNDS = {pin: 3, guess: 1, other: 1, round: 3, warn: 1, tick: 1, perfect: 1, hurt: 3, out: 1,
-              win: 1, lose: 3, join: 1, start: 2, orb: 1, level: 1, click: 1, note: 1, good: 1, bad: 1, bubble: 1, toast: 1};
+              win: 1, lose: 3, join: 1, start: 2, orb: 1, level: 1, click: 1, note: 1, good: 1, bad: 1, bubble: 1, toast: 1, fuse: 1, boom: 4};
 // how loud each one is next to the others: small sounds stay small
 var LOUD = {pin: .45, guess: .5, other: .3, round: .3, warn: .45, tick: .4, perfect: .6, hurt: .55, out: .6,
             win: .5, lose: .55, join: .4, start: .35, orb: .3, level: .5, click: .35, note: .35, good: .45, bad: .45,
-            bubble: .25, toast: .4};
+            bubble: .25, toast: .4, fuse: .55, boom: .6};
 var SOUND_GAP = 80;   // ms: the same sound asked again sooner is skipped, so nothing piles up
 var SOUND_MAX = 14;   // sounds started in one second, at most (counted by the clock: a
                       // count of sounds still playing never went down while the
