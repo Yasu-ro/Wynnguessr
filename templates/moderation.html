@@ -14,6 +14,10 @@
         <input type="radio" name="mod-tab" id="tab-photos" value="photos"{% if first == 'photos' %} checked{% endif %}>
         <label for="tab-photos" class="tab">Photos</label>
         {% endif %}
+        {% if may.players %}
+        <input type="radio" name="mod-tab" id="tab-players" value="players">
+        <label for="tab-players" class="tab">Players</label>
+        {% endif %}
         <input type="radio" name="mod-tab" id="tab-staff" value="staff"{% if not may.pictures %} checked{% endif %}>
         <label for="tab-staff" class="tab">Team</label>
         {% if may.tags %}
@@ -37,6 +41,17 @@
     <section class="mod-pane" id="pane-photos"{% if first != 'photos' %} hidden{% endif %}>
         <div class="mod-photos" id="photo-list"></div>
         <p class="hint" id="photo-empty" hidden>Nothing to look at. A picture a player sends waits here before anyone else sees it.</p>
+    </section>
+    {% endif %}
+
+    {% if may.players %}
+    <section class="mod-pane" id="pane-players" hidden>
+        <form class="mod-find" id="player-find" autocomplete="off">
+            <input class="field" name="q" placeholder="Player name" aria-label="Player name" maxlength="20" required>
+            <button class="btn" type="submit">Find</button>
+        </form>
+        <div class="mod-found" id="player-found"></div>
+        <div id="player-card"></div>
     </section>
     {% endif %}
 

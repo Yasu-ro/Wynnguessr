@@ -381,15 +381,36 @@ def stamp(hashed):
 @app.before_request
 def still_logged_in():
     # (not for the pictures: 95 % of the requests, and none needs it)
-    if request.endpoint in ('static', 'play_tile', 'survival_tile') or not session.get('loggedin'):
+    # a banned player, guest or not, is logged out of every browser, and
+    # their next page tells them why, once (a page: not a script's call, nor
+    # a picture, which would use the message up unseen)
+    if request.endpoint in ('static', 'play_tile', 'survival_tile'):
         return
-    with connect() as c:
-        me = c.execute("SELECT password FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
-    if me and session.setdefault('stamp', stamp(me[0])) == stamp(me[0]):
-        return
-    session.clear()
+    if session.get('user_id'):
+        with connect() as c:
+            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+            note = me and (me['banned_until'] or 0) > time.time() and ban_note(c, session['user_id'])
+        if note:
+            session.clear()
+            session['banned'] = note
+        elif session.get('loggedin') and not (me and not me['guest'] and session.setdefault('stamp', stamp(me[0])) == stamp(me[0])):
+            session.clear()
+    if session.get('banned') and request.method == 'GET' and a_page():
+        return render_template('apology.html', message = session.pop('banned')), 403
+
+def a_page():
+    # a page the player opens, not a script's call nor a picture. Browsers say
+    # so (Sec-Fetch-Dest); else the Accept header (its "best" will not do:
+    # Chromium's signed-exchange type would rank above text/html)
+    dest = request.headers.get('Sec-Fetch-Dest')
+    return dest == 'document' if dest else request.accept_mimetypes.best_match(['application/json', 'image/webp', 'text/html']) == 'text/html'
 
 def log_in(c, uid, wynn = False):
+    # a banned player stays out: what to tell them comes back instead
+    note = ban_note(c, uid)
+    if note:
+        return note
+    seen(c, uid)
     adopt(c, uid)
     session.permanent = True
     session['guest'] = False
@@ -438,8 +459,8 @@ def login():
         with connect() as c:
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
             if user and user[2] and bcrypt.check_password_hash(user[2], password):
-                log_in(c, user[0])
-                return redirect(next_page())
+                note = log_in(c, user[0])
+                return render_template('apology.html', message = note) if note else redirect(next_page())
         failed(username)
         return render_template('apology.html', message = "Invalid username or password")
     else:
@@ -452,7 +473,7 @@ def register():
         password = request.form['password']
         confirmation = request.form['confirmation']
         with connect() as c:
-            problem = name_problem(c, username) or password_problem(password, confirmation)
+            problem = place_note(c) or name_problem(c, username) or password_problem(password, confirmation)
             if problem:
                 return render_template('apology.html', message = problem)
             uid = c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed(password))).lastrowid
@@ -477,8 +498,8 @@ def recover():
         user = c.execute("SELECT id, recovery FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
         if user and user['recovery'] and bcrypt.check_password_hash(user['recovery'], plain_code(request.form.get('code', ''))):
             c.execute("UPDATE users SET password = ?, recovery = NULL WHERE id = ?", (hashed(request.form['password']), user['id']))
-            log_in(c, user['id'])
-            return redirect('account?saved=recovered')
+            note = log_in(c, user['id'])
+            return render_template('apology.html', message = note) if note else redirect('account?saved=recovered')
     failed(username)
     return render_template('apology.html', message = "Wrong username or recovery code")
 
@@ -522,9 +543,11 @@ def guest():
     if not name or len(name) > 20:
         return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
     with connect() as c:
+        if place_note(c):
+            return render_template('apology.html', message = place_note(c))
         if c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
             return render_template('apology.html', message = "This name belongs to a registered player: pick another one, or log in")
-        uid = c.execute("INSERT INTO users (username, password, guest) VALUES (?, '', 1)", (name,)).lastrowid
+        uid = c.execute("INSERT INTO users (username, password, guest, seen_from) VALUES (?, '', 1, ?)", (name, place())).lastrowid
     session.permanent = True
     session['loggedin'] = False
     session['guest'] = True
@@ -885,7 +908,9 @@ def wynn_back():
             return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
-        log_in(c, uid, wynn = True)
+        note = log_in(c, uid, wynn = True)
+    if note:
+        return wynn_fail(note)
     return redirect('../../' + session.pop('wynn_next', './'))
 
 @app.route("/apology")
@@ -1178,6 +1203,7 @@ def room():
         # classic room can still be played alone, the other modes only looked at
         c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, ?, ?)",
                   (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time()))
+        seen(c, session['user_id'])
     return render_template('room.html', code = r['code'])
 
 @app.route("/api/room/<code>")
@@ -1244,6 +1270,9 @@ def room_state(code):
         for p in out['players']:
             if p['uid'] in ignored:
                 p['ignored'] = True
+        muted = (c.execute("SELECT muted_until FROM users WHERE id = ?", (me['user_id'],)).fetchone()[0] or 0) - now
+        if muted > 0:
+            out['muted'] = how_long(muted)
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
         if r['mode'] == 'survival':
@@ -1284,6 +1313,9 @@ def room_chat(code):
         r, me = member(c, code)
         if not r or not text:
             return jsonify({"success": False})
+        muted = (c.execute("SELECT muted_until FROM users WHERE id = ?", (me['user_id'],)).fetchone()[0] or 0) - time.time()
+        if muted > 0:
+            return jsonify({"success": False, "error": "You are muted for " + how_long(muted)})
         last = c.execute("SELECT MAX(at) FROM room_chat WHERE code = ? AND user_id = ?", (r['code'], me['user_id'])).fetchone()[0]
         if last and time.time() - last < 0.7:
             return jsonify({"success": False, "error": "Slow down a little"})
@@ -3218,6 +3250,128 @@ def mod_report():
             return jsonify({"success": False}), 403
         if c.execute("UPDATE chat_reports SET done = 1 WHERE message = ? AND done = 0", (mid,)).rowcount:
             logged(c, 'report', m['user_id'], 'report dismissed: "%s"' % (m['raw'] or m['text']), reason)
+    return jsonify({"success": True})
+
+# ---------- Moderation: sanctions ----------
+# Mute (no chat) and ban (no playing), as on Discord and Minecraft servers:
+# each has a length and a reason, and goes to the log; a Helper mutes for an
+# hour at most. A ban logs the player out of every browser. A guest is only a
+# name and could come back as a new one: so while a ban lasts (28 days at
+# most there: addresses change hands), the player's last address makes no new
+# guest or account. The staff never sees an address. Rename: the old name
+# stays in the log.
+
+MUTES = (600, 3600, 86400, 7 * 86400, 28 * 86400)
+BANS = (86400, 7 * 86400, 28 * 86400, 0)          # 0: forever
+FOREVER = 10 ** 11                                 # a date that never comes
+PLACE_BAN = 28 * 86400
+
+with connect() as c:
+    if 'muted_until' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN muted_until REAL")
+        c.execute("ALTER TABLE users ADD COLUMN banned_until REAL")
+        c.execute("ALTER TABLE users ADD COLUMN ban_reason TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN seen_from TEXT")    # the last address, for a ban only
+    c.execute("CREATE TABLE IF NOT EXISTS place_bans (place TEXT, until REAL, user_id INTEGER)")
+
+def how_long(seconds):
+    # "6 more days": the same for everyone, whatever their time zone (a
+    # minute of slack: an hour's mute read a moment later is still an hour)
+    for unit, size in (('day', 86400), ('hour', 3600), ('minute', 60)):
+        if seconds + 60 >= size or unit == 'minute':
+            n = max(1, round(seconds / size))
+            return '%d more %s%s' % (n, unit, '' if n == 1 else 's')
+
+def seen(c, uid):
+    c.execute("UPDATE users SET seen_from = ? WHERE id = ?", (place(), uid))
+
+def ban_note(c, uid):
+    # why this player may not come in, or None
+    u = c.execute("SELECT banned_until, ban_reason FROM users WHERE id = ?", (uid,)).fetchone()
+    left = (u and u['banned_until'] or 0) - time.time()
+    if left > 0:
+        return ('This account is banned' + ('' if u['banned_until'] >= FOREVER else ' for ' + how_long(left)) +
+                ('. Why: ' + u['ban_reason'] if u['ban_reason'] else ''))
+
+def place_note(c):
+    # a banned player's address makes no new name while the ban lasts
+    if c.execute("SELECT 1 FROM place_bans WHERE place = ? AND until > ?", (place(), time.time())).fetchone():
+        return "This connection is banned for now"
+
+@app.route("/api/mod/players")
+def mod_players():
+    # find players by the start of their name, the exact one and accounts first
+    q = ' '.join(request.args.get('q', '').split())
+    with connect() as c:
+        if not may(c, 'players'):
+            return jsonify({"success": False}), 403
+        rows = [dict(u) for u in c.execute('''SELECT id, username AS name, COALESCE(guest, 0) AS guest FROM users
+            WHERE username LIKE ? ESCAPE '\\' ORDER BY username = ? COLLATE NOCASE DESC, COALESCE(guest, 0), id DESC LIMIT 20''',
+            (re.sub(r'([\\%_])', r'\\\1', q) + '%', q))] if q else []
+    return jsonify({"success": True, "players": rows})
+
+@app.route("/api/mod/player")
+def mod_player():
+    # one player: how things stand, what this staff member may do, what happened
+    uid = request.args.get('id', type = int)
+    with connect() as c:
+        if not may(c, 'players'):
+            return jsonify({"success": False}), 403
+        u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if not u:
+            return jsonify({"success": False})
+        now = time.time()
+        log = [dict(x) for x in c.execute('''SELECT m.at, m.details, m.reason, a.username AS by FROM mod_log m LEFT JOIN users a ON a.id = m.by
+            WHERE m.target = ? ORDER BY m.id DESC LIMIT 30''', (uid,))]
+        said = [dict(x) for x in c.execute('''SELECT code AS room, at, COALESCE(raw, text) AS text, hidden_by IS NOT NULL AS hidden
+            FROM room_chat WHERE user_id = ? ORDER BY id DESC LIMIT 10''', (uid,))]
+        reported = c.execute("SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = ?", (uid,)).fetchone()[0]
+        out = {"success": True, "id": uid, "name": u['username'], "guest": bool(u['guest']), "tag": tag_of(c, [uid]).get(uid),
+               "picture": None if u['guest'] else avatar_url(u), "reported": reported, "log": log, "said": said,
+               "muted": how_long(u['muted_until'] - now) if (u['muted_until'] or 0) > now else None,
+               "banned": ('forever' if u['banned_until'] >= FOREVER else 'for ' + how_long(u['banned_until'] - now)) if (u['banned_until'] or 0) > now else None,
+               "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename')}}
+        out['mutes'] = [m for m in MUTES if out['may']['long_mute'] or m <= HELPER_MUTE]
+        out['bans'] = list(BANS)
+    return jsonify(out)
+
+@app.route("/api/mod/sanction", methods=['POST'])
+def mod_sanction():
+    f = request.form
+    uid, what, reason = f.get('id', type = int), f.get('do'), f.get('reason', '').strip()[:200]
+    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename'}.get(what)
+    with room_tx() as c:
+        u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if not u or not need or not may(c, need, uid):
+            return jsonify({"success": False, "error": "You can only do this to players below you"}), 403
+        now, length = time.time(), f.get('length', type = int)
+        if what == 'mute':
+            if length not in MUTES or (length > HELPER_MUTE and not may(c, 'long_mute', uid)):
+                return jsonify({"success": False, "error": "A Helper mutes for an hour at most"})
+            c.execute("UPDATE users SET muted_until = ? WHERE id = ?", (now + length, uid))
+            logged(c, 'mute', uid, 'muted for ' + how_long(length).replace(' more', ''), reason)
+        elif what == 'unmute':
+            c.execute("UPDATE users SET muted_until = NULL WHERE id = ?", (uid,))
+            logged(c, 'mute', uid, 'unmuted', reason)
+        elif what == 'ban':
+            if length not in BANS:
+                return jsonify({"success": False})
+            until = now + length if length else FOREVER
+            c.execute("UPDATE users SET banned_until = ?, ban_reason = ? WHERE id = ?", (until, reason or None, uid))
+            if u['seen_from']:
+                c.execute("INSERT INTO place_bans (place, until, user_id) VALUES (?, ?, ?)", (u['seen_from'], min(until, now + PLACE_BAN), uid))
+            logged(c, 'ban', uid, 'banned ' + ('for ' + how_long(length).replace(' more', '') if length else 'forever'), reason)
+        elif what == 'unban':
+            c.execute("UPDATE users SET banned_until = NULL, ban_reason = NULL WHERE id = ?", (uid,))
+            c.execute("UPDATE place_bans SET until = ? WHERE user_id = ? AND until > ?", (now, uid, now))
+            logged(c, 'ban', uid, 'unbanned', reason)
+        else:
+            name = clean_name(f.get('name', ''))
+            problem = name_problem(c, name, uid) or (filtered(name) != name and "This name is not allowed")
+            if problem:
+                return jsonify({"success": False, "error": problem})
+            c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
+            logged(c, 'rename', uid, 'renamed from ' + u['username'], reason)
     return jsonify({"success": True})
 
 fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)

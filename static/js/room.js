@@ -114,6 +114,7 @@ function render(data) {
     s = data;
     if (s.next_url) preload(s.next_url);
     chat(s.chat, s.hidden);
+    $('#chat-input').prop('disabled', !!s.muted).attr('placeholder', s.muted ? 'You are muted for ' + s.muted : 'Say something...');
     arrivals();
     if (s.next && s.live && s.state == 'finished') {
         leaving = true;

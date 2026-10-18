@@ -790,8 +790,40 @@ max), journal d'audit avec la raison. D'où :
     `clean_zz.py` effaçait les comptes `zz_` mais pas leurs signalements, et
     le compte suivant héritait de 10 signalements (limite atteinte). Toute
     table rangée par id de joueur doit être nettoyée avec lui.
-- **À venir** (étapes suivantes) : sourdine/ban/renommer (avec
-  bannissement de la connexion pour les invités), filtre des pseudos (même
+- **Sanctions** (étape 4, 2026-10-18) — section « Moderation: sanctions »
+  d'`app.py`, onglet **Players** (chercher un nom, invités compris ; le nom
+  d'un signalement y mène) : état, actions permises, historique (journal le
+  visant, nombre de signalements, 10 derniers messages tels que tapés).
+  - **Mute** (Helper, 1 h au plus ; au-delà Moderator) : 10 min, 1 h,
+    1 jour, 7 jours, 28 jours (le plafond de Discord). Plus de chat ; sa page
+    le dit à la place de la saisie (« You are muted for 52 more minutes »).
+  - **Ban** (Moderator) : 1 jour, 7, 28, Forever ; demande deux clics. Le
+    joueur est déconnecté **de tous ses navigateurs** à sa requête suivante
+    (`still_logged_in`, invités compris), sa page suivante dit pourquoi
+    **une fois** (la raison est montrée : le champ le dit), la connexion
+    est refusée avec la même phrase. **L'adresse** : chaque connexion,
+    invité et entrée de salon notent la dernière (`users.seen_from`, lue
+    par `place()` dans l'en-tête de Cloudflare) ; un ban la bloque
+    (`place_bans`) pour **créer** un invité ou un compte, le temps du ban et
+    **28 jours au plus** (les adresses changent de main ; un compte existant
+    à la même adresse joue toujours). L'équipe ne voit jamais d'adresse.
+  - **Rename** (Moderator) : mêmes règles qu'un pseudo choisi, et refusé
+    s'il passe par le filtre ; l'ancien nom au journal.
+  - Durées écrites « 6 more days » (`how_long`, une minute de marge : sans
+    elle, une heure lue une milliseconde après disait « 60 more minutes ») :
+    pareilles dans tous les fuseaux.
+  - Sur téléphone, les 6 onglets tiennent sur une ligne dès 360 px.
+  - **Piège payé** : pour n'afficher le message du ban que sur une vraie page
+    (une image ou un appel de script l'aurait consommé sans qu'il se voie),
+    `request.accept_mimetypes.best` ne marche pas : werkzeug classe
+    `application/signed-exchange;v=b3` de Chromium avant `text/html`.
+    `a_page()` lit `Sec-Fetch-Dest: document`, sinon `best_match`.
+  - Piège de test : après un `HUP` du serveur de test à 4 workers, attendre
+    que tous aient redémarré (ils démarrent un par un, `.starting.lock`).
+  - Tests : `t_sanctions.py` (35, une adresse par client par l'en-tête
+    `CF-Connecting-IP`, sinon un ban bloquerait 127.0.0.1 pour tous les
+    tests), `t_players_page.py` (navigateur, 13 × 2).
+- **À venir** (étapes suivantes) : filtre des pseudos (même
   `bad_words.txt`) et noms réservés, passe de sécurité. `REVIEWERS` (tri
   des lieux) reste à part pour l'instant.
 

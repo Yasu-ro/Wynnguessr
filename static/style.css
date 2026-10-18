@@ -496,6 +496,100 @@ button, input {
     padding: 4px 16px;
     font-size: 15px;
 }
+/* Players: find one, how things stand, mute / ban / rename, what happened */
+.mod-find {
+    display: flex;
+    gap: 8px;
+    max-width: 420px;
+    margin: 0 auto 14px;
+}
+.mod-find .field {
+    flex: 1;
+    min-width: 0;
+}
+.mod-found {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.mod-player {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 640px;
+    margin: 0 auto;
+}
+.mod-player h3 {
+    margin: 10px 0 0;
+    font: 400 21px/1.2 var(--hand);
+}
+.mod-player h3 small {
+    margin-left: 6px;
+    font: 400 14px var(--sans);
+    color: var(--ink-soft);
+}
+.mod-player-who {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 14px;
+    margin: 0;
+}
+.mod-player-who img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 3px;
+    box-shadow: var(--frame-thin);
+    image-rendering: pixelated;
+}
+.mod-player small, .mod-history small {
+    color: var(--ink-soft);
+}
+.mod-status {
+    margin: 0;
+    padding: 6px 10px;
+    font-weight: 700;
+    text-align: center;
+    color: #fff;
+    background: var(--red);
+    border-radius: 4px;
+}
+.mod-act {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.mod-act h3 {
+    flex-basis: 100%;
+}
+.mod-act .btn {
+    min-height: 36px;
+    padding: 4px 16px;
+    font-size: 15px;
+}
+.mod-rename {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+}
+.mod-rename .field {
+    flex: 1;
+    min-width: 0;
+}
+.mod-history {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.mod-history li {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--line);
+}
 .account-waiting {
     display: flex;
     align-items: center;
@@ -3626,6 +3720,14 @@ body.room-playing {
     .tab {
         padding: 4px 5px 5px;
         font-size: 14px;
+    }
+    /* six tabs for the staff: one line still */
+    .mod-tabs {
+        gap: 10px 4px;
+    }
+    .mod-tabs .tab {
+        padding-inline: 4px;
+        font-size: 13px;
     }
     .profile-stats {
         display: grid;

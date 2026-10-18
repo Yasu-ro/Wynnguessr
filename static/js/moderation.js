@@ -118,8 +118,8 @@ $(function () {
             $('#report-list').html(r.reports.map(function (x) {
                 var by = x.by.length > 3 ? x.by.slice(0, 3).join(', ') + ' and ' + (x.by.length - 3) + ' more' : x.by.join(', ');
                 return "<div class='mod-report' data-id='" + x.id + "'><p class='mod-report-head'>" +
-                    (x.author.guest ? '<span><b>' + esc(x.author.name) + '</b> <small>(guest)</small></span>'
-                                    : "<a class='board-name' href='player?id=" + x.author.id + "'>" + esc(x.author.name) + '</a>') +
+                    "<span><a class='board-name' href='#' data-player='" + x.author.id + "'>" + esc(x.author.name) + '</a>' +
+                    (x.author.guest ? ' <small>(guest)</small>' : '') + '</span>' +
                     '<small>Room ' + esc(x.room) + ' · ' + when(x.at) + '</small></p>' +
                     "<div class='mod-chat'>" + x.around.map(function (m) {
                         return '<p' + (m.id == x.id ? " class='reported'" : m.hidden ? " class='gone'" : '') + '><b>' + esc(m.name) + '</b><span>' + esc(m.text) + '</span></p>';
@@ -136,6 +136,110 @@ $(function () {
         var card = $(this).closest('.mod-report'), what = $(this).data('report');
         card.find('button').prop('disabled', true);
         $.post(what == 'hide' ? 'api/mod/hide' : 'api/mod/report', {id: card.data('id'), 'do': what, reason: card.find('input').val()}).always(reports);
+    });
+
+    // ---------- players ----------
+    // find a player, see how things stand and what happened, and act: mute,
+    // ban (asks twice), rename. The server says what this rank may do.
+    var LENGTHS = {600: '10 min', 3600: '1 hour', 86400: '1 day', 604800: '7 days', 2419200: '28 days', 0: 'Forever'};
+    var shown = null, banArmed = 0;
+
+    $('#player-find').on('submit', function (e) {
+        e.preventDefault();
+        $.getJSON('api/mod/players', {q: $(this).find('[name=q]').val()}).done(function (r) {
+            if (r.players.length == 1) {
+                $('#player-found').empty();
+                player(r.players[0].id);
+                return;
+            }
+            $('#player-card').empty();
+            $('#player-found').html(r.players.length ? r.players.map(function (p) {
+                return "<button type='button' class='chip' data-player='" + p.id + "'>" + esc(p.name) + (p.guest ? ' <small>(guest)</small>' : '') + '</button>';
+            }).join('') : "<p class='hint'>No player with this name.</p>");
+        });
+    });
+    $('#player-found').on('click', '[data-player]', function () {
+        player($(this).data('player'));
+    });
+    // a name on a report opens its player here
+    $('#report-list').on('click', '[data-player]', function (e) {
+        e.preventDefault();
+        $('#tab-players').prop('checked', true).trigger('change');
+        $('#player-found').empty();
+        player($(this).data('player'));
+    });
+
+    function lengths(name, list) {
+        return "<div class='chips'>" + list.map(function (l, i) {
+            return "<input type='radio' name='" + name + "' id='" + name + '-' + l + "' value='" + l + "'" + (i == 0 ? ' checked' : '') + '>' +
+                "<label class='chip small' for='" + name + '-' + l + "'>" + LENGTHS[l] + '</label>';
+        }).join('') + '</div>';
+    }
+
+    function player(id) {
+        $.getJSON('api/mod/player', {id: id}).done(function (p) {
+            if (!p.success) {
+                return;
+            }
+            shown = p.id;
+            var status = [p.banned ? 'Banned ' + p.banned : '', p.muted ? 'Muted for ' + p.muted : ''].filter(Boolean);
+            var acts = '';
+            if (p.may.mute) {
+                acts += "<div class='mod-act'><h3>Mute <small>no chat</small></h3>" + (p.muted
+                    ? "<button type='button' class='btn wood' data-act='unmute'>Unmute</button>"
+                    : lengths('mute-length', p.mutes) + "<button type='button' class='btn' data-act='mute'>Mute</button>") + '</div>';
+            }
+            if (p.may.ban) {
+                acts += "<div class='mod-act'><h3>Ban <small>no playing, logged out everywhere</small></h3>" + (p.banned
+                    ? "<button type='button' class='btn wood' data-act='unban'>Unban</button>"
+                    : lengths('ban-length', p.bans) + "<button type='button' class='btn red' data-act='ban'>Ban</button>") + '</div>';
+            }
+            if (p.may.rename) {
+                acts += "<div class='mod-act'><h3>Rename</h3><div class='mod-rename'><input class='field' name='name' value='" + esc(p.name).replace(/'/g, '&#39;') +
+                    "' aria-label='New name' maxlength='20'><button type='button' class='btn' data-act='rename'>Rename</button></div></div>";
+            }
+            if (acts) {
+                acts = "<input class='field' name='reason' placeholder='Why (kept in the log; a banned player reads it)' aria-label='Why' maxlength='200'>" + acts +
+                    "<p class='note' id='player-note' hidden></p>";
+            } else {
+                acts = "<p class='hint'>This player is not below you: you can only look.</p>";
+            }
+            $('#player-card').html("<section class='panel mod-player'><h2>" + esc(p.name) + '</h2>' +
+                "<p class='mod-player-who'>" + (p.picture ? "<img class='avatar small' src='" + esc(p.picture) + "' alt=''>" : '') +
+                (p.tag ? "<span class='name-tag " + esc(p.tag.color) + "'>" + esc(p.tag.label) + '</span>' : '') +
+                (p.guest ? '<small>Guest</small>' : "<a class='board-name' href='player?id=" + p.id + "'>Profile</a>") +
+                '<small>Reported ' + (p.reported == 1 ? 'once' : p.reported + ' times') + '</small></p>' +
+                (status.length ? "<p class='mod-status'>" + esc(status.join(' · ')) + '</p>' : '') + acts +
+                '<h3>History</h3>' + (p.log.length ? "<ul class='mod-history'>" + p.log.map(function (e) {
+                    return '<li><small>' + when(e.at) + ' · ' + esc(e.by) + '</small> ' + esc(e.details) +
+                        (e.reason ? "<small class='mod-why'>" + esc(e.reason) + '</small>' : '') + '</li>';
+                }).join('') + '</ul>' : "<p class='hint'>Nothing yet.</p>") +
+                '<h3>Last Messages</h3>' + (p.said.length ? "<div class='mod-chat'>" + p.said.map(function (m) {
+                    return '<p' + (m.hidden ? " class='gone'" : '') + '><small>' + esc(m.room) + ' · ' + when(m.at) + '</small> ' + esc(m.text) + '</p>';
+                }).join('') + '</div>' : "<p class='hint'>Nothing yet.</p>") + '</section>');
+        });
+    }
+
+    $('#player-card').on('click', '[data-act]', function () {
+        var card = $(this).closest('.mod-player'), what = $(this).data('act'), button = $(this);
+        // a ban asks twice
+        if (what == 'ban' && Date.now() - banArmed > ARMED) {
+            banArmed = Date.now();
+            button.text('Sure?');
+            setTimeout(function () { if (Date.now() - banArmed >= ARMED) button.text('Ban'); }, ARMED + 50);
+            return;
+        }
+        banArmed = 0;
+        $.post('api/mod/sanction', {id: shown, 'do': what, reason: card.find('[name=reason]').val(), name: card.find('[name=name]').val(),
+                                    length: card.find('[name=' + what + '-length]:checked').val()}).done(function (r) {
+            if (r.success) {
+                player(shown);
+            } else {
+                $('#player-note').prop('hidden', false).addClass('bad').text(r.error || 'Refused');
+            }
+        }).fail(function (x) {
+            $('#player-note').prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused');
+        });
     });
 
     // ---------- tags ----------
