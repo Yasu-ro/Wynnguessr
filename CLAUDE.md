@@ -244,12 +244,12 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
   On peut envoyer sa propre image : recadrée en carré, **réencodée en webp
   256 px côté serveur** (le fichier envoyé n'est jamais servi), 8 Mo max.
   Dossier `avatars/` hors git, propre à chaque site. Route `avatar?id=&v=`.
-  Les comptes d'`ADMINS` (Yasuro, par id) ont un bouton « Remove picture »
-  sur le profil des autres.
+  **Approuvée avant d'être vue** depuis le 2026-10-18 (voir « Phase 2 ») ;
+  l'équipe a un bouton « Remove picture » sur le profil des autres.
 - **Pseudo** : changeable sur `account` ; bouton « Use my Minecraft name » si
   lié. Unique **sans tenir compte de la casse** (avant, « yasuro » pouvait
   s'inscrire à côté de « Yasuro »), jamais le `mc_name` vérifié d'un autre.
-  Conséquence : **`REVIEWERS`, `PUBLISHER`, `ADMINS` sont des ids**, sinon
+  Conséquence : **`REVIEWERS`, `PUBLISHER`, `OWNER` sont des ids**, sinon
   quelqu'un pourrait prendre le nom libéré par Yasuro et ses droits.
 - **Mot de passe** : changement avec l'ancien, sauf si la session vient de
   « Log in with Wynncraft » (`session['wynn']`) : c'est la récupération d'un
@@ -739,11 +739,23 @@ max), journal d'audit avec la raison. D'où :
   aperçu en direct) ou la range (cachée partout, pas effacée) ; un
   Moderator la donne ou la reprend (règle d'en dessous) ; tout au journal.
   Tables `tags`, `user_tags`. Tests : `t_tags.py` (15), `t_tags_page.py`.
-- **À venir** (étapes suivantes) : photos à approuver, signaler et couper
-  (chat), cacher un message, sourdine/ban/renommer (avec bannissement de la
-  connexion pour les invités), filtre des pseudos et des mots, passe de
-  sécurité. `ADMINS` (retrait de photo) et `REVIEWERS` (tri des lieux)
-  restent à part pour l'instant.
+- **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
+  Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
+  dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne
+  jusque-là. Son auteur la voit sur `account` (« waiting for a moderator »),
+  l'équipe par `avatar?id=&pending=1` (privé, personne d'autre). Onglet
+  **Photos** de Moderation, ouvert d'office quand il y a de quoi, et un
+  compteur rouge sur le bouton du menu : Yes la met en place, No la jette
+  avec une raison facultative que le joueur lit **une fois** sur `account`
+  (`avatar_note`). Règle d'en dessous : la photo d'un Helper attend un rang
+  plus haut, celle de l'Owner passe directement (personne au-dessus).
+  Retirer une photo depuis un profil passe par le même pouvoir (`pictures`,
+  Helper) et va au journal ; `ADMINS` n'existe plus. Les photos déjà en
+  place avant restent. Tests : `t_pictures.py` (17), `t_photos_page.py`.
+- **À venir** (étapes suivantes) : signaler et couper (chat), cacher un
+  message, sourdine/ban/renommer (avec bannissement de la connexion pour les
+  invités), filtre des pseudos et des mots, passe de sécurité.
+  `REVIEWERS` (tri des lieux) reste à part pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
 - **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,

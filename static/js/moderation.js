@@ -25,6 +25,9 @@ $(function () {
         if (tab == 'tags') {
             tags();
         }
+        if (tab == 'photos') {
+            photos();
+        }
     });
 
     // ---------- the team ----------
@@ -81,6 +84,27 @@ $(function () {
         }).fail(function (x) {
             $('#give-note').prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused');
         });
+    });
+
+    // ---------- photos ----------
+    // each picture a player sent: yes, it becomes theirs; no, it goes, and
+    // they read why on their page
+    function photos() {
+        $.getJSON('api/mod/pictures').done(function (r) {
+            $('#photo-list').html(r.pictures.map(function (p) {
+                return "<div class='mod-photo' data-id='" + p.id + "'><img src='" + esc(p.url) + "' alt='' width='128' height='128'>" +
+                    "<a class='board-name' href='player?id=" + p.id + "'>" + esc(p.name) + '</a><small>' + when(p.at) + '</small>' +
+                    "<input class='field small' placeholder='Why (if no)' aria-label='Why' maxlength='200'>" +
+                    "<div><button type='button' class='btn' data-photo='approve'>Yes</button>" +
+                    "<button type='button' class='btn red' data-photo='reject'>No</button></div></div>";
+            }).join(''));
+            $('#photo-empty').prop('hidden', r.pictures.length > 0);
+        });
+    }
+    $('#photo-list').on('click', '[data-photo]', function () {
+        var card = $(this).closest('.mod-photo');
+        card.find('button').prop('disabled', true);
+        $.post('api/mod/picture', {id: card.data('id'), 'do': $(this).data('photo'), reason: card.find('input').val()}).always(photos);
     });
 
     // ---------- tags ----------
@@ -176,4 +200,7 @@ $(function () {
     $('#log-more').on('click', function () { log(true); });
 
     staff();
+    if ($('#pane-photos').length) {
+        photos();
+    }
 });

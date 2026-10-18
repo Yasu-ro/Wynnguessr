@@ -6,7 +6,11 @@
     <h1 class="sign">Moderation</h1>
     <p class="mod-you">You are <span class="rank-tag rank-{{ rank }}">{{ RANKS[rank] }}</span></p>
     <div class="tabs mod-tabs" id="mod-tabs">
-        <input type="radio" name="mod-tab" id="tab-staff" value="staff" checked>
+        {% if may.pictures %}
+        <input type="radio" name="mod-tab" id="tab-photos" value="photos" checked>
+        <label for="tab-photos" class="tab">Photos</label>
+        {% endif %}
+        <input type="radio" name="mod-tab" id="tab-staff" value="staff"{% if not may.pictures %} checked{% endif %}>
         <label for="tab-staff" class="tab">Team</label>
         {% if may.tags %}
         <input type="radio" name="mod-tab" id="tab-tags" value="tags">
@@ -18,7 +22,14 @@
         {% endif %}
     </div>
 
-    <section class="mod-pane" id="pane-staff">
+    {% if may.pictures %}
+    <section class="mod-pane" id="pane-photos">
+        <div class="mod-photos" id="photo-list"></div>
+        <p class="hint" id="photo-empty" hidden>Nothing to look at. A picture a player sends waits here before anyone else sees it.</p>
+    </section>
+    {% endif %}
+
+    <section class="mod-pane" id="pane-staff"{% if may.pictures %} hidden{% endif %}>
         <table class="leaderboard-table mod-table">
             <thead><tr class="leaderboard-row"><th>Player</th><th>Rank</th><th class="board-more">Given by</th><th></th></tr></thead>
             <tbody id="staff-rows"></tbody>

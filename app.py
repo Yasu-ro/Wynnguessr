@@ -531,7 +531,6 @@ def guest():
     session['user_id'] = uid
     return redirect(next_page())
 
-ADMINS = (1,)    # user ids that may take down someone's picture: Yasuro
 AVATAR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'avatars')   # not in git
 PICTURE_MAX = 8 * 1024 * 1024
 STEVE = 'https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb'
@@ -547,9 +546,9 @@ def show_profile(uid):
             return render_template('apology.html', message = "This player does not exist"), 404
         p = progress(c, uid)
         tags = tags_of(c, [uid])[uid]
-    return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
+        return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
                            avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
-                           admin = session.get('loggedin') and session.get('user_id') in ADMINS,
+                           admin = may(c, 'pictures', uid),
                            games = p['history'][:30], p = p)
 
 @app.route("/profile")
@@ -563,11 +562,12 @@ def player():
     # anyone's profile, opened from the leaderboard
     uid = request.args.get('id', type = int)
     if request.method == 'POST':
-        # an admin takes down a picture that should not be there
-        if not (session.get('loggedin') and session.get('user_id') in ADMINS):
-            return render_template('apology.html', message = "Not allowed"), 403
+        # the staff takes down a picture that should not be there
         with connect() as c:
+            if not may(c, 'pictures', uid):
+                return render_template('apology.html', message = "Not allowed"), 403
             drop_picture(c, uid)
+            logged(c, 'picture', uid, 'picture taken down')
         return redirect('player?id=' + str(uid))
     return show_profile(uid)
 
@@ -614,8 +614,14 @@ def head(uuid):
 @app.route("/avatar")
 def avatar():
     # a player's picture: the one they sent, else their Minecraft head
+    uid = request.args.get('id', type = int)
     with connect() as c:
-        user = c.execute("SELECT avatar, mc_uuid FROM users WHERE id = ?", (request.args.get('id', type = int),)).fetchone()
+        user = c.execute("SELECT avatar, avatar_pending, mc_uuid FROM users WHERE id = ?", (uid,)).fetchone()
+        if request.args.get('pending') and user and user['avatar_pending'] and (
+                uid == session.get('user_id') and session.get('loggedin') or may(c, 'pictures')):
+            response = send_from_directory(AVATAR_DIR, user['avatar_pending'] + '.webp', max_age = 600)
+            response.cache_control.public, response.cache_control.private = False, True
+            return response
     if user and user['avatar']:
         return send_from_directory(AVATAR_DIR, user['avatar'] + '.webp', max_age = 86400)
     path = head(user['mc_uuid'] if user else None)
@@ -640,14 +646,22 @@ def save_picture(c, uid, upload):
     name = secrets.token_hex(10)
     os.makedirs(AVATAR_DIR, exist_ok = True)
     img.save(os.path.join(AVATAR_DIR, name + '.webp'), 'WEBP', quality = 85)
-    drop_picture(c, uid)
-    c.execute("UPDATE users SET avatar = ? WHERE id = ?", (name, uid))
+    # it waits for the staff before anyone sees it (Yasuro), except the
+    # owner's: nobody is above to look at it
+    drop_picture(c, uid, 'avatar_pending')
+    c.execute("UPDATE users SET avatar_pending = ?, pending_at = ?, avatar_note = NULL WHERE id = ?", (name, time.time(), uid))
+    if rank_of(c, uid) == 4:
+        approve_picture(c, uid)
 
-def drop_picture(c, uid):
-    # back to the Minecraft head
-    old = c.execute("SELECT avatar FROM users WHERE id = ?", (uid,)).fetchone()
+def approve_picture(c, uid):
+    drop_picture(c, uid)
+    c.execute("UPDATE users SET avatar = avatar_pending, avatar_pending = NULL, pending_at = NULL WHERE id = ?", (uid,))
+
+def drop_picture(c, uid, which = 'avatar'):
+    # the shown picture (back to the Minecraft head), or the one waiting
+    old = c.execute(f"SELECT {which} FROM users WHERE id = ?", (uid,)).fetchone()
     if old and old[0]:
-        c.execute("UPDATE users SET avatar = NULL WHERE id = ?", (uid,))
+        c.execute(f"UPDATE users SET {which} = NULL WHERE id = ?", (uid,))
         try:
             os.remove(os.path.join(AVATAR_DIR, old[0] + '.webp'))
         except OSError:
@@ -670,7 +684,7 @@ def account():
         if what == 'picture':
             problem = save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture"
         elif what == 'head':
-            problem = drop_picture(c, uid)
+            problem = drop_picture(c, uid) or drop_picture(c, uid, 'avatar_pending')
         elif what in ('name', 'mc-name'):
             name = me['mc_name'] if what == 'mc-name' else clean_name(form.get('username', ''))
             problem = name_problem(c, name or '', uid)
@@ -704,6 +718,8 @@ def account():
 def account_page(section = None, error = None, code = None):
     with connect() as c:
         me = c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+        if me['avatar_note'] and request.method == 'GET':
+            c.execute("UPDATE users SET avatar_note = NULL WHERE id = ?", (me['id'],))   # said once
     return render_template('account.html', me = me, avatar = avatar_url(me), section = section, error = error,
                            code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
 
@@ -2897,7 +2913,10 @@ def staff_menu():
             return 0
         with connect() as c:
             return my_rank(c)
-    return {'my_rank': rank, 'RANKS': RANKS}
+    def waiting():
+        with connect() as c:
+            return len(pictures_waiting(c))
+    return {'my_rank': rank, 'RANKS': RANKS, 'mod_waiting': waiting}
 
 @app.route("/moderation")
 def moderation():
@@ -2949,6 +2968,49 @@ def mod_rank():
         else:
             c.execute("DELETE FROM staff WHERE user_id = ?", (user['id'],))
         logged(c, 'rank', user['id'], '%s → %s' % (RANKS.get(old, 'Player'), RANKS.get(new, 'Player')), reason)
+    return jsonify({"success": True})
+
+with connect() as c:
+    # a picture sent waits for the staff: which, since when, and why one was refused
+    if 'avatar_pending' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN avatar_pending TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN pending_at REAL")
+        c.execute("ALTER TABLE users ADD COLUMN avatar_note TEXT")
+
+def pictures_waiting(c):
+    # the pictures this session's staff member may look at, oldest first
+    r = my_rank(c)
+    if r < MAY['pictures']:
+        return []
+    return [dict(u) for u in c.execute("SELECT id, username AS name, avatar_pending, pending_at FROM users WHERE avatar_pending IS NOT NULL ORDER BY pending_at")
+            if rank_of(c, u['id']) < r]
+
+@app.route("/api/mod/pictures")
+def mod_pictures():
+    with connect() as c:
+        if not may(c, 'pictures'):
+            return jsonify({"success": False}), 403
+        rows = pictures_waiting(c)
+    return jsonify({"success": True, "pictures": [{"id": u['id'], "name": u['name'], "at": u['pending_at'],
+                    "url": 'avatar?id=%d&pending=1&v=%s' % (u['id'], u['avatar_pending'])} for u in rows]})
+
+@app.route("/api/mod/picture", methods=['POST'])
+def mod_picture():
+    # yes: it becomes the player's picture; no: it goes, and they are told why
+    uid, what = request.form.get('id', type = int), request.form.get('do')
+    reason = request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        if not may(c, 'pictures', uid) or what not in ('approve', 'reject'):
+            return jsonify({"success": False}), 403
+        if not c.execute("SELECT avatar_pending FROM users WHERE id = ?", (uid,)).fetchone()[0]:
+            return jsonify({"success": False, "error": "Already looked at"})
+        if what == 'approve':
+            approve_picture(c, uid)
+            logged(c, 'picture', uid, 'picture approved', reason)
+        else:
+            drop_picture(c, uid, 'avatar_pending')
+            c.execute("UPDATE users SET avatar_note = ? WHERE id = ?", (reason or 'not accepted', uid))
+            logged(c, 'picture', uid, 'picture refused', reason)
     return jsonify({"success": True})
 
 @app.route("/api/mod/tags")
