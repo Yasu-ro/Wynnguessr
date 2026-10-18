@@ -496,6 +496,28 @@ button, input {
     padding: 4px 16px;
     font-size: 15px;
 }
+/* Players: the list (filters, a row per player), then a player's card */
+.mod-kinds {
+    justify-content: center;
+    margin-bottom: 14px;
+}
+.mod-who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.mod-who img {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--ink);
+    image-rendering: pixelated;
+}
+.mod-flags {
+    color: var(--ink-soft);
+}
 /* Players: find one, how things stand, mute / ban / rename, what happened */
 .mod-find {
     display: flex;
@@ -506,13 +528,6 @@ button, input {
 .mod-find .field {
     flex: 1;
     min-width: 0;
-}
-.mod-found {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 14px;
 }
 .mod-player {
     display: flex;

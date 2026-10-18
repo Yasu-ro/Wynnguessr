@@ -46,12 +46,24 @@
 
     {% if may.players %}
     <section class="mod-pane" id="pane-players" hidden>
-        <form class="mod-find" id="player-find" autocomplete="off">
-            <input class="field" name="q" placeholder="Player name" aria-label="Player name" maxlength="20" required>
-            <button class="btn" type="submit">Find</button>
-        </form>
-        <div class="mod-found" id="player-found"></div>
-        <div id="player-card"></div>
+        <div id="player-list">
+            <form class="mod-find" id="player-find" autocomplete="off">
+                <input class="field" name="q" placeholder="Search a name" aria-label="Search a name" maxlength="20">
+            </form>
+            <div class="chips mod-kinds" id="player-kinds">
+                {% for k, label in [('all', 'All'), ('accounts', 'Accounts'), ('guests', 'Guests'), ('staff', 'Staff'), ('muted', 'Muted'), ('banned', 'Banned'), ('reported', 'Reported')] %}
+                <input type="radio" name="kind" id="kind-{{ k }}" value="{{ k }}"{% if loop.first %} checked{% endif %}>
+                <label class="chip small" for="kind-{{ k }}">{{ label }}</label>
+                {% endfor %}
+            </div>
+            <table class="leaderboard-table mod-table">
+                <thead><tr class="leaderboard-row"><th>Player</th><th>Status</th><th></th></tr></thead>
+                <tbody id="player-rows"></tbody>
+            </table>
+            <p class="hint" id="player-empty" hidden>No player here.</p>
+            <button type="button" class="btn wood board-next" id="player-more" hidden>Show 50 more</button>
+        </div>
+        <div id="player-card" hidden></div>
     </section>
     {% endif %}
 

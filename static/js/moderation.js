@@ -32,6 +32,9 @@ $(function () {
         if (tab == 'reports') {
             reports();
         }
+        if (tab == 'players' && !listed) {
+            players();
+        }
     });
 
     // ---------- the team ----------
@@ -145,29 +148,53 @@ $(function () {
     var LENGTHS = {600: '10 min', 3600: '1 hour', 86400: '1 day', 604800: '7 days', 2419200: '28 days', 0: 'Forever'};
     var shown = null, banArmed = 0;
 
+    // the list: every player, filtered by kind and by name, 50 at a time;
+    // a row opens the player's card, which goes back to the list
+    var listed = 0, asked = 0, typing = null;
+    function players(more) {
+        var n = ++asked;
+        $.getJSON('api/mod/players', {q: $('#player-find [name=q]').val(), kind: $('[name=kind]:checked').val(), start: more ? listed : 0}).done(function (r) {
+            if (n != asked) {
+                return;   // an older search, answered late
+            }
+            var rows = r.players.map(function (p) {
+                var status = [p.guest ? 'Guest' : '', p.muted ? 'Muted' : '', p.banned ? 'Banned' : '',
+                              p.reported ? 'Reported ' + p.reported + '×' : ''].filter(Boolean);
+                return "<tr class='leaderboard-row'><td><div class='mod-who'><img src='" + esc(p.picture) + "' alt='' width='24' height='24'>" + esc(p.name) +
+                    (p.tag ? " <span class='name-tag " + esc(p.tag.color) + "'>" + esc(p.tag.label) + '</span>' : '') + '</div></td>' +
+                    "<td class='mod-flags'>" + esc(status.join(' · ')) + '</td>' +
+                    "<td class='mod-tools'><div><button type='button' class='chip small' data-player='" + p.id + "'>Open</button></div></td></tr>";
+            }).join('');
+            $('#player-rows')[more ? 'append' : 'html'](rows);
+            listed = (more ? listed : 0) + r.players.length;
+            $('#player-empty').prop('hidden', listed > 0);
+            $('#player-more').prop('hidden', !r.more);
+        });
+    }
     $('#player-find').on('submit', function (e) {
         e.preventDefault();
-        $.getJSON('api/mod/players', {q: $(this).find('[name=q]').val()}).done(function (r) {
-            if (r.players.length == 1) {
-                $('#player-found').empty();
-                player(r.players[0].id);
-                return;
-            }
-            $('#player-card').empty();
-            $('#player-found').html(r.players.length ? r.players.map(function (p) {
-                return "<button type='button' class='chip' data-player='" + p.id + "'>" + esc(p.name) + (p.guest ? ' <small>(guest)</small>' : '') + '</button>';
-            }).join('') : "<p class='hint'>No player with this name.</p>");
-        });
+    }).on('input', function () {
+        clearTimeout(typing);
+        typing = setTimeout(function () { players(); }, 250);
     });
-    $('#player-found').on('click', '[data-player]', function () {
+    $('#player-kinds').on('change', function () { players(); });
+    $('#player-more').on('click', function () { players(true); });
+    $('#player-rows').on('click', '[data-player]', function () {
         player($(this).data('player'));
     });
-    // a name on a report opens its player here
+    $('#player-card').on('click', '[data-back]', function () {
+        $('#player-card').prop('hidden', true);
+        $('#player-list').prop('hidden', false);
+        players();
+    });
+    // a name on a report, or ?player= (the Moderate button of a profile), opens its player here
+    function openPlayer(id) {
+        $('#tab-players').prop('checked', true).trigger('change');
+        player(id);
+    }
     $('#report-list').on('click', '[data-player]', function (e) {
         e.preventDefault();
-        $('#tab-players').prop('checked', true).trigger('change');
-        $('#player-found').empty();
-        player($(this).data('player'));
+        openPlayer($(this).data('player'));
     });
 
     function lengths(name, list) {
@@ -195,6 +222,13 @@ $(function () {
                     ? "<button type='button' class='btn wood' data-act='unban'>Unban</button>"
                     : lengths('ban-length', p.bans) + "<button type='button' class='btn red' data-act='ban'>Ban</button>") + '</div>';
             }
+            if (p.ranks) {
+                acts += "<div class='mod-act'><h3>Rank</h3><div class='mod-rename'><select class='field' name='rank' aria-label='Rank'>" +
+                    Object.keys(p.ranks).sort().reverse().map(function (k) {
+                        return "<option value='" + k + "'" + (k == p.rank ? ' selected' : '') + '>' + esc(p.ranks[k]) + '</option>';
+                    }).join('') + "<option value='0'" + (p.rank ? '' : ' selected') + ">No rank</option></select>" +
+                    "<button type='button' class='btn' data-act='rank'>Save</button></div></div>";
+            }
             if (p.may.rename) {
                 acts += "<div class='mod-act'><h3>Rename</h3><div class='mod-rename'><input class='field' name='name' value='" + esc(p.name) +
                     "' aria-label='New name' maxlength='20'><button type='button' class='btn' data-act='rename'>Rename</button></div></div>";
@@ -205,7 +239,9 @@ $(function () {
             } else {
                 acts = "<p class='hint'>This player is not below you: you can only look.</p>";
             }
-            $('#player-card').html("<section class='panel mod-player'><h2>" + esc(p.name) + '</h2>' +
+            $('#player-list').prop('hidden', true);
+            $('#player-card').prop('hidden', false).html("<a class='back' href='#' data-back><i class='material-icons'>arrow_back</i>All players</a>" +
+                "<section class='panel mod-player'><h2>" + esc(p.name) + '</h2>' +
                 "<p class='mod-player-who'>" + (p.picture ? "<img class='avatar small' src='" + esc(p.picture) + "' alt=''>" : '') +
                 (p.tag ? "<span class='name-tag " + esc(p.tag.color) + "'>" + esc(p.tag.label) + '</span>' : '') +
                 (p.guest ? '<small>Guest</small>' : "<a class='board-name' href='player?id=" + p.id + "'>Profile</a>") +
@@ -231,6 +267,12 @@ $(function () {
             return;
         }
         banArmed = 0;
+        if (what == 'rank') {
+            $.post('api/mod/rank', {name: card.find('h2').text(), rank: card.find('[name=rank]').val(), reason: card.find('[name=reason]').val()})
+                .done(function (r) { r.success ? player(shown) : $('#player-note').prop('hidden', false).addClass('bad').text(r.error); })
+                .fail(function (x) { $('#player-note').prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused'); });
+            return;
+        }
         $.post('api/mod/sanction', {id: shown, 'do': what, reason: card.find('[name=reason]').val(), name: card.find('[name=name]').val(),
                                     length: card.find('[name=' + what + '-length]:checked').val()}).done(function (r) {
             if (r.success) {
@@ -341,5 +383,9 @@ $(function () {
     }
     if ($('#pane-reports').length) {
         reports();
+    }
+    var asked_for = /[?&]player=(\d+)/.exec(location.search);
+    if (asked_for && $('#pane-players').length) {
+        openPlayer(+asked_for[1]);
     }
 });

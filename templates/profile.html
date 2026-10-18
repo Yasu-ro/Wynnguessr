@@ -17,8 +17,9 @@
         {% endif %}
         {% if own %}
             <a class="btn wood" href="account">Edit profile</a>
-        {% elif admin and user.avatar %}
-            <form action="player?id={{ user.id }}" method="post"><button type="submit" class="btn red">Remove picture</button></form>
+        {% else %}
+            {% if moderate %}<a class="btn wood" href="moderation?player={{ user.id }}">Moderate</a>{% endif %}
+            {% if admin and user.avatar %}<form action="player?id={{ user.id }}" method="post"><button type="submit" class="btn red">Remove picture</button></form>{% endif %}
         {% endif %}
     </div>
 

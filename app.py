@@ -609,7 +609,7 @@ def show_profile(uid):
         tags = tags_of(c, [uid])[uid]
         return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
                            avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
-                           admin = may(c, 'pictures', uid),
+                           admin = may(c, 'pictures', uid), moderate = uid != session.get('user_id') and may(c, 'players'),
                            games = p['history'][:30], p = p)
 
 @app.route("/profile")
@@ -3266,8 +3266,10 @@ def mod_rank():
         user = c.execute("SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone()
         if r < MAY['staff']:
             return jsonify({"success": False, "error": "Only an Admin can change the team"}), 403
-        if not user or user['guest']:
-            return jsonify({"success": False, "error": "No player account with this name"})
+        if not user:
+            return jsonify({"success": False, "error": "No player with this name"})
+        if user['guest']:
+            return jsonify({"success": False, "error": user['username'] + " is a guest name, not an account: ranks are for accounts only"})
         old = rank_of(c, user['id'])
         if new not in [0] + list(RANKS) or new >= r or old >= r:
             return jsonify({"success": False, "error": "You can only give ranks below yours, to players below you"})
@@ -3543,17 +3545,37 @@ def place_note(c):
     if c.execute("SELECT 1 FROM place_bans WHERE place = ? AND until > ?", (place(), time.time())).fetchone():
         return "This connection is banned for now"
 
+PLAYERS_PAGE = 50
+KINDS = {   # the filters of the Players tab
+    'all': '1',
+    'accounts': 'COALESCE(u.guest, 0) = 0',
+    'guests': 'u.guest = 1',
+    'staff': '(u.id = %d OR u.id IN (SELECT user_id FROM staff))' % OWNER,
+    'muted': 'u.muted_until > :now',
+    'banned': 'u.banned_until > :now',
+    'reported': 'u.id IN (SELECT m.user_id FROM chat_reports cr JOIN room_chat m ON m.id = cr.message)',
+}
+
 @app.route("/api/mod/players")
 def mod_players():
-    # find players by the start of their name, the exact one and accounts first
-    q = ' '.join(request.args.get('q', '').split())
+    # every player, newest first, 50 at a time; filtered by a kind and by
+    # anything in the name (an exact name first)
+    q, kind = ' '.join(request.args.get('q', '').split()), request.args.get('kind', 'all')
+    start = request.args.get('start', 0, type = int)
     with connect() as c:
-        if not may(c, 'players'):
+        if not may(c, 'players') or kind not in KINDS:
             return jsonify({"success": False}), 403
-        rows = [dict(u) for u in c.execute('''SELECT id, username AS name, COALESCE(guest, 0) AS guest FROM users
-            WHERE username LIKE ? ESCAPE '\\' ORDER BY username = ? COLLATE NOCASE DESC, COALESCE(guest, 0), id DESC LIMIT 20''',
-            (re.sub(r'([\\%_])', r'\\\1', q) + '%', q))] if q else []
-    return jsonify({"success": True, "players": rows})
+        now = time.time()
+        rows = c.execute(f'''SELECT u.id, u.username AS name, COALESCE(u.guest, 0) AS guest, u.avatar, u.mc_uuid,
+                u.muted_until > :now AS muted, u.banned_until > :now AS banned,
+                (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) AS reported
+            FROM users u WHERE {KINDS[kind]} AND u.username LIKE :q ESCAPE '\\'
+            ORDER BY u.username = :exact COLLATE NOCASE DESC, u.id DESC LIMIT :n OFFSET :start''',
+            {'now': now, 'q': '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%', 'exact': q, 'n': PLAYERS_PAGE + 1, 'start': start}).fetchall()
+        tags = tag_of(c, [u['id'] for u in rows])
+        out = [{'id': u['id'], 'name': u['name'], 'guest': bool(u['guest']), 'muted': bool(u['muted']), 'banned': bool(u['banned']),
+                'reported': u['reported'], 'tag': tags.get(u['id']), 'picture': avatar_url(u)} for u in rows[:PLAYERS_PAGE]]
+    return jsonify({"success": True, "players": out, "more": len(rows) > PLAYERS_PAGE})
 
 @app.route("/api/mod/player")
 def mod_player():
@@ -3577,6 +3599,10 @@ def mod_player():
                "banned": ('forever' if u['banned_until'] >= FOREVER else 'for ' + how_long(u['banned_until'] - now)) if (u['banned_until'] or 0) > now else None,
                "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename')}}
         out['mutes'] = [m for m in MUTES if out['may']['long_mute'] or m <= HELPER_MUTE]
+        r = my_rank(c)
+        if r >= MAY['staff'] and not u['guest'] and rank_of(c, uid) < r:
+            out['ranks'] = {k: v for k, v in RANKS.items() if k < r}
+        out['rank'] = rank_of(c, uid)
         out['bans'] = list(BANS)
     return jsonify(out)
 

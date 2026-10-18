@@ -970,6 +970,18 @@ max), journal d'audit avec la raison. D'où :
   - Tests : `t_security.py` (9), `t_quotes_page.py`, tout le reste rejoué
     sur Flask 3 (moteurs et navigateurs ; `t_classic_page`, `t_sv_page`,
     `t_mod_page` mis à jour : Survival par défaut, onglet Reports d'abord).
+- **Retouches de Yasuro avant la 3.0.0 (2026-10-18)** : onglet Players =
+  **la liste de tous les joueurs** (les plus récents d'abord, 50 par 50),
+  une recherche qui filtre en tapant (n'importe où dans le nom), des puces
+  All / Accounts / Guests / Staff / Muted / Banned / Reported, une ligne par
+  joueur (tête, nom, étiquette, état, Open) ; la fiche a en plus le **rang**
+  (Admin et au-dessus, comptes en dessous de soi). Un **profil** a un bouton
+  **Moderate** pour l'équipe → `moderation?player=<id>` ouvre sa fiche.
+  « Je ne peux pas mettre Yulo admin » : sur la bêta, `yulo` et `Yulo` sont
+  des **pseudos d'invités** (son compte y est `Yulofox` ; le compte `Yulo`
+  du vrai site est postérieur à la copie de la bêta) ; un rang ne va qu'à
+  un compte (un pseudo d'invité, n'importe qui peut le reprendre). Le refus
+  le dit maintenant en clair.
 - `REVIEWERS` (tri des lieux) reste à part de Moderation pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
