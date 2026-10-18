@@ -2323,7 +2323,7 @@ body.room-playing {
     font-family: var(--sans);
 }
 /* past 1 px per block, the map shows blocks instead of a blur */
-.crisp .leaflet-image-layer {
+.crisp .leaflet-image-layer, .crisp .leaflet-tile {
     image-rendering: pixelated;
 }
 .leaflet-container .leaflet-bar {

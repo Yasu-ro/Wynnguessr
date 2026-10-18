@@ -29,7 +29,11 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
 
 ## Faire tourner
 
-- Service utilisateur `wynnguessr` : gunicorn (venv `.venv`, 1 worker, 8 threads)
+- Service utilisateur `wynnguessr` : gunicorn (venv `.venv`, **4 workers** depuis
+  la phase « vitesse » du 2026-10-18 — 1 avant, plafonné à un cœur par le
+  GIL, à 55 % de charge —, 8 threads ; l'unité systemd est hors git : la
+  changer à la main sur la bêta et le vrai site, puis `daemon-reload` et
+  `restart`, un `HUP` ne change pas le nombre de workers)
   sur `127.0.0.1:8790`, journal d'accès activé (`journalctl --user -u wynnguessr`).
   gunicorn est en 26.x : la 20.1 du dépôt d'origine plante sous Python 3.13.
 - Après modif de `app.py` ou d'un template : `systemctl --user restart wynnguessr`.
@@ -690,6 +694,36 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   autres** : personne ne peut tout effacer parce qu'il a le rang le plus
   haut. Yasuro en premier, il ajoutera les autres.
 - **Photos de profil : approuvées par un modérateur avant d'être visibles.**
+
+**Phase 1, vitesse (2026-10-18, bêta)** — fait :
+- **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
+  `mapTiles()` dans `block.js`) : zoom 0 au pixel près en WebP sans perte
+  (8,4 Mo en tout, une vingtaine de minutes à couper), zooms -1 à -3 réduits
+  en WebP 90. Première manche de Survival : **3,6 Mo téléchargés au lieu de
+  11,9** (la carte : 0,05 Mo au lieu de 8,73). Le clic tombe toujours sur
+  le bloc visé (vérifié). Une nouvelle carte = un nouveau dossier
+  (`map-2027`), car les tuiles sont gardées un an.
+- **Fichiers versionnés gardés un an** par le navigateur et Cloudflare
+  (`?v=`, tuiles de la carte, sons de Mojang) : `kept_long()`.
+- **Tuiles d'un salon** (jeton `room:…`, le même pour tous, jamais mort) :
+  `public, max-age=86400`, Cloudflare les garde et les sert aux autres. Solo
+  et Survival restent `private` (corrigé au passage : l'en-tête disait à la
+  fois « public » et « private »).
+- La vérification de session ne se fait plus pour les tuiles (95 % des
+  requêtes : 2 213 + 1 509 par minute sur le vrai site).
+- **4 workers** : les échecs de connexion (`fails`) passent de la mémoire à la
+  base (sinon chacun aurait son compte) ; les migrations au démarrage se font
+  une à la fois (`.starting.lock`, sinon deux workers ajoutent la même
+  colonne et l'un ne démarre pas) ; base en **WAL** (lire ne bloque plus
+  l'écriture). Vérifié : 4 workers sur une copie fraîche de la base du vrai
+  site, puis une partie complète sur la bêta, aucun « database is locked ».
+- **Lancer de potion** : `potion-throw.webp`, les mêmes pixels et les mêmes
+  durées image par image que le GIF de Yasuro (vérifié), 930 ko au lieu de
+  1,6 Mo ; le GIF reste dans git comme original.
+- Reste : la qualité des photos des lieux (le plus lourd), à choisir par
+  Yasuro sur une comparaison. La base de WynnGuessr **n'est pas dans le
+  coffre** (`coffre.sh` ne sauvegarde que `dispo.db`) : seulement les
+  copies faites à la main avant chaque mise en prod.
 
 Mesures du 2026-10-18 pour la vitesse : la carte `map-2026.webp` pèse
 **8,7 Mo** (chargée avant la première partie) ; un lieu, ~4,6 Mo pour le

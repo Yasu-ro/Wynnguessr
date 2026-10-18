@@ -234,7 +234,7 @@ function pin(fill, star) {
 
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
-    L.imageOverlay('static/map-2026.webp', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
+    mapTiles(m);
     crisp(m);
     m.setView([3072, -256], zoom);
     return m;

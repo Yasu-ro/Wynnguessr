@@ -82,7 +82,7 @@ var PERFECT = 2;
 
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5, attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'});
-    L.imageOverlay('static/map-2026.webp', BOUNDS).addTo(m);
+    mapTiles(m);
     m.setView([3072, -256], zoom);
     crisp(m);
     return m;

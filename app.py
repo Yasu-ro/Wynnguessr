@@ -14,6 +14,7 @@ import io
 import time
 import base64
 import hashlib
+import fcntl
 from datetime import date
 import urllib.request
 from urllib.parse import quote, urlencode
@@ -40,6 +41,15 @@ def connect():
     c.row_factory = sqlite3.Row
     return c
 
+# The site runs several processes (gunicorn -w): each one runs the
+# migrations below as it starts. One at a time, or two could add the same
+# column and one would fail to start (the lock is let go at the end of this
+# file). The database in WAL mode: reading no longer holds up a writer.
+STARTING = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.starting.lock'), 'w')
+fcntl.flock(STARTING, fcntl.LOCK_EX)
+with connect() as c:
+    c.execute("PRAGMA journal_mode=WAL")
+
 @app.context_processor
 def assets():
     # Cloudflare tells browsers to keep static files 4 hours without asking
@@ -57,6 +67,18 @@ def only_one_site_in_search(response):
     # of search engines, so Google only lists wynndle.com
     if request.host != 'wynndle.com':
         response.headers['X-Robots-Tag'] = 'noindex'
+    return response
+
+@app.after_request
+def kept_long(response):
+    # a file whose address changes with it (asset(): ?v=, the map's tiles in
+    # a folder named after the map, Mojang's sounds that never change) is
+    # kept a year, by the browser and by Cloudflare, without asking again:
+    # before, Cloudflare checked them every 4 hours and the 8.7 MB map came
+    # back from here
+    if request.endpoint == 'static' and response.status_code == 200 and (
+            'v' in request.args or request.path.startswith(('/static/map-2026/', '/static/sounds/'))):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     return response
 
 @app.after_request
@@ -323,7 +345,12 @@ def game():
 
 TRIES = 10       # wrong passwords (or recovery codes) for one account from one place...
 WINDOW = 900     # ...in this many seconds, then it has to wait
-FAILS = {}       # (place, name) and name -> times of the recent failures (one worker: memory is enough)
+
+# the recent failures, in the database: the site runs several processes,
+# which must all see them (in memory, each had its own count)
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS fails (place TEXT, name TEXT, at REAL)")
+    c.execute("CREATE INDEX IF NOT EXISTS fails_name ON fails (name, at)")
 
 def place():
     # behind Cloudflare or Funnel every request comes from 127.0.0.1: the
@@ -332,16 +359,16 @@ def place():
 
 def too_many(name):
     # also a cap per account whatever the place, a little higher
-    now, name = time.time(), name.lower()
-    if len(FAILS) > 10000:
-        FAILS.clear()
-    for k in ((place(), name), name):
-        FAILS[k] = [t for t in FAILS.get(k, ()) if now - t < WINDOW]
-    return len(FAILS[(place(), name)]) >= TRIES or len(FAILS[name]) >= 3 * TRIES
+    since, name = time.time() - WINDOW, name.lower()
+    with connect() as c:
+        c.execute("DELETE FROM fails WHERE at < ?", (since,))
+        here = c.execute("SELECT COUNT(*) FROM fails WHERE name = ? AND place = ? AND at > ?", (name, place(), since)).fetchone()[0]
+        anywhere = c.execute("SELECT COUNT(*) FROM fails WHERE name = ? AND at > ?", (name, since)).fetchone()[0]
+    return here >= TRIES or anywhere >= 3 * TRIES
 
 def failed(name):
-    for k in ((place(), name.lower()), name.lower()):
-        FAILS.setdefault(k, []).append(time.time())
+    with connect() as c:
+        c.execute("INSERT INTO fails (place, name, at) VALUES (?, ?, ?)", (place(), name.lower(), time.time()))
 
 def stamp(hashed):
     # a trace of the password in the session: when it changes, every other
@@ -350,7 +377,8 @@ def stamp(hashed):
 
 @app.before_request
 def still_logged_in():
-    if request.endpoint == 'static' or not session.get('loggedin'):
+    # (not for the pictures: 95 % of the requests, and none needs it)
+    if request.endpoint in ('static', 'play_tile', 'survival_tile') or not session.get('loggedin'):
         return
     with connect() as c:
         me = c.execute("SELECT password FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
@@ -1671,12 +1699,16 @@ def tile_url(c, lid, scope, fog = False):
 @app.route("/play/tile/<token>/<path:name>")
 def play_tile(token, name):
     with connect() as c:
-        row = c.execute("""SELECT CASE WHEN t.fog = 1 AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END
+        row = c.execute("""SELECT CASE WHEN t.fog = 1 AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END, t.scope
                 FROM tiles t JOIN locations l ON l.location_id = t.location_id WHERE t.token = ?""", (token,)).fetchone()
     if not row or not row[0].startswith('static/tiles/'):
         return '', 404
+    if row[1].startswith('room:'):
+        # a room's token never dies and everyone in the room has it: Cloudflare
+        # keeps the tiles, and sends them to the others without asking here
+        return send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 86400)
     response = send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 3600)
-    response.cache_control.private = True   # the browser keeps it, Cloudflare does not (see Survival)
+    response.cache_control.public, response.cache_control.private = False, True   # alone: the browser keeps it, Cloudflare does not (see Survival)
     return response
 
 # ---------- Solo ----------
@@ -2301,7 +2333,7 @@ def survival_tile(token, name):
         return '', 404
     response = send_from_directory(os.path.join(TILES_DIR, run[0][len('static/tiles/'):].strip('/')), name, max_age = 600)
     # kept by the browser, never by Cloudflare: the address must die with the round
-    response.cache_control.private = True
+    response.cache_control.public, response.cache_control.private = False, True
     return response
 
 
@@ -2745,6 +2777,8 @@ def room_milk(code):
             return jsonify({"success": False})
         c.execute("INSERT OR IGNORE INTO room_milk (code, round, user_id, at) VALUES (?, ?, ?, ?)", (r['code'], n, uid, now))
     return jsonify({"success": True})
+
+fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)
 
 
 if __name__ == "__main__":

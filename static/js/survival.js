@@ -74,7 +74,7 @@ function pin(fill, star) {
 
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
-    L.imageOverlay('static/map-2026.webp', BOUNDS, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
+    mapTiles(m);
     m.setView([3072, -256], zoom);
     m.on('zoomend', function () { m.getContainer().classList.toggle('crisp', m.getZoom() > 0); });
     return m;
