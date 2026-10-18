@@ -1132,6 +1132,15 @@ les mêmes noms se mélangeraient aux anciennes.
 
 ### Aperçu des liens partagés (Discord…)
 
+- **Lien de salon** (2026-10-18, demande de Yasuro) : la carte dit le salon
+  (« Room Y2JHUC · Survival (Hard, milk) ») et où il en est (« Yasuro is
+  waiting in the lobby. Hop on! », « 3 players waiting… », « Game on: round
+  4… », « This game is over. ») : `room_card()`. Le robot de Discord n'a pas
+  de session : `/room` le renvoie vers `/guest?next=room?code=…`, c'est cette
+  page qui porte la carte. **Instantané** : Discord garde la carte telle
+  qu'au moment du partage, elle ne se met pas à jour.
+
+
 2026-10-17, demande de Yasuro. Balises Open Graph dans `templates/share.html`,
 incluse par `index`, `layout` et `game` (pas `review`). L'image
 `static/banner.jpg` (1200×630) est tirée du même lieu que la photo d'accueil

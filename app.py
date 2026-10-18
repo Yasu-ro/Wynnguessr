@@ -364,12 +364,37 @@ def logout():
     session.clear()
     return redirect('./')
 
+def room_card(page):
+    # the card under a shared room link (Discord, WhatsApp...): who waits in
+    # it, or how far the game is. Their robots are not logged in: they land
+    # here, on the way to the room. A snapshot: Discord keeps it as it was
+    m = re.fullmatch(r'room\?code=([A-Za-z0-9]+)', page)
+    if not m:
+        return None
+    with connect() as c:
+        r = find_room(c, m.group(1))
+        if not r:
+            return None
+        here = c.execute("SELECT COUNT(*) FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], time.time() - AWAY)).fetchone()[0]
+        host = c.execute("SELECT username FROM users WHERE id = ?", (r['host_id'],)).fetchone()
+    mode = {'classic': 'Classic', 'duel': 'Duel', 'survival': 'Survival', 'royale': 'Battle Royale'}[r['mode']]
+    if r['mode'] == 'survival':
+        mode += ' (' + r['difficulty'].capitalize() + (', milk' if r['milk'] else '') + ')'
+    players = '%d %s' % (here, 'player' if here == 1 else 'players')
+    if r['state'] == 'waiting':
+        text = (host[0] + ' is waiting' if here <= 1 and host else players + ' waiting') + ' in the lobby. Hop on!'
+    elif r['state'] == 'playing':
+        text = 'Game on: round %d, %s.' % (r['round'], players)
+    else:
+        text = 'This game is over.'
+    return {'title': 'Room ' + r['code'] + ' · ' + mode, 'text': text}
+
 @app.route("/guest", methods=['POST', 'GET'])
 def guest():
     # multiplayer without an account: just a nickname. A guest is a user row
     # marked guest: no password, and never on the leaderboard
     if request.method == 'GET':
-        return render_template('guest.html')
+        return render_template('guest.html', card = room_card(next_page()))
     name = ' '.join(request.form.get('username', '').split())
     if not name or len(name) > 20:
         return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
