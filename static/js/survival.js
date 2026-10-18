@@ -31,6 +31,7 @@ var THROW_GIF = document.body.dataset.throw;   // its address, versioned (asset(
 var throwGif = null;    // loaded once; a new address for it each time plays it from its first frame
 fetch(THROW_GIF).then(function (r) { return r.blob(); }).then(function (b) { throwGif = b; }).catch(function () {});
 var DARK_AFTER = 10;    // Darkness: seconds of picture before the dark
+var NAUSEA_SPIN = -40;  // Nausea: degrees per second the view turns by itself (a turn in 9 s; Yasuro: -9 was far too slow)
 var darkTimer = null, witherShown = null;
 
 function potionIcon(name) {
@@ -131,7 +132,7 @@ function guessScreen() {
     if (s.effect == 'nausea') {
         // Nausea: the view turns by itself, and the player cannot hold it (the
         // server shakes the pin); Pannellum turns it, no costly CSS motion
-        view = {autoLoad: true, autoRotate: -9, draggable: false, mouseZoom: false, keyboardZoom: false,
+        view = {autoLoad: true, autoRotate: NAUSEA_SPIN, draggable: false, mouseZoom: false, keyboardZoom: false,
                 disableKeyboardCtrl: true, showControls: false};
     }
     viewer = pannellum.viewer('game-panorama', panoramaConfig(s.url, view));

@@ -392,7 +392,8 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   tangue en CSS) était « super easy » et faisait ramer (un panorama 3D animé
   en CSS se recalcule à chaque image). Après essai de quatre remplaçantes
   au panneau de test, Yasuro a choisi **Shaky Hands + Dizziness** réunies
-  sous le nom Nausea : la vue tourne seule (rotation de Pannellum, -9 °/s,
+  sous le nom Nausea : la vue tourne seule (rotation de Pannellum, `NAUSEA_SPIN`
+  = -40 °/s, un tour en 9 s ; -9 était « way » trop lent,
   impossible à tenir, aucun coût en plus) et le serveur décale l'épingle de
   20 à 60 blocs (`SHAKE`) ; la révélation montre le point visé (rond blanc)
   et le point tombé. Écartées : Tunnel Vision (champ fixé à 35°), Mirror
