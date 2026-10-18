@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+
+{% block title %}: Moderation{% endblock %}
+
+{% block content %}
+    <h1 class="sign">Moderation</h1>
+    <p class="mod-you">You are <span class="rank-tag rank-{{ rank }}">{{ RANKS[rank] }}</span></p>
+    <div class="tabs mod-tabs" id="mod-tabs">
+        <input type="radio" name="mod-tab" id="tab-staff" value="staff" checked>
+        <label for="tab-staff" class="tab">Team</label>
+        {% if may.log %}
+        <input type="radio" name="mod-tab" id="tab-log" value="log">
+        <label for="tab-log" class="tab">Log</label>
+        {% endif %}
+    </div>
+
+    <section class="mod-pane" id="pane-staff">
+        <table class="leaderboard-table mod-table">
+            <thead><tr class="leaderboard-row"><th>Player</th><th>Rank</th><th class="board-more">Given by</th><th></th></tr></thead>
+            <tbody id="staff-rows"></tbody>
+        </table>
+        {% if may.staff %}
+        <form class="panel narrow mod-form" id="give-form" autocomplete="off">
+            <h2>Give a Rank</h2>
+            <input class="field" name="name" placeholder="Player name" aria-label="Player name" maxlength="20" required>
+            <div class="chips" id="give-ranks"></div>
+            <input class="field" name="reason" placeholder="Why (kept in the log)" aria-label="Why" maxlength="200">
+            <button class="btn wide" type="submit">Give the Rank</button>
+            <p class="note" id="give-note" hidden></p>
+        </form>
+        {% endif %}
+        <p class="hint">You can only act on players below you, and give ranks below yours. Every change goes to the log.</p>
+    </section>
+
+    {% if may.log %}
+    <section class="mod-pane" id="pane-log" hidden>
+        <table class="leaderboard-table mod-table">
+            <thead><tr class="leaderboard-row"><th>When</th><th>Who</th><th>What</th></tr></thead>
+            <tbody id="log-rows"></tbody>
+        </table>
+        <p class="hint" id="log-empty" hidden>Nothing yet.</p>
+        <button type="button" class="btn wood board-next" id="log-more" hidden>Show 50 more</button>
+    </section>
+    {% endif %}
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="{{ asset('js/moderation.js') }}"></script>
+{% endblock %}

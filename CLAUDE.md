@@ -705,6 +705,33 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   haut. Yasuro en premier, il ajoutera les autres.
 - **Photos de profil : approuvées par un modérateur avant d'être visibles.**
 
+**Phase 2, modération — étape 1 faite (2026-10-18, bêta)** : section
+« Moderation » d'`app.py`, page `/moderation` (bouton « Moderation » du
+menu, pour l'équipe seulement), `moderation.js`. Recherche : Wynncraft
+marque son équipe par des étiquettes de chat ([Mod] nom orange, [Admin]) ;
+Discord : on n'agit que sur plus bas que soi, sourdines à durée (28 j
+max), journal d'audit avec la raison. D'où :
+- **Rangs** : Owner (Yasuro, `OWNER = 1` dans le code, personne ne peut le
+  retirer), Admin, Moderator, Helper (`RANKS`, table `staff`) ; pouvoirs dans
+  `MAY` (le plus petit rang qui a chaque pouvoir) : Helper = photos, cacher
+  un message, sourdine d'1 h max ; Moderator = + sourdine longue, ban,
+  renommer, journal ; Admin = + donner et retirer les rangs.
+- **Règles** : on n'agit que sur plus bas que soi, on ne donne que des
+  rangs plus bas que le sien, jamais le rang Owner, jamais à un invité ;
+  **rien n'est détruit** (message caché et non effacé, ban levable, ancien
+  nom gardé au journal) et le journal (`mod_log`, qui, quoi, sur qui,
+  pourquoi) n'a aucun bouton pour l'effacer.
+- Page : onglets Team (rangs, changer ou retirer — retirer demande deux
+  clics — pour qui est en dessous, formulaire « Give a Rank » avec la raison)
+  et Log (50 par 50, la raison sous chaque action). Étiquettes de rang aux
+  couleurs de Wynncraft (Moderator orange). Tests : `t_ranks.py` (15),
+  `t_mod_page.py` (navigateur, ordinateur et téléphone).
+- **À venir** (étapes suivantes) : photos à approuver, signaler et couper
+  (chat), cacher un message, sourdine/ban/renommer (avec bannissement de la
+  connexion pour les invités), filtre des pseudos et des mots, passe de
+  sécurité. `ADMINS` (retrait de photo) et `REVIEWERS` (tri des lieux)
+  restent à part pour l'instant.
+
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
 - **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
   `mapTiles()` dans `block.js`) : zoom 0 au pixel près en WebP sans perte

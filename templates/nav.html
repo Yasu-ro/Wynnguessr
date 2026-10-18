@@ -7,6 +7,9 @@
         <span class="nav-gap"></span>
         {% if session['loggedin'] %}
         {% set me = my_progress() %}
+        {% if my_rank() %}
+        <a class="nav-btn" href="moderation"{% if request.path == '/moderation' %} aria-current="page"{% endif %}><i class="material-icons">gavel</i><span>Moderation</span></a>
+        {% endif %}
         <a class="pill" href="profile" title="Level {{ me.level }}"{% if request.path == '/profile' %} aria-current="page"{% endif %}><b class="pill-level">{{ me.level }}</b><span>Profile</span><i class="pill-xp" style="width: {{ (100 * me.into / me.need) | round(1) }}%"></i></a>
         <a class="nav-btn" href="logout"><i class="material-icons">logout</i><span>Logout</span></a>
         {% else %}

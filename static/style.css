@@ -277,6 +277,70 @@ button, input {
     background: radial-gradient(circle, var(--ring) 0 3.5px, transparent 4.5px) center bottom / 12px 12px no-repeat,
                 linear-gradient(var(--line), var(--line)) center bottom 5px / 100% 2px no-repeat;
 }
+/* Moderation: the staff's tags, as Wynncraft's chat tags ([Mod] in orange) */
+.rank-tag {
+    display: inline-block;
+    padding: 1px 8px 2px;
+    font: 700 14px/1.3 var(--sans);
+    white-space: nowrap;
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.rank-4 {
+    background: var(--gold);
+}
+.rank-3 {
+    color: #fff;
+    background: #c4372b;
+}
+.rank-2 {
+    background: #f58231;
+}
+.rank-1 {
+    background: var(--teal-light);
+}
+.mod-you {
+    margin: -8px 0 18px;
+    text-align: center;
+}
+.mod-tabs {
+    margin-bottom: 18px;
+}
+/* the first column is a player here, not the narrow "#" of the leaderboard */
+.mod-table td:first-child, .mod-table th:first-child {
+    width: auto;
+    font-weight: 700;
+    text-align: left;
+    white-space: nowrap;
+}
+.mod-tools > div {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+.mod-tools .field.small {
+    width: auto;
+    padding: 3px 6px;
+    font-size: 15px;
+}
+.chip.armed {
+    color: #fff;
+    background-color: var(--red);
+}
+.mod-why {
+    display: block;
+    color: var(--ink-soft);
+}
+.mod-when {
+    white-space: nowrap;
+}
+.panel.narrow.mod-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 32px auto 0;
+}
+
 /* About: the site in numbers, its game modes, the Discord */
 .about-lead {
     max-width: 640px;

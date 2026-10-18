@@ -2784,6 +2784,123 @@ def room_milk(code):
         c.execute("INSERT OR IGNORE INTO room_milk (code, round, user_id, at) VALUES (?, ?, ?, ?)", (r['code'], n, uid, now))
     return jsonify({"success": True})
 
+# ---------- Moderation ----------
+# Staff ranks, as Wynncraft's chat tags ([Admin], [Mod]...), each with its
+# powers, under one rule (Yasuro: "all have different powers over each other
+# so no one can just delete everything because we have the highest role"):
+# one acts only on someone of a lower rank, gives only ranks lower than one's
+# own, and nothing is ever destroyed: a hidden message can be shown again, a
+# ban lifted, an old name stays in the log, and the log itself cannot be
+# erased from the site. The owner is set here: nobody can take it away.
+
+OWNER = 1                 # Yasuro's account
+RANKS = {4: 'Owner', 3: 'Admin', 2: 'Moderator', 1: 'Helper'}
+MAY = {                   # the lowest rank with each power
+    'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
+    'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
+    'staff': 3,           # give and take ranks (below one's own)
+}
+HELPER_MUTE = 3600        # a Helper mutes for an hour at most
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS staff (user_id INTEGER PRIMARY KEY, rank INTEGER, by INTEGER, at REAL);
+        CREATE TABLE IF NOT EXISTS mod_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at REAL, by INTEGER,
+            action TEXT, target INTEGER, details TEXT, reason TEXT);
+    ''')
+
+def rank_of(c, uid):
+    if uid == OWNER:
+        return 4
+    row = c.execute("SELECT rank FROM staff WHERE user_id = ?", (uid,)).fetchone()
+    return row[0] if row else 0
+
+def my_rank(c):
+    return rank_of(c, session['user_id']) if session.get('loggedin') else 0
+
+def may(c, power, target = None):
+    # may this session's player use this power (on that player)?
+    r = my_rank(c)
+    return r >= MAY[power] and (target is None or rank_of(c, target) < r)
+
+def logged(c, action, target, details = '', reason = ''):
+    c.execute("INSERT INTO mod_log (at, by, action, target, details, reason) VALUES (?, ?, ?, ?, ?, ?)",
+              (time.time(), session['user_id'], action, target, details, reason))
+
+@app.context_processor
+def staff_menu():
+    # the Moderation button of the menu, for the staff only
+    def rank():
+        if not session.get('loggedin'):
+            return 0
+        with connect() as c:
+            return my_rank(c)
+    return {'my_rank': rank, 'RANKS': RANKS}
+
+@app.route("/moderation")
+def moderation():
+    with connect() as c:
+        r = my_rank(c)
+    if not r:
+        return render_template('apology.html', message = "This page is for the moderation team"), 403
+    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()})
+
+@app.route("/api/mod/staff")
+def mod_staff():
+    # the team: every rank, who gave it, and what this player may give
+    with connect() as c:
+        r = my_rank(c)
+        if not r:
+            return jsonify({"success": False}), 403
+        rows = [{"id": OWNER, "rank": 4, "by": None, "at": None}] + [dict(x) for x in c.execute(
+            "SELECT user_id AS id, rank, by, at FROM staff WHERE user_id != ? ORDER BY rank DESC, at", (OWNER,))]
+        names = {u['id']: u['username'] for u in c.execute(
+            f"SELECT id, username FROM users WHERE id IN ({','.join('?' * len(rows))}) OR id IN (SELECT by FROM staff)",
+            [x['id'] for x in rows])}
+        for x in rows:
+            x.update(name = names.get(x['id'], '?'), by = names.get(x['by']) if x['by'] else None, tag = RANKS[x['rank']],
+                     mine = x['rank'] < r and r >= MAY['staff'])
+    return jsonify({"success": True, "rank": r, "staff": rows,
+                    "give": {k: v for k, v in RANKS.items() if k < r} if r >= MAY['staff'] else {}})
+
+@app.route("/api/mod/rank", methods=['POST'])
+def mod_rank():
+    # give, change or take a rank (0 takes it): only below one's own, only to
+    # someone below one's own, never the owner, never a guest
+    name, reason = ' '.join(request.form.get('name', '').split()), request.form.get('reason', '').strip()[:200]
+    new = request.form.get('rank', type = int)
+    with room_tx() as c:
+        r = my_rank(c)
+        user = c.execute("SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone()
+        if r < MAY['staff']:
+            return jsonify({"success": False, "error": "Only an Admin can change the team"}), 403
+        if not user or user['guest']:
+            return jsonify({"success": False, "error": "No player account with this name"})
+        old = rank_of(c, user['id'])
+        if new not in [0] + list(RANKS) or new >= r or old >= r:
+            return jsonify({"success": False, "error": "You can only give ranks below yours, to players below you"})
+        if new == old:
+            return jsonify({"success": False, "error": "Nothing to change"})
+        if new:
+            c.execute("INSERT INTO staff (user_id, rank, by, at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET rank = excluded.rank, by = excluded.by, at = excluded.at",
+                      (user['id'], new, session['user_id'], time.time()))
+        else:
+            c.execute("DELETE FROM staff WHERE user_id = ?", (user['id'],))
+        logged(c, 'rank', user['id'], '%s → %s' % (RANKS.get(old, 'Player'), RANKS.get(new, 'Player')), reason)
+    return jsonify({"success": True})
+
+@app.route("/api/mod/log")
+def mod_log_list():
+    # the log, newest first, 50 at a time (before: the oldest id already shown)
+    with connect() as c:
+        if not may(c, 'log'):
+            return jsonify({"success": False}), 403
+        before = request.args.get('before', type = int) or 2 ** 62
+        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, a.username AS by, t.username AS target
+            FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
+            WHERE m.id < ? ORDER BY m.id DESC LIMIT 50''', (before,))]
+    return jsonify({"success": True, "log": rows})
+
 fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)
 
 
