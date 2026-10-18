@@ -4,8 +4,9 @@ $(function () {
     var team = null, armed = null, armedAt = 0;
     var ARMED = 3000;   // ms the "Sure?" of a removal waits for the second click
 
+    // quotes too: a name may end up inside an attribute (data-name='...')
     function esc(text) {
-        return $('<div>').text(text == null ? '' : text).html();
+        return $('<div>').text(text == null ? '' : text).html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
     function tag(rank, name) {
         return "<span class='rank-tag rank-" + rank + "'>" + esc(name) + '</span>';
@@ -195,7 +196,7 @@ $(function () {
                     : lengths('ban-length', p.bans) + "<button type='button' class='btn red' data-act='ban'>Ban</button>") + '</div>';
             }
             if (p.may.rename) {
-                acts += "<div class='mod-act'><h3>Rename</h3><div class='mod-rename'><input class='field' name='name' value='" + esc(p.name).replace(/'/g, '&#39;') +
+                acts += "<div class='mod-act'><h3>Rename</h3><div class='mod-rename'><input class='field' name='name' value='" + esc(p.name) +
                     "' aria-label='New name' maxlength='20'><button type='button' class='btn' data-act='rename'>Rename</button></div></div>";
             }
             if (acts) {

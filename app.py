@@ -1,6 +1,4 @@
 from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, send_file, jsonify
-from flask_session import Session
-from flask_cors import CORS
 import os
 import re
 import sqlite3
@@ -22,7 +20,6 @@ from flask_bcrypt import Bcrypt
 from config import Config
 
 app = Flask(__name__)
-CORS(app)
 bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 # other sites share this domain behind Tailscale Funnel
@@ -31,6 +28,8 @@ app.config['SESSION_COOKIE_NAME'] = 'wynnguessr_session'
 # elsewhere), and only over https
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = True
+# nothing bigger comes in (the mod's captures are ~13 MB)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
 # only these locations are played; 'new' ones wait for the review
 PLAYABLE = "('old', 'kept')"
@@ -87,6 +86,12 @@ def no_tricks(response):
     # real ones), and a file is only ever read as the type it is served as
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    # nor carry a <base>, run a plugin, or send its forms anywhere else; and
+    # always https (the browser remembers it a year). The scripts themselves
+    # are left free: the pages have inline ones, and the CDNs they come from
+    # host any npm package, so a list would stop nothing
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
 def next_page():
@@ -357,8 +362,33 @@ with connect() as c:
 
 def place():
     # behind Cloudflare or Funnel every request comes from 127.0.0.1: the
-    # real address is in their header
-    return request.headers.get('CF-Connecting-IP') or request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or request.remote_addr
+    # real address is the last one in X-Forwarded-For, which both write after
+    # whatever the player sent. Not CF-Connecting-IP: through Funnel (the old
+    # address) a player could write that one himself, and so get around the
+    # limits and the bans
+    return request.headers.get('X-Forwarded-For', '').split(',')[-1].strip() or request.headers.get('CF-Connecting-IP') or request.remote_addr
+
+# what one address may make in WINDOW: no flood of guests, accounts, rooms, pictures
+ACTIONS = {'guest': 10, 'account': 5, 'room': 20, 'picture': 10}
+
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS actions (place TEXT, what TEXT, at REAL)")
+    c.execute("CREATE INDEX IF NOT EXISTS actions_place ON actions (place, what, at)")
+
+def too_often(what):
+    # (not for this machine itself: tests and tools; through Cloudflare or
+    # Funnel a request always has its player's address)
+    if place() in ('127.0.0.1', '::1'):
+        return False
+    since = time.time() - WINDOW
+    with connect() as c:
+        c.execute("DELETE FROM actions WHERE at < ?", (since,))
+        return c.execute("SELECT COUNT(*) FROM actions WHERE place = ? AND what = ? AND at > ?", (place(), what, since)).fetchone()[0] >= ACTIONS[what]
+
+def done(c, what):
+    # counted once made, so a name already taken costs nothing (on the
+    # request's own connection: a second one would wait for its transaction)
+    c.execute("INSERT INTO actions (place, what, at) VALUES (?, ?, ?)", (place(), what, time.time()))
 
 def too_many(name):
     # also a cap per account whatever the place, a little higher
@@ -475,10 +505,12 @@ def register():
         password = request.form['password']
         confirmation = request.form['confirmation']
         with connect() as c:
-            problem = place_note(c) or name_problem(c, username) or password_problem(password, confirmation)
+            problem = (place_note(c) or (too_often('account') and "Too many new accounts from here: wait a few minutes")
+                       or name_problem(c, username) or password_problem(password, confirmation))
             if problem:
                 return render_template('apology.html', message = problem)
             uid = c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed(password))).lastrowid
+            done(c, 'account')
             log_in(c, uid)
             return redirect(next_page())
     else:
@@ -546,12 +578,15 @@ def guest():
         return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
     if name_rule(name):
         return render_template('apology.html', message = name_rule(name))
+    if too_often('guest'):
+        return render_template('apology.html', message = "Too many new nicknames from here: wait a few minutes")
     with connect() as c:
         if place_note(c):
             return render_template('apology.html', message = place_note(c))
         if c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
             return render_template('apology.html', message = "This name belongs to a registered player: pick another one, or log in")
         uid = c.execute("INSERT INTO users (username, password, guest, seen_from) VALUES (?, '', 1, ?)", (name, place())).lastrowid
+        done(c, 'guest')
     session.permanent = True
     session['loggedin'] = False
     session['guest'] = True
@@ -709,7 +744,10 @@ def account():
     with connect() as c:
         me = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
         if what == 'picture':
-            problem = save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture"
+            problem = ("Too many pictures: wait a few minutes" if too_often('picture') else
+                       save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture")
+            if not problem:
+                done(c, 'picture')
         elif what == 'head':
             problem = drop_picture(c, uid) or drop_picture(c, uid, 'avatar_pending')
         elif what in ('name', 'mc-name'):
@@ -1178,10 +1216,12 @@ def room_create():
     if not session.get('user_id'):
         return redirect('../guest?next=' + quote('mode?play=friends'))
     s, error = room_settings(request.form)
-    if error:
-        return render_template('apology.html', message = error)
+    if error or too_often('room'):
+        return render_template('apology.html', message = error or "Too many new rooms: wait a few minutes")
     with room_tx() as c:
         code = new_room(c, session['user_id'], s)
+        if code:
+            done(c, 'room')
     if not code:
         return render_template('apology.html', message = "Not enough locations in these provinces")
     return redirect('../room?code=' + code)

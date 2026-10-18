@@ -13,8 +13,9 @@ $(function () {
         wins: ['Wins', 'Best streak', 'Games']
     };
 
+    // quotes too: a name may end up inside an attribute (data-name='...')
     function esc(text) {
-        return $('<div>').text(text).html();
+        return $('<div>').text(text).html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function number(n) {

@@ -33,7 +33,12 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   la phase « vitesse » du 2026-10-18 — 1 avant, plafonné à un cœur par le
   GIL, à 55 % de charge —, 8 threads ; l'unité systemd est hors git : la
   changer à la main sur la bêta et le vrai site, puis `daemon-reload` et
-  `restart`, un `HUP` ne change pas le nombre de workers)
+  `restart`, un `HUP` ne change pas le nombre de workers).
+  **Deux venv depuis le 2026-10-18** : la bêta a le sien
+  (`~/Wynnguessr-beta/.venv`, Flask 3.1.3, fait depuis `requirements.txt`) ;
+  le vrai site garde `~/Wynnguessr/.venv` (Flask 2.2.3) jusqu'à la 3.0.0.
+  **Ne jamais mettre à jour un paquet dans le venv du vrai site pendant qu'il
+  tourne** : ses workers chargeraient le nouveau code au fil des imports.
   sur `127.0.0.1:8790`, journal d'accès activé (`journalctl --user -u wynnguessr`).
   gunicorn est en 26.x : la 20.1 du dépôt d'origine plante sous Python 3.13.
 - Après modif de `app.py` ou d'un template : `systemctl --user restart wynnguessr`.
@@ -271,8 +276,8 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
   nom d'un joueur, y compris le Push de `/review`) ; `X-Frame-Options: DENY`
   et `nosniff` ; 10 essais ratés par compte et par adresse en 15 min (30 par
   compte toutes adresses), sur la connexion, le code et l'ancien mot de passe
-  (mémoire du worker : un `HUP` remet à zéro). Laissés tels quels : CORS
-  ouvert de l'origine (sans cookies, donc sans danger), `logout` en GET,
+  (dans la base, table `fails`, depuis les 4 workers). Laissés tels quels :
+  `logout` en GET,
   message libre d'`apology?message=` (échappé, mais permet d'afficher un
   texte trompeur).
 
@@ -697,7 +702,9 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   `extension: 'webp'` dans `room.js`, `survival.js`, `game.js`, le
   préchargement de `room.js` (`.jpg` en dur) et la démo de `index.html`,
   et vérifier que chaque lieu s'ouvre). À la mise en prod : passer le
-  vrai site à 4 workers (unité systemd hors git) et `VERSION = '3.0'`.
+  vrai site à 4 workers (unité systemd hors git), **lui faire son venv
+  neuf depuis `requirements.txt`** (Flask 3 ; puis `restart`, pas `HUP`)
+  et `VERSION = '3.0'`.
 - **Modération** : une **page à part** pour les modérateurs, à côté du bouton
   Profile, avec tout ce qu'il faut pour ajouter des modérateurs et modérer.
   **Des rangs** (admin, mod…) aux pouvoirs différents **les uns sur les
@@ -835,8 +842,55 @@ max), journal d'audit avec la raison. D'où :
   depuis Players après la 3.0.0 si Yasuro le veut. Test : `t_names.py`.
   Les noms Minecraft d'un nouveau compte Wynncraft ne passent pas par là
   (ils viennent de Mojang).
-- **À venir** : passe de sécurité. `REVIEWERS` (tri des lieux) reste à
-  part pour l'instant.
+- **Passe de sécurité** (étape 6, 2026-10-18, fin de la phase 2) :
+  - **Faille trouvée et fermée** : `esc()` (jQuery `text → html`)
+    n'échappait pas les guillemets ; un nom placé dans un attribut
+    (`data-save='…'`, onglets Team et Tags) en sortait. Un compte
+    `x' onclick='…` à qui l'on donnait une étiquette exécutait son code dans
+    la session de l'Admin. `esc()` échappe `"` et `'` dans `room.js`,
+    `board.js`, `moderation.js`. Test : `t_quotes_page.py`.
+  - **Bibliothèques** : `pip-audit` trouvait 27 failles connues (Flask
+    2.2.3, Werkzeug 2.3.6, Flask-Cors 4.0.1). Flask 3.1.3 + Werkzeug 3.1.9 :
+    aucune. **Flask-Cors retiré** (l'API était ouverte à tout site, rien de
+    chez nous n'en a besoin : le mod parle en Java) et Flask-Session retiré
+    (importé, jamais branché : la session est le cookie signé de Flask).
+    `requirements.txt` à jour (Pillow y manquait).
+  - **Adresse d'un joueur** (`place()`) : la **dernière** de
+    `X-Forwarded-For`, que Cloudflare et Funnel écrivent après ce
+    qu'envoie le joueur. Avant : `CF-Connecting-IP` d'abord, qu'un joueur
+    passant par l'ancienne adresse Funnel pouvait écrire lui-même (limites
+    et bans contournés). Vérifié sur la bêta, en passant par Cloudflare avec
+    des en-têtes forgés : l'adresse notée est la vraie (celle du serveur,
+    en IPv6). Cloudflare refuse d'emblée toute requête portant un
+    `CF-Connecting-IP` (erreur 1000).
+  - **Limites par adresse, sur 15 min** (`ACTIONS`, table `actions`) :
+    10 invités, 5 comptes, 20 salons, 10 photos, comptés une fois faits
+    (un nom déjà pris ne coûte rien). L'adresse locale (tests, outils)
+    n'est pas limitée : derrière Cloudflare ou Funnel, une requête a
+    toujours l'adresse de son joueur.
+  - **En-têtes** : HSTS (un an) et une CSP minimale (`frame-ancestors`,
+    `base-uri`, `object-src`, `form-action`). Pas de liste de scripts :
+    les pages ont des scripts en ligne, et unpkg/jsdelivr servent tout npm,
+    une liste n'arrêterait rien.
+  - **Envois** : 32 Mo au plus (`MAX_CONTENT_LENGTH` ; captures du mod
+    ~13 Mo). Photos : déjà refusées au-delà de 40 Mpx avant décodage.
+  - **SRI** sur jQuery et Pannellum (Leaflet l'avait) : fichiers comparés à
+    la copie de jQuery et aux empreintes publiées par jsDelivr.
+  - Vérifié sans faille : SQL (seules des constantes et des `?` sont
+    interpolés), clé de capture (`compare_digest`), et une partie complète
+    (salon Survival, chat, classement, profil, Moderation) jouée avec des
+    joueurs nommés `zz_<zz-q>…` : aucune balise n'entre (`t_xss_page.py`).
+  - **Pièges payés** : (1) `done()` ouvrait une seconde connexion pendant
+    la transaction de l'inscription → « database is locked » après 10 s :
+    toujours passer la connexion de la requête. (2) En test, l'en-tête
+    `X-Forwarded-For` de Playwright (`extra_http_headers`) part aussi vers
+    les CDN ; avec le SRI ces requêtes sont en CORS, le CDN refuse l'en-tête
+    en trop et jQuery ne charge pas : ne l'ajouter qu'aux requêtes du site
+    (`ctx.route`). Aucun effet chez un vrai joueur.
+  - Tests : `t_security.py` (9), `t_quotes_page.py`, tout le reste rejoué
+    sur Flask 3 (moteurs et navigateurs ; `t_classic_page`, `t_sv_page`,
+    `t_mod_page` mis à jour : Survival par défaut, onglet Reports d'abord).
+- `REVIEWERS` (tri des lieux) reste à part de Moderation pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
 - **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
