@@ -667,6 +667,29 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   l'interrogation **suivante** le dernier guess, la révélation finit donc
   une seconde plus tard que le guess + 10 s.
 
+## Worlds : serveurs publics (planifié le 2026-10-18, rien de codé)
+
+Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
+à beaucoup, sans code de salon. Ses réponses :
+- Nom : **Worlds**, comme les mondes de Wynncraft (WC1, WC2…).
+- Des **cartes** comme sur la page About, les plus jouées et les plus
+  peuplées en haut (Survival Normal, avec ou sans lait, Classic…) ; Duel
+  plus tard, après sa refonte. Bouton Ready pour lancer.
+- **Invités acceptés** (« we want anyone to join in the fun »), en leur
+  disant que sans compte leurs scores ne vont pas au classement.
+- **Chat gardé**, avec de la sécurité : signaler, couper quelqu'un ; et
+  sécuriser aussi **les pseudos et les photos de profil**.
+- **Avant de grossir les salons** : rendre le site plus rapide (des joueurs
+  se plaignent du chargement) et plus sûr, **sans rien casser**.
+- Visiteurs : Cloudflare maintenant (fait), la base de données ensuite.
+
+Mesures du 2026-10-18 pour la vitesse : la carte `map-2026.webp` pèse
+**8,7 Mo** (chargée avant la première partie) ; un lieu, ~4,6 Mo pour le
+premier regard (niveaux 1-3), 11 Mo de plus au zoom ; le GIF du lancer
+1,6 Mo ; Cloudflare ne garde que 12 % (les tuiles passent par des jetons
+privés, uniques par partie) : 144 Go servis en 24 h, tous par la connexion
+de la maison. Le serveur : 1 processus gunicorn, 8 fils, 12 cœurs libres.
+
 ## Niveaux, XP et séries de victoires
 
 2026-10-17, demande de Yasuro : des niveaux pour les comptes, « genre barre
