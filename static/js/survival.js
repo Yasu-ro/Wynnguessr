@@ -18,7 +18,8 @@ var POTIONS = {
     wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
     regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
     nausea: ['Nausea', 'The view turns by itself, and your pin lands a little off.'],
-    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.']
+    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.'],
+    blindness: ['Blindness', 'Thick fog: you only see what is close.']
 };
 var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
 var TEST = document.body.dataset.test == '1';   // the beta's test panel (reviewers only, runs off the leaderboard)

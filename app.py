@@ -1266,6 +1266,22 @@ def capture():
         return jsonify({"success": False}), 400
     # a random name: the address of a picture must not give away where it is
     name = secrets.token_hex(10)
+    if request.args.get('fog'):
+        # the fog tour (mod 1.8+): the same place seen with a render distance
+        # of 6 and no Distant Horizons, for Blindness; it joins the location
+        # already kept, no review
+        with connect() as c:
+            loc = c.execute("SELECT location_id FROM locations WHERE location_id = ? AND review = 'kept'",
+                            (request.args['fog'],)).fetchone()
+        if not loc or not data.startswith(b'PK'):
+            return jsonify({"success": False}), 400
+        try:
+            url = make_tiles(data, name)
+        except Exception:
+            return jsonify({"success": False}), 400
+        with connect() as c:
+            c.execute("UPDATE locations SET fog_url = ? WHERE location_id = ?", (url, loc[0]))
+        return jsonify({"success": True, "id": loc[0]})
     if data.startswith(b'PK'):
         # mod 1.6+: the six cube faces in a zip, cut into tiles
         try:
@@ -1324,6 +1340,15 @@ def make_tiles(data, name):
         face.resize((1024, 1024), Image.Resampling.LANCZOS).save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
     os.rename(tmp, os.path.join(TILES_DIR, name))
     return 'static/tiles/' + name + '/'
+
+@app.route("/api/capture/fog")
+def capture_fog():
+    # for the mod's fog tour: the kept locations still without their fog photo
+    if not key_ok():
+        return jsonify({"success": False}), 403
+    with connect() as c:
+        rows = c.execute("SELECT location_id, x_position, z_position FROM locations WHERE review = 'kept' AND fog_url IS NULL").fetchall()
+    return jsonify([{"id": r[0], "x": int(math.floor(r[1])), "z": int(math.floor(r[2]))} for r in rows])
 
 @app.route("/api/capture/planned")
 def capture_planned():
@@ -1387,19 +1412,25 @@ def review_push():
     if os.path.samefile(LIVE_DB, 'database.db'):
         return jsonify({"success": False, "error": "this is the live site"})
     with connect() as c:
-        kept = c.execute("""SELECT location_id, x_position, z_position, image_url, province
+        kept = c.execute("""SELECT location_id, x_position, z_position, image_url, province, fog_url
                             FROM locations WHERE review = 'kept'""").fetchall()
     live = sqlite3.connect(LIVE_DB, timeout=10)
     try:
         if 'review' not in [r[1] for r in live.execute("PRAGMA table_info(locations)")]:
             return jsonify({"success": False, "error": "the live site is not up to date yet"})
+        # the fog photos too, once the live site has their column (its app.py
+        # adds it on start); their tiles are shared through /data, like the others
+        fog = 'fog_url' in [r[1] for r in live.execute("PRAGMA table_info(locations)")]
         with live:
             live.execute("UPDATE locations SET review = 'deleted'")
             live.executemany("""INSERT INTO locations (location_id, x_position, z_position, image_url, province, review)
                                 VALUES (?, ?, ?, ?, ?, 'kept')
                                 ON CONFLICT(location_id) DO UPDATE SET x_position = excluded.x_position,
                                     z_position = excluded.z_position, image_url = excluded.image_url,
-                                    province = excluded.province, review = 'kept'""", [tuple(r) for r in kept])
+                                    province = excluded.province, review = 'kept'""", [tuple(r)[:5] for r in kept])
+            if fog:
+                live.executemany("UPDATE locations SET fog_url = ? WHERE location_id = ?",
+                                 [(r['fog_url'], r['location_id']) for r in kept])
     finally:
         live.close()
     return jsonify({"success": True, "count": len(kept)})
@@ -1686,7 +1717,7 @@ FIRST_POTION = 4           # no potion before this round
 POTION_RATE = {'normal': 1 / 5, 'hard': 1 / 4, 'hardcore': 1 / 3}
 # name: weight (Regeneration, the only good one, comes half as often).
 # Blindness waits for the fog pictures (CLAUDE.md, "Survival")
-POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkness': 2, 'regeneration': 1}
+POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkness': 2, 'regeneration': 1, 'blindness': 2}
 SHAKE = (20, 60)           # Nausea: the pin lands this many blocks off, in any direction
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
@@ -1744,6 +1775,9 @@ with connect() as c:
     # the potion thrown at the player with a result, for the round after it
     if 'next_effect' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
         c.execute("ALTER TABLE survival_runs ADD COLUMN next_effect TEXT")
+    # Blindness: the same place in the fog (the mod's fog tour), when it was taken
+    if 'fog_url' not in [col[1] for col in c.execute("PRAGMA table_info(locations)")]:
+        c.execute("ALTER TABLE locations ADD COLUMN fog_url TEXT")
     # test runs (the beta's test panel), never on the leaderboard; where a
     # guess under Nausea was aimed before it landed off
     if 'test' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
@@ -1797,27 +1831,39 @@ def survival_next(c, run):
             if l[0] not in used]
     if not left:
         return survival_end(c, run)   # every location found: nothing left to play
-    lid = secrets.choice(left)
     n = run['round'] + 1
     effect = run['next_effect']   # thrown at the player with the last result
+    if effect == 'blindness':
+        # played on a place that has its fog photo
+        foggy = fog_left(c, run)
+        left, effect = (foggy, effect) if foggy else (left, None)
+    lid = secrets.choice(left)
     now = time.time()
     seconds = SWIFT_TIME if effect == 'swiftness' else ROUND_TIME[run['difficulty']]
     c.execute("""UPDATE survival_runs SET round = ?, phase = 'guess', location_id = ?, token = ?, effect = ?,
             next_effect = NULL, round_start = ?, deadline = ?, used = ? WHERE id = ?""",
             (n, lid, secrets.token_hex(16), effect, now, now + seconds, json.dumps(used + [lid]), run['id']))
 
-def potion(difficulty, n, effect):
+def potion(difficulty, n, effect, fog = True):
     # the potion for round n, or None: never before FIRST_POTION, never two in
     # a row (so drawn more often after a round without one, for potions to
-    # really come once every 5, 4 or 3 rounds: r / (1 - r))
+    # really come once every 5, 4 or 3 rounds: r / (1 - r)); Blindness only
+    # when a location with its fog photo is left (fog), never imitated
     rate = POTION_RATE[difficulty]
     if not POTIONS or n < FIRST_POTION or effect or secrets.randbelow(10 ** 6) >= rate / (1 - rate) * 10 ** 6:
         return None
-    pick = secrets.randbelow(sum(POTIONS.values()) * 100) / 100
-    for name, weight in POTIONS.items():
+    pool = {k: w for k, w in POTIONS.items() if fog or k != 'blindness'}
+    pick = secrets.randbelow(sum(pool.values()) * 100) / 100
+    for name, weight in pool.items():
         pick -= weight
         if pick < 0:
             return name
+
+def fog_left(c, run):
+    # a location with its fog photo, not seen yet in this run
+    used = json.loads(run['used'])
+    return [l[0] for l in c.execute(f"SELECT location_id FROM locations WHERE review IN {PLAYABLE} AND fog_url IS NOT NULL")
+            if l[0] not in used]
 
 def survival_settle(c, run, x = None, z = None):
     # the round's guess (x and z, or None: no pin when the clock ran out, the creeper)
@@ -1855,7 +1901,7 @@ def survival_settle(c, run, x = None, z = None):
              aim_x if effect == 'nausea' else None, aim_z if effect == 'nausea' else None))
     c.execute("""UPDATE survival_runs SET hp = ?, close = ?, survived = ?, points = points + ?, time = time + ?,
             phase = ?, next_effect = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over',
-            potion(run['difficulty'], n + 1, effect) if hp_after > 0 else None, run['id']))
+            potion(run['difficulty'], n + 1, effect, bool(fog_left(c, run))) if hp_after > 0 else None, run['id']))
     run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
     if hp_after <= 0:
         c.execute("UPDATE survival_runs SET ended = ? WHERE id = ?", (now, run['id']))
@@ -1923,10 +1969,18 @@ def survival_test():
         if what == 'potion' and form.get('potion', '') in [''] + list(POTIONS):
             name = form['potion'] or None
             if run['phase'] == 'guess':
-                # drunk now: the round starts again under it (same place, its clock)
+                # drunk now: the round starts again under it (same place, its
+                # clock; Blindness needs a place with its fog photo)
                 seconds = SWIFT_TIME if name == 'swiftness' else ROUND_TIME[run['difficulty']]
-                c.execute("UPDATE survival_runs SET effect = ?, round_start = ?, deadline = ? WHERE id = ?",
-                          (name, now, now + seconds, run['id']))
+                lid = run['location_id']
+                if name == 'blindness' and not c.execute("SELECT fog_url FROM locations WHERE location_id = ?", (lid,)).fetchone()[0]:
+                    foggy = fog_left(c, run)
+                    if not foggy:
+                        c.execute("ROLLBACK")
+                        return jsonify({"success": False, "error": "no fog photo yet"})
+                    lid = secrets.choice(foggy)
+                c.execute("UPDATE survival_runs SET effect = ?, round_start = ?, deadline = ?, location_id = ?, token = ? WHERE id = ?",
+                          (name, now, now + seconds, lid, secrets.token_hex(16), run['id']))
             else:
                 c.execute("UPDATE survival_runs SET next_effect = ? WHERE id = ?", (name, run['id']))
         elif what == 'hearts' and form.get('hp', '').isdigit():
@@ -2022,7 +2076,9 @@ def survival_tile(token, name):
     # the pictures of the round being played, under an address that only means
     # something during that round
     with connect() as c:
-        run = c.execute("""SELECT l.image_url FROM survival_runs r JOIN locations l ON l.location_id = r.location_id
+        # under Blindness, the fog photo of the same place
+        run = c.execute("""SELECT CASE WHEN r.effect = 'blindness' AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END
+                FROM survival_runs r JOIN locations l ON l.location_id = r.location_id
                 WHERE r.token = ? AND r.phase = 'guess'""", (token,)).fetchone()
     if not run or not run[0].startswith('static/tiles/'):
         return '', 404

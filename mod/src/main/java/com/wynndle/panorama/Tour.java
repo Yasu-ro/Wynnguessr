@@ -17,6 +17,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -39,13 +40,19 @@ import java.util.stream.Stream;
 // - the tour key flies to every spot planned on the review map, one by one:
 //   teleport, turn around once (Distant Horizons loads what is looked at),
 //   wait, take the panorama and fly on while it is being sent. Turn and wait
-//   times come from the config file (spinSeconds, waitSeconds).
+//   times come from the config file (spinSeconds, waitSeconds);
+// - the fog tour key does the same over every kept location that has no fog
+//   photo yet: render distance 6, Distant Horizons removed (both checked
+//   before it starts), no turn (nothing far to load), the photo sent as the
+//   location's fog version (Survival's Blindness).
 public class Tour {
 	static final int LOAD_TIMEOUT = 300; // a spot whose chunk never comes is skipped
 
 	enum Step { IDLE, FETCHING, GOING, LANDING, SPINNING, WAITING }
 
 	static Step step = Step.IDLE;
+	static boolean fog;                  // this tour: the fog tour
+	static final int FOG_DISTANCE = 6;   // its render distance, in chunks
 	static int ticks;
 	static int id, x, z;
 	static volatile JsonArray fetched;
@@ -54,9 +61,9 @@ public class Tour {
 	static int spinTicks, waitTicks;
 	static Object coverageLevel;
 
-	static void toggle(Minecraft mc) {
+	static void toggle(Minecraft mc, boolean foggy) {
 		if (step != Step.IDLE) {
-			stop(mc, "tour stopped");
+			stop(mc, (fog ? "fog " : "") + "tour stopped");
 			return;
 		}
 		if (!mc.hasSingleplayerServer()) {
@@ -67,10 +74,23 @@ public class Tour {
 			say(mc, "no key in config/wynndle-panorama.json", ChatFormatting.RED);
 			return;
 		}
+		if (foggy) {
+			// the fog is the vanilla one at this distance: anything else would
+			// give pictures that do not match each other
+			if (mc.options.renderDistance().get() != FOG_DISTANCE) {
+				say(mc, "set the render distance to " + FOG_DISTANCE + " for the fog tour", ChatFormatting.RED);
+				return;
+			}
+			if (FabricLoader.getInstance().isModLoaded("distanthorizons")) {
+				say(mc, "remove Distant Horizons for the fog tour", ChatFormatting.RED);
+				return;
+			}
+		}
+		fog = foggy;
 		skipped.clear();
-		spinTicks = (int) Math.round(Math.max(0, WynndlePanorama.config.spinSeconds) * 20);
+		spinTicks = fog ? 0 : (int) Math.round(Math.max(0, WynndlePanorama.config.spinSeconds) * 20);
 		waitTicks = (int) Math.round(Math.max(0, WynndlePanorama.config.waitSeconds) * 20);
-		say(mc, "tour started", ChatFormatting.GRAY);
+		say(mc, (fog ? "fog " : "") + "tour started", ChatFormatting.GRAY);
 		fetch();
 	}
 
@@ -85,7 +105,7 @@ public class Tour {
 		fetchFailed = false;
 		Thread t = new Thread(() -> {
 			try {
-				fetched = new Gson().fromJson(get("/api/capture/planned"), JsonArray.class);
+				fetched = new Gson().fromJson(get(fog ? "/api/capture/fog" : "/api/capture/planned"), JsonArray.class);
 			} catch (Exception e) {
 				fetchFailed = true;
 			}
@@ -122,7 +142,7 @@ public class Tour {
 				}
 				if (best == null) {
 					int sending = WynndlePanorama.pending.get();
-					stop(mc, "tour done" + (sending > 0 ? ", " + sending + " photos still being sent" : ""));
+					stop(mc, (fog ? "fog " : "") + "tour done" + (sending > 0 ? ", " + sending + " photos still being sent" : ""));
 					return;
 				}
 				id = best.get("id").getAsInt();
@@ -164,8 +184,8 @@ public class Tour {
 			}
 			case WAITING -> {
 				if (++ticks >= waitTicks) {
-					WynndlePanorama.capture(mc, id);
-					// still planned on the site until it is sent: not again in this tour
+					WynndlePanorama.capture(mc, id, fog);
+					// still listed on the site until it is sent: not again in this tour
 					skipped.add(id);
 					fetch();
 				}

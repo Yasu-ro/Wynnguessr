@@ -42,7 +42,9 @@ import java.util.zip.ZipOutputStream;
 // Pannellum, nothing gets resampled into a blur. The zip is named X_Z after
 // the player's block, and sent to the site's review page when
 // config/wynndle-panorama.json has a key. A second key runs the tour of the
-// spots planned on that page (see Tour).
+// spots planned on that page, a third the fog tour: the kept locations once
+// more, with a render distance of 6 and no Distant Horizons, for the
+// Survival's Blindness (see Tour).
 public class WynndlePanorama implements ClientModInitializer {
 	// Pannellum's cube faces, in Minecraft's order: north (front, every
 	// panorama faces north), east, south, west, up, down
@@ -56,7 +58,7 @@ public class WynndlePanorama implements ClientModInitializer {
 		double waitSeconds = 3;  // tour: then this long still
 	}
 
-	static KeyMapping key, tourKey;
+	static KeyMapping key, tourKey, fogKey;
 	// packing, saving and sending run one after the other here, so the
 	// tour can fly on as soon as a panorama is drawn
 	static final ExecutorService WORKER = Executors.newSingleThreadExecutor(r -> {
@@ -75,22 +77,28 @@ public class WynndlePanorama implements ClientModInitializer {
 			"key.wynndle-panorama.capture", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_SHIFT, KeyMapping.Category.MISC));
 		tourKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
 			"key.wynndle-panorama.tour", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_CONTROL, KeyMapping.Category.MISC));
+		fogKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+			"key.wynndle-panorama.fogtour", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_RIGHT_ALT, KeyMapping.Category.MISC));
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			while (key.consumeClick()) {
-				if (mc.player != null && mc.level != null && Tour.step == Tour.Step.IDLE) capture(mc, -1);
+				if (mc.player != null && mc.level != null && Tour.step == Tour.Step.IDLE) capture(mc, -1, false);
 			}
 			while (tourKey.consumeClick()) {
-				if (mc.player != null && mc.level != null) Tour.toggle(mc);
+				if (mc.player != null && mc.level != null) Tour.toggle(mc, false);
+			}
+			while (fogKey.consumeClick()) {
+				if (mc.player != null && mc.level != null) Tour.toggle(mc, true);
 			}
 			Tour.tick(mc);
 		});
 	}
 
-	// planned: id of the spot planned on the review page, or -1
-	static void capture(Minecraft mc, int planned) {
+	// planned: id of the spot planned on the review page (or, fog: of the kept
+	// location photographed again in the fog), or -1
+	static void capture(Minecraft mc, int planned, boolean fog) {
 		LocalPlayer p = mc.player;
 		int x = p.getBlockX(), z = p.getBlockZ();
-		Path out = FabricLoader.getInstance().getGameDir().resolve("wynndle");
+		Path out = FabricLoader.getInstance().getGameDir().resolve(fog ? "wynndle/fog" : "wynndle");
 		Path tmp = out.resolve(".tmp-" + System.currentTimeMillis());
 
 		// Every image faces north in its centre, whatever way the player looks.
@@ -126,7 +134,7 @@ public class WynndlePanorama implements ClientModInitializer {
 				if (config.key.isEmpty()) {
 					say(mc, Component.literal("Wynndle: " + file.getName() + " saved").withStyle(ChatFormatting.GREEN));
 				} else {
-					String error = upload(file, x, z, planned);
+					String error = upload(file, x, z, planned, fog);
 					say(mc, error == null
 						? Component.literal("Wynndle: " + file.getName() + " sent").withStyle(ChatFormatting.GREEN)
 						: Component.literal("Wynndle: " + file.getName() + " saved, not sent (" + error + ")").withStyle(ChatFormatting.GOLD));
@@ -161,9 +169,9 @@ public class WynndlePanorama implements ClientModInitializer {
 	}
 
 	// Returns null when the site has it, else why not (the file stays saved).
-	static String upload(File file, int x, int z, int planned) {
+	static String upload(File file, int x, int z, int planned, boolean fog) {
 		try {
-			HttpRequest req = Tour.request("/api/capture?x=" + x + "&z=" + z + (planned >= 0 ? "&planned=" + planned : ""))
+			HttpRequest req = Tour.request("/api/capture?x=" + x + "&z=" + z + (planned >= 0 ? (fog ? "&fog=" : "&planned=") + planned : ""))
 				.header("Content-Type", "application/zip")
 				.POST(HttpRequest.BodyPublishers.ofFile(file.toPath()))
 				.build();

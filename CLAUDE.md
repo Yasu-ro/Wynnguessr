@@ -347,8 +347,12 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   cœur toutes les 5 s jusqu'au guess), Regeneration (+2 cœurs si dans la
   zone), Nausea (la vue tourne seule et l'épingle tombe à côté), Darkness
   (image 10 s puis noir).
-  Blindness attend les photos « brouillard » (distance de rendu 6, sans
-  Distant Horizons, nouvelle tournée du mod), pas d'imitation avant.
+  Blindness (« Thick fog ») : la même place photographiée dans le brouillard
+  (`locations.fog_url`, tournée brouillard du mod 1.8.0). Tirée seulement
+  s'il reste un lieu qui a sa photo brouillard (`fog_left`), et la manche
+  se joue alors sur un tel lieu ; jamais d'imitation (si le seul lieu
+  brouillard est déjà vu, la manche part sans potion). Elle vient donc
+  d'elle-même, au fur et à mesure des photos.
 - **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
   (dégâts), rouge (au-delà, mort avec les cœurs qui restaient). Dégâts
   écrits « −6.5 » + un cœur (demande de Yasuro, pas « 6½ hearts »).
@@ -863,6 +867,19 @@ les noms au-dessus des entités. Les supports d'armure restent (Wynncraft en
 décore), seul leur nom part. Télécharger la carte (Chunky, world downloader) a
 été écarté : Chunky génère un monde côté serveur et ne copie rien de
 Wynncraft.
+
+**Tournée brouillard** (1.8.0, touche **Alt droite**, réglable : « Wynndle
+fog tour » dans Contrôles → Divers) : comme la tournée, mais sur les lieux
+**gardés** qui n'ont pas encore leur photo brouillard (`GET
+api/capture/fog`), sans le tour sur soi (rien de loin à charger). Elle
+refuse de partir sans **distance de rendu 6** et si **Distant Horizons**
+est chargé (choix de Yasuro : 6 chunks, DH retiré à la main). La photo
+part avec `&fog=<id>` et rejoint le lieu (`fog_url`), sans tri ; copie
+locale dans `.minecraft/wynndle/fog/`. Elle se pose comme la tournée (sol
+le plus haut) : une photo prise à la main ailleurs qu'au sol ne sera pas
+au même endroit en hauteur. Le Push emporte `fog_url` vers le vrai site
+dès que celui-ci a la colonne (son `app.py` l'ajoute au démarrage), et
+marche sans en attendant.
 
 - Cible : pack Modrinth **Wynncraft Plus** (Fabric, MC 1.21.11), celui de Yasuro.
   Il contient Iris, Distant Horizons, Sodium : leur effet sur la capture n'a
