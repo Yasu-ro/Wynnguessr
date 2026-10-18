@@ -31,6 +31,8 @@ SOUNDS = {
     'toast': ['ui/toast/in'],
     'fuse': ['random/fuse'],
     'boom': ['random/explode1', 'random/explode2', 'random/explode3', 'random/explode4'],
+    'throw': ['random/bow'],
+    'splash': ['random/glass1', 'random/glass2', 'random/glass3'],
 }
 
 def get(url):

@@ -17,10 +17,12 @@
         <p class="nav-stat" id="sv-round"></p>
         <p class="nav-stat" id="sv-points"></p>
         <p class="nav-stat" id="sv-time" hidden></p>
+        <p class="nav-stat sv-effect" id="sv-effect" hidden></p>
     </nav>
 
     <div class="guess-screen" id="guess-screen" hidden>
         <div id="game-panorama"></div>
+        <div class="sv-dark" id="sv-dark" hidden></div>
         <div class="hearts" id="hearts"></div>
         <div class="map-container">
             <div id="map"></div>
@@ -34,6 +36,8 @@
             <div class="hearts small" id="hearts-result"></div>
             <p id="sv-verdict"></p>
             <p id="sv-detail" class="score-info"></p>
+            <div class="potion-throw" id="potion-throw" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
+            <div class="potion-card" id="potion-card" hidden></div>
             <div id="xp-slot" class="xp-slot"></div>
             <div class="sv-actions">
                 <button id="next-button" class="next-button" type="button">Next Location</button>

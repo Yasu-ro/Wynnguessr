@@ -10,6 +10,34 @@ var s = null;                               // the last state from the server
 var viewer = null, map = null, scoreMap = null, marker = null;
 var deadline = null, clockTimer = null, fused = false, sending = false;
 
+// the potions: name, what they do; their bottles in static/potions.png, in
+// this order (tools/potions.py draws them)
+var POTIONS = {
+    swiftness: ['Swiftness', '20 seconds to find it, but a bigger safe zone.'],
+    mining_fatigue: ['Mining Fatigue', 'No zooming on the map.'],
+    wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
+    regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
+    nausea: ['Nausea', 'The world sways.'],
+    darkness: ['Darkness', 'You see the picture for 5 seconds, then it goes dark.']
+};
+var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
+var THROW_MS = 1050;    // the length of static/potion-throw.gif (a temporary one: Yasuro draws the real one)
+var SPLASH_MS = 560;    // when the bottle breaks in it
+var DARK_AFTER = 5;     // Darkness: seconds of picture before the dark
+var darkTimer = null, witherShown = null;
+
+function potionIcon(name) {
+    return "<i class='potion-icon' style='--i:" + BOTTLES.indexOf(name) + "'></i>";
+}
+
+// a heart drawn in the text, and an amount of half-hearts: 13 -> "6.5"
+function heartIcon() {
+    return "<i class='heart inline" + (DIFFICULTY == 'hardcore' ? ' hc' : '') + "'></i>";
+}
+function amount(half) {
+    return String(half / 2);
+}
+
 function api(path, data) {
     return $.ajax({url: 'api/survival' + path, type: data ? 'POST' : 'GET', data: data, dataType: 'json', timeout: 10000});
 }
@@ -81,6 +109,7 @@ function makeMap(id, zoom) {
 }
 
 function guessScreen() {
+    $('body').addClass('guessing');
     $('#score-screen').prop('hidden', true);
     $('#guess-screen').prop('hidden', false);
     drawHearts(document.getElementById('hearts'), s.hp, s.max);
@@ -110,6 +139,7 @@ function guessScreen() {
         Sfx.play('pin');
         $('#guess-button').removeClass('room-warn').text('Guess!');
     });
+    effects();
     // the server's clock: what is left of it when the round came
     deadline = Date.now() + s.time_left * 1000;
     clearInterval(clockTimer);
@@ -117,10 +147,46 @@ function guessScreen() {
     clock();
 }
 
+// the potion of this round, if any: its bottle in the menu, and what it does
+// to the page (the server takes care of the rest: time, zone, hearts)
+function effects() {
+    var e = s.effect, spent = s.time - s.time_left;
+    $('#sv-effect').prop('hidden', !e).html(e ? potionIcon(e) + '<span>' + POTIONS[e][0] + '</span>' : '');
+    $('#game-panorama').toggleClass('nausea', e == 'nausea');
+    clearTimeout(darkTimer);
+    $('#sv-dark').prop('hidden', true);
+    if (e == 'darkness') {
+        darkTimer = setTimeout(function () { $('#sv-dark').prop('hidden', false); }, Math.max(0, DARK_AFTER - spent) * 1000);
+    }
+    if (e == 'mining_fatigue') {
+        // no zoom at all: the map stays as it opens
+        map.setMinZoom(map.getZoom()).setMaxZoom(map.getZoom());
+        ['scrollWheelZoom', 'doubleClickZoom', 'touchZoom', 'boxZoom', 'keyboard'].forEach(function (h) { map[h].disable(); });
+        map.zoomControl.remove();
+    }
+    witherShown = s.hp;
+}
+
+// Wither: the hearts the server will take, shown as they go
+function wither(left) {
+    if (s.effect != 'wither') {
+        return;
+    }
+    var hp = Math.max(0, s.hp - Math.floor((s.time - left) / 5));
+    if (hp != witherShown) {
+        witherShown = hp;
+        var el = document.getElementById('hearts');
+        drawHearts(el, hp, s.max);
+        replay(el, 'hurt');
+        Sfx.play('hurt', 1, .6);
+    }
+}
+
 // the time left; the creeper hisses for the last seconds, then the pin goes
 // by itself, or the creeper explodes
 function clock() {
     var left = Math.max(0, (deadline - Date.now()) / 1000);
+    wither(left);
     $('#sv-time').prop('hidden', false).html("<i class='material-icons'>timer</i>" + Math.ceil(left) + ' s')
         .toggleClass('urgent', left <= 10);
     if (left <= FUSE && !fused && !sending) {
@@ -147,6 +213,7 @@ function send(auto) {
     }
     sending = true;
     clearInterval(clockTimer);
+    clearTimeout(darkTimer);
     var data = {round: s.round};
     if (marker) {
         var b = blockAt(marker.getLatLng());
@@ -183,6 +250,7 @@ function explode() {
 
 function resultScreen(before) {
     var r = s.result;
+    $('body').removeClass('guessing');
     $('#sv-time').prop('hidden', true);
     $('#guess-screen').prop('hidden', true);
     $('#score-screen').prop('hidden', false);
@@ -222,6 +290,17 @@ function resultScreen(before) {
     }
     $('#next-button').prop('hidden', over).prop('disabled', false);
     $('#again-button, #menu-button').prop('hidden', !over);
+    $('#sv-effect').prop('hidden', true);
+    $('#potion-throw, #potion-card').prop('hidden', true);
+    if (s.potion && !over) {
+        // the next round's potion: thrown right after a guess (a reload just shows it)
+        $('#next-button').prop('hidden', true);
+        if (before && before.phase == 'guess' && !REDUCED) {
+            setTimeout(throwPotion, 900);
+        } else {
+            showPotion();
+        }
+    }
     var slot = document.getElementById('xp-slot');
     slot.innerHTML = '';
     if (over) {
@@ -233,24 +312,47 @@ function resultScreen(before) {
     }
 }
 
+// the potion flies, breaks, and shows what it is; then the next round may start
+function throwPotion() {
+    if (s.phase != 'result') {
+        return;
+    }
+    Sfx.play('throw');
+    $('#potion-gif').attr('src', 'static/potion-throw.gif?' + Date.now());   // from its first frame
+    $('#potion-throw').prop('hidden', false);
+    setTimeout(function () { Sfx.play('splash'); }, SPLASH_MS);
+    setTimeout(function () {
+        $('#potion-throw').prop('hidden', true);
+        showPotion();
+    }, THROW_MS);
+}
+
+function showPotion() {
+    var p = POTIONS[s.potion];
+    $('#potion-card').html(potionIcon(s.potion) + '<div><b>' + p[0] + '!</b><span>' + p[1].replace(/\{heart\}/g, heartIcon()) +
+        '</span></div>').prop('hidden', false);
+    $('#next-button').prop('hidden', false);
+}
+
 // what happened, in words and in one sound
 function verdict(r, over) {
     var lost = r.damage + r.wither, words;
     if (r.creeper) {
-        words = 'Boom! No guess in time';
+        words = 'Boom! No guess in time · −' + amount(lost) + ' ' + heartIcon();
     } else if (!lost) {
-        words = r.heal ? 'Spot on! Half a heart back' : 'Safe!';
+        words = r.heal ? 'Spot on! +' + amount(r.heal) + ' ' + heartIcon() : 'Safe!';
     } else {
-        words = '−' + hearts(lost);
+        words = '−' + amount(lost) + ' ' + heartIcon() + (r.heal ? ' · +' + amount(r.heal) + ' ' + heartIcon() : '');
     }
     if (r.wither) {
-        words += ' · Wither: −' + hearts(r.wither);
+        words += ' <small>(Wither: −' + amount(r.wither) + ')</small>';
     }
     if (over) {
         words = "Game over! You survived " + s.survived + (s.survived == 1 ? ' location' : ' locations');
     }
-    $('#sv-verdict').text(words).toggleClass('bad', !!lost && !over).toggleClass('over', over);
-    var detail = r.x === null ? '' : Math.round(r.distance).toLocaleString('en-US') + ' blocks away · +' + r.points.toLocaleString('en-US') + ' pts';
+    $('#sv-verdict').html(words).toggleClass('bad', !!lost && !over).toggleClass('over', over);
+    var far = Math.round(r.distance);
+    var detail = r.x === null ? '' : far.toLocaleString('en-US') + (far == 1 ? ' block' : ' blocks') + ' away · +' + r.points.toLocaleString('en-US') + ' pts';
     if (over) {
         detail = s.points.toLocaleString('en-US') + ' points';
     }
@@ -260,12 +362,6 @@ function verdict(r, over) {
     } else if (!r.creeper) {
         Sfx.play(lost ? 'hurt' : r.heal ? 'perfect' : 'good');
     }
-}
-
-// half-hearts, in words: 3 -> "1½ hearts"
-function hearts(half) {
-    var whole = Math.floor(half / 2), text = (whole ? whole : '') + (half % 2 ? '½' : '');
-    return text + (half > 2 ? ' hearts' : ' heart');
 }
 
 $('#next-button').on('click', function () {

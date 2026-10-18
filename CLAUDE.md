@@ -349,7 +349,26 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   Blindness attend les photos « brouillard » (distance de rendu 6, sans
   Distant Horizons, nouvelle tournée du mod), pas d'imitation avant.
 - **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
-  (dégâts), rouge (au-delà, mort avec les cœurs qui restaient).
+  (dégâts), rouge (au-delà, mort avec les cœurs qui restaient). Dégâts
+  écrits « −6.5 » + un cœur (demande de Yasuro, pas « 6½ hearts »).
+- **Potions, présentation** (choix de Yasuro) : la potion est tirée **au
+  guess** (`potion()`, gardée dans `survival_runs.next_effect`) et appliquée
+  à la manche suivante. Au résultat, le bouton attend : son de lancer
+  (`random/bow`), GIF `static/potion-throw.gif`, verre brisé
+  (`random/glass1-3`), puis la carte de la potion et le bouton. **Le GIF est
+  provisoire** (dessiné par `tools/potions.py`) : Yasuro dessinera le vrai,
+  à mettre sous le même nom, en réglant `THROW_MS` (sa durée) et
+  `SPLASH_MS` (le moment où la bouteille casse) dans `survival.js`. Les
+  flacons (`static/potions.png`, couleurs des effets de Minecraft) sont à
+  nous. Un rechargement montre la carte sans le lancer.
+- Effets côté page : Mining Fatigue (zoom de la carte bloqué), Nausea (le
+  panorama tangue, agrandi ×1,22 : à moins, un bord blanc apparaissait ;
+  coupé par le mouvement réduit), Darkness (noir après 5 s, même après un
+  rechargement), Wither (les cœurs tombent à l'écran toutes les 5 s, le
+  serveur compte). Le flacon de la manche est dans le menu (sur téléphone,
+  sans son nom, et les points s'effacent pendant la manche : le menu
+  débordait).
+- Cœurs espacés d'un pixel du dessin (demande de Yasuro).
 - **Score** = lieux survécus, départage = total des points (formule
   Classic). Un classement par difficulté, plus aucune option (toutes les
   provinces, vue libre), anciens scores Survival effacés.

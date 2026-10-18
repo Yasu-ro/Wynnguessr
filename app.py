@@ -1522,7 +1522,9 @@ NEAR = 10                  # blocks: a near-perfect guess; two in a row give bac
 LATE = 2                   # seconds a guess may come after the deadline (network lag)
 FIRST_POTION = 4           # no potion before this round
 POTION_RATE = {'normal': 1 / 5, 'hard': 1 / 4, 'hardcore': 1 / 3}
-POTIONS = {}               # name: weight; each one is added once the page knows how to draw it
+# name: weight (Regeneration, the only good one, comes half as often).
+# Blindness waits for the fog pictures (CLAUDE.md, "Survival")
+POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkness': 2, 'regeneration': 1}
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
 
@@ -1576,6 +1578,9 @@ with connect() as c:
     ''')
     # the new Survival has a leaderboard per difficulty, broken ties on points;
     # the old one's scores (other rules) go, once
+    # the potion thrown at the player with a result, for the round after it
+    if 'next_effect' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
+        c.execute("ALTER TABLE survival_runs ADD COLUMN next_effect TEXT")
     if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN difficulty TEXT")
         c.execute("ALTER TABLE scores ADD COLUMN points INTEGER")
@@ -1624,23 +1629,25 @@ def survival_next(c, run):
         return survival_end(c, run)   # every location found: nothing left to play
     lid = secrets.choice(left)
     n = run['round'] + 1
-    effect = None
-    # never two in a row: drawn more often after a round without one, so
-    # that potions really come once every 5, 4 or 3 rounds (r / (1 - r))
-    rate = POTION_RATE[run['difficulty']]
-    if POTIONS and n >= FIRST_POTION and not run['effect'] and secrets.randbelow(10 ** 6) < rate / (1 - rate) * 10 ** 6:
-        names = list(POTIONS)
-        pick = secrets.randbelow(sum(POTIONS.values()) * 100) / 100
-        for name in names:
-            pick -= POTIONS[name]
-            if pick < 0:
-                effect = name
-                break
+    effect = run['next_effect']   # thrown at the player with the last result
     now = time.time()
     seconds = SWIFT_TIME if effect == 'swiftness' else ROUND_TIME[run['difficulty']]
     c.execute("""UPDATE survival_runs SET round = ?, phase = 'guess', location_id = ?, token = ?, effect = ?,
-            round_start = ?, deadline = ?, used = ? WHERE id = ?""",
+            next_effect = NULL, round_start = ?, deadline = ?, used = ? WHERE id = ?""",
             (n, lid, secrets.token_hex(16), effect, now, now + seconds, json.dumps(used + [lid]), run['id']))
+
+def potion(difficulty, n, effect):
+    # the potion for round n, or None: never before FIRST_POTION, never two in
+    # a row (so drawn more often after a round without one, for potions to
+    # really come once every 5, 4 or 3 rounds: r / (1 - r))
+    rate = POTION_RATE[difficulty]
+    if not POTIONS or n < FIRST_POTION or effect or secrets.randbelow(10 ** 6) >= rate / (1 - rate) * 10 ** 6:
+        return None
+    pick = secrets.randbelow(sum(POTIONS.values()) * 100) / 100
+    for name, weight in POTIONS.items():
+        pick -= weight
+        if pick < 0:
+            return name
 
 def survival_settle(c, run, x = None, z = None):
     # the round's guess (x and z, or None: no pin when the clock ran out, the creeper)
@@ -1670,7 +1677,8 @@ def survival_settle(c, run, x = None, z = None):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (run['id'], n, loc['location_id'], x, z, d, hp, damage, wither, heal if hp_after > 0 else 0, points, effect, spent, now))
     c.execute("""UPDATE survival_runs SET hp = ?, close = ?, survived = ?, points = points + ?, time = time + ?,
-            phase = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over', run['id']))
+            phase = ?, next_effect = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over',
+            potion(run['difficulty'], n + 1, effect) if hp_after > 0 else None, run['id']))
     run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
     if hp_after <= 0:
         c.execute("UPDATE survival_runs SET ended = ? WHERE id = ?", (now, run['id']))
@@ -1708,6 +1716,8 @@ def survival_state(c, run):
                          "damage": g['damage'], "wither": g['wither'], "heal": g['heal'], "points": g['points'],
                          "effect": g['effect'], "creeper": g['x'] is None, "safe": safe, "far": far,
                          "kill": kill_radius(g['round'], g['effect'], g['hp'] - g['wither'])}
+        if run['phase'] == 'result':
+            out['potion'] = run['next_effect']   # thrown now, for the next round
     return out
 
 @app.route("/survival")
