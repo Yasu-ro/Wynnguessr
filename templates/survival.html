@@ -3,7 +3,7 @@
 <head>
 {% include "head.html" %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" integrity="sha256-p/HXuG8QaPIo2S8bCu+VvUHR4uEnhVFlc62/VS7ieT0=" crossorigin="">
     <link rel="stylesheet" href="{{ asset('style.css') }}">
     <title>WynnGuessr: Survival</title>
 {% include "share.html" %}
@@ -36,7 +36,7 @@
             <div class="hearts small" id="hearts-result"></div>
             <p id="sv-verdict"></p>
             <p id="sv-detail" class="score-info"></p>
-            <div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.gif') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
+            <div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.webp') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
             <div class="potion-card" id="potion-card" hidden></div>
             <div id="xp-slot" class="xp-slot"></div>
             <div class="sv-actions">
@@ -59,12 +59,12 @@
     </details>
     {% endif %}
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" integrity="sha256-wS9gmOZBqsqWxgIVgA8Y9WcQOa7PgSIX+rPA0VL2rbQ=" crossorigin=""></script>
     <script src="{{ asset('js/sound.js') }}"></script>
     <script src="{{ asset('js/motion.js') }}"></script>
     <script src="{{ asset('js/xp.js') }}"></script>
     <script src="{{ asset('js/block.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js" integrity="sha256-oosvezOf0KYCxnad8dymrUOvc7yMalvmcglxUonBKpo=" crossorigin=""></script>
     <script src="{{ asset('js/potions.js') }}"></script>
     <script src="{{ asset('js/survival.js') }}"></script>
 </body>

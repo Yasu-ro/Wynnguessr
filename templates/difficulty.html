@@ -24,7 +24,7 @@
                 // Survival has no settings but its difficulty (the number of rounds is classic's only)
                 document.addEventListener('modechange', function (e) {
                     var survival = e.detail == 'survival';
-                    ['provinces', 'timer', 'look'].forEach(function (id) { document.getElementById(id).hidden = survival; });
+                    ['provinces', 'timer', 'look'].forEach(function (id) { var f = document.getElementById(id); if (f) f.hidden = survival; });   // no provinces in solo
                     document.getElementById('rounds').hidden = e.detail != 'classic';
                     document.getElementById('difficulty').hidden = !survival;
                     document.getElementById('milk').hidden = !survival;

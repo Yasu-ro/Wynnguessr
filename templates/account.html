@@ -26,7 +26,15 @@
                 </div>
             </div>
             {% if not me.mc_uuid and not me.avatar %}<p class="hint">Link your Wynncraft account to get your own Minecraft head.</p>{% endif %}
-            {{ note('picture') }}{{ note('head') }}
+            {% if me.avatar_pending %}
+            <div class="account-waiting">
+                <img class="avatar small" src="avatar?id={{ me.id }}&pending=1&v={{ me.avatar_pending }}" alt="" width="64" height="64">
+                <p>Your new picture is waiting for a moderator. Until then, the others see the one above.</p>
+            </div>
+            {% elif me.avatar_note %}
+            <p class="note bad">Your picture was not accepted: {{ me.avatar_note }}</p>
+            {% endif %}
+            {% if not (saved == 'picture' and me.avatar_pending) %}{{ note('picture') }}{% endif %}{{ note('head') }}
         </section>
 
         <section class="panel">

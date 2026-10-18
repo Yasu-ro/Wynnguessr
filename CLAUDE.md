@@ -29,7 +29,16 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
 
 ## Faire tourner
 
-- Service utilisateur `wynnguessr` : gunicorn (venv `.venv`, 1 worker, 8 threads)
+- Service utilisateur `wynnguessr` : gunicorn (venv `.venv`, **4 workers** depuis
+  la phase « vitesse » du 2026-10-18 — 1 avant, plafonné à un cœur par le
+  GIL, à 55 % de charge —, 8 threads ; l'unité systemd est hors git : la
+  changer à la main sur la bêta et le vrai site, puis `daemon-reload` et
+  `restart`, un `HUP` ne change pas le nombre de workers).
+  **Deux venv depuis le 2026-10-18** : la bêta a le sien
+  (`~/Wynnguessr-beta/.venv`, Flask 3.1.3, fait depuis `requirements.txt`) ;
+  le vrai site garde `~/Wynnguessr/.venv` (Flask 2.2.3) jusqu'à la 3.0.0.
+  **Ne jamais mettre à jour un paquet dans le venv du vrai site pendant qu'il
+  tourne** : ses workers chargeraient le nouveau code au fil des imports.
   sur `127.0.0.1:8790`, journal d'accès activé (`journalctl --user -u wynnguessr`).
   gunicorn est en 26.x : la 20.1 du dépôt d'origine plante sous Python 3.13.
 - Après modif de `app.py` ou d'un template : `systemctl --user restart wynnguessr`.
@@ -240,12 +249,12 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
   On peut envoyer sa propre image : recadrée en carré, **réencodée en webp
   256 px côté serveur** (le fichier envoyé n'est jamais servi), 8 Mo max.
   Dossier `avatars/` hors git, propre à chaque site. Route `avatar?id=&v=`.
-  Les comptes d'`ADMINS` (Yasuro, par id) ont un bouton « Remove picture »
-  sur le profil des autres.
+  **Approuvée avant d'être vue** depuis le 2026-10-18 (voir « Phase 2 ») ;
+  l'équipe a un bouton « Remove picture » sur le profil des autres.
 - **Pseudo** : changeable sur `account` ; bouton « Use my Minecraft name » si
   lié. Unique **sans tenir compte de la casse** (avant, « yasuro » pouvait
   s'inscrire à côté de « Yasuro »), jamais le `mc_name` vérifié d'un autre.
-  Conséquence : **`REVIEWERS`, `PUBLISHER`, `ADMINS` sont des ids**, sinon
+  Conséquence : **`REVIEWERS`, `PUBLISHER`, `OWNER` sont des ids**, sinon
   quelqu'un pourrait prendre le nom libéré par Yasuro et ses droits.
 - **Mot de passe** : changement avec l'ancien, sauf si la session vient de
   « Log in with Wynncraft » (`session['wynn']`) : c'est la récupération d'un
@@ -267,8 +276,8 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
   nom d'un joueur, y compris le Push de `/review`) ; `X-Frame-Options: DENY`
   et `nosniff` ; 10 essais ratés par compte et par adresse en 15 min (30 par
   compte toutes adresses), sur la connexion, le code et l'ancien mot de passe
-  (mémoire du worker : un `HUP` remet à zéro). Laissés tels quels : CORS
-  ouvert de l'origine (sans cookies, donc sans danger), `logout` en GET,
+  (dans la base, table `fails`, depuis les 4 workers). Laissés tels quels :
+  `logout` en GET,
   message libre d'`apology?message=` (échappé, mais permet d'afficher un
   texte trompeur).
 
@@ -667,6 +676,374 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   l'interrogation **suivante** le dernier guess, la révélation finit donc
   une seconde plus tard que le guess + 10 s.
 
+## Worlds : serveurs publics (planifié le 2026-10-18, rien de codé)
+
+Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
+à beaucoup, sans code de salon. Ses réponses :
+- Nom : **Worlds**, comme les mondes de Wynncraft (WC1, WC2…).
+- Des **cartes** comme sur la page About, les plus jouées et les plus
+  peuplées en haut (Survival Normal, avec ou sans lait, Classic…) ; Duel
+  plus tard, après sa refonte. Bouton Ready pour lancer.
+- **Invités acceptés** (« we want anyone to join in the fun »), en leur
+  disant que sans compte leurs scores ne vont pas au classement.
+- **Chat gardé**, avec de la sécurité : signaler, couper quelqu'un ; et
+  sécuriser aussi **les pseudos et les photos de profil**.
+- **Avant de grossir les salons** : rendre le site plus rapide (des joueurs
+  se plaignent du chargement) et plus sûr, **sans rien casser**.
+- Visiteurs : Cloudflare maintenant (fait), la base de données ensuite.
+- **Ordre validé** : 1. vitesse, 2. sécurité et modération, 3. Worlds,
+  4. Duel.
+- **Phase 3, réponses de Yasuro (2026-10-18 au soir)** :
+  - Lancement : moitié des joueurs prêts (au moins 2) → compte à rebours de
+    15 s ; **anti-AFK** : « tout joueur qui n'a pas cliqué prêt et a loupé
+    la première partie doit être kick ».
+  - 16 joueurs par monde, et un **Quick Play** : « super duper easy » ; **un
+    salon toujours prêt** par type de partie : plein ou lancé, un autre
+    s'ouvre aussitôt.
+  - Menu Play : **Solo · Play Online · Custom** (« With Friends » devient
+    Custom).
+  - **Une carte par type de partie**, ordonnées et mises en avant par un
+    algorithme « super smart » : les plus jouées en haut, mais un nouveau
+    mode ne doit pas finir enterré en bas.
+  - **Choisir ses provinces : seulement en Custom.**
+  - Les cartes (mondes, choix des modes) sont de **vraies cartes à jouer,
+    « used but not to the extreme »**, après recherche (magie de Wynncraft,
+    humain contre IA). Recherche faite : couleurs des rangs d'objets de
+    Wynncraft (Wynntils `GearTier` : Unique jaune, Rare violet clair,
+    Legendary turquoise, Fabled rouge, Mythic violet foncé) ; tics « vibe
+    coded » (dégradés violets, ombres grises floues, cartes dans des
+    cartes, points qui ne disent rien, une couleur par bloc) ; Balatro
+    (rotation au hasard de quelques degrés, carte qui se lève et dont
+    l'ombre grandit) ; vraies cartes (index dans les coins depuis 1864,
+    rayon ≈ 5 % de la largeur, enseignes du bas imprimées à l'envers, usure
+    surtout aux coins tenus en main). Prototype dans le scratchpad
+    (`tools/cards.py`, `templates/cards.html`, section « Playing cards » de
+    `style.css`) : chaque carte veut dire son jeu (Survival Normal = 10 de
+    cœur, Hard = 5, Hardcore = As ; Classic = 5 de punaises ; Duel = 6
+    d'épées ; Solo = As de punaises avec notre logo, Online = Joker,
+    Custom = Roi). Montré à Yasuro : « I really like it », avec trois
+    retouches, faites : (1) la page Play ne montre que les trois cartes
+    (Solo → page solo, **Multiplayer** → les mondes, Custom Game → comme
+    avant) ; (2) cartes « lifeless, bland » → **tapis de feutre vert** cadré
+    de bois (tout était beige sur beige), **rangs en pixel art** (police 5×7
+    à nous, `card-ranks.png` : une police d'ordinateur à côté d'enseignes en
+    pixels faisait plat, comme dans Balatro tout est pixel), la carte
+    **penche vers la souris** (`cards.js`, souris seulement, jamais en
+    mouvement réduit), **les têtes de qui attend** sur la fiche ; (3) « hard
+    to understand what to click » → une **fiche de papier glissée sous
+    chaque carte**, avec son nom et un bouton vert Play/Join (marche au
+    doigt, sans survol). **Quick Play retiré** (Yasuro n'en voyait pas
+    l'effet) : l'ordre met déjà en premier la carte où des joueurs
+    attendent, c'était « cliquer la première carte » avec moins d'info.
+  - **Décisions** : classement Classic **carte entière seulement** (filtre
+    des provinces retiré : « unclutter the page ») ; **Duel reste en Custom**
+    pour l'instant (sa refonte d'abord).
+- **Phase 3 faite sur la bêta (2026-10-18)** — section « Multiplayer:
+  worlds » d'`app.py`, page `multiplayer`, `multiplayer.js`, lobby du salon :
+  - Un monde = un salon `rooms.world` (type), **sans hôte**, réglages de la
+    carte, carte entière. 7 types (Survival ×3 difficultés ×lait, Classic 5
+    manches). `open_world()` : le lobby **le plus plein** qui a de la place
+    (16, `WORLD_MAX`), sinon un neuf : il y en a toujours un ouvert.
+    `multiplayer?join=<type>` y envoie (un nouveau venu passe d'abord par le
+    choix du pseudo, `next_page` accepte `join`).
+  - Lobby : bouton **I'm Ready** ; moitié des présents prêts (2 au moins) →
+    **15 s** (`starts_at`), tous prêts → 3 s ; se raviser ne l'arrête pas,
+    moins de 2 présents si. Au départ, **qui n'est pas prêt sort du monde**
+    (`room_bans.why = 'away'`) et retombe sur Multiplayer avec « The game
+    started without you » ; sauf arrivé depuis moins de 10 s
+    (`WORLD_GRACE`, `room_players.joined`) : il joue. Un joueur compte
+    présent **60 s** (`GONE`), pas 10 : piège de yolo, un onglet en
+    arrière-plan aurait été jeté alors qu'il était prêt.
+  - Fin : résultats 20 s (« Next game in N s », bouton Leave), puis tout le
+    monde passe ensemble au lobby ouvert (`next_code`), où Ready est
+    redemandé : le contrôle anti-AFK revient à chaque partie.
+  - Page : ordre = joueurs en attente ×100 + en partie ×40 + parties
+    récentes (une partie compte moitié tous les 3 jours) + coup de pouce
+    d'un type nouveau (`since`, 14 jours, étiquette « New » Legendary) ;
+    « Most played » (Mythic) au plus joué. Ordre figé au chargement, les
+    nombres et têtes se rafraîchissent toutes les 5 s (`api/multiplayer`).
+  - Invités acceptés ; dans le lobby : « Without an account, your scores
+    don't go on the leaderboard ». Scores comme les salons (Classic → carte
+    entière, 5 manches ; Survival → sa difficulté et son lait).
+  - Solo : plus de provinces (`/game` et `solo_settings` prennent toutes).
+    **Piège payé** : le script de `difficulty.html` cachait `#provinces`,
+    absent en solo → erreur JS, la difficulté de Survival ne s'affichait
+    plus (attrapé par `t_sv_page`).
+  - Tests : `t_worlds.py` (33, horloge à la main), `t_worlds_page.py`
+    (navigateur : Play → Multiplayer → Join, invité, Ready, partie
+    complète, lobby suivant, AFK sorti). Tout le reste rejoué vert.
+  - À faire avant la 3.0.0 : test de charge (50 joueurs).
+- **Sortie : tout d'un coup, en version 3.0.0** (Yasuro, 2026-10-18 : « I
+  would rather push everything at once as a big 3.0.0 version ») : **plus
+  aucune mise en prod partielle** ; le vrai site reste en 2.3 jusque-là.
+- **État au 2026-10-18 au soir** : phase 1 faite sur la bêta, sauf la
+  bascule des pages en WebP (attendre la fin du service `wynnguessr-webp`,
+  ~4 h à partir de 17 h 11 : `journalctl --user -u wynnguessr-webp`, puis
+  `extension: 'webp'` dans `room.js`, `survival.js`, `game.js`, le
+  préchargement de `room.js` (`.jpg` en dur) et la démo de `index.html`,
+  et vérifier que chaque lieu s'ouvre). À la mise en prod : passer le
+  vrai site à 4 workers (unité systemd hors git), **lui faire son venv
+  neuf depuis `requirements.txt`** (Flask 3 ; puis `restart`, pas `HUP`)
+  et `VERSION = '3.0'`.
+- **Modération** : une **page à part** pour les modérateurs, à côté du bouton
+  Profile, avec tout ce qu'il faut pour ajouter des modérateurs et modérer.
+  **Des rangs** (admin, mod…) aux pouvoirs différents **les uns sur les
+  autres** : personne ne peut tout effacer parce qu'il a le rang le plus
+  haut. Yasuro en premier, il ajoutera les autres.
+- **Photos de profil : approuvées par un modérateur avant d'être visibles.**
+
+**Phase 2, modération — étape 1 faite (2026-10-18, bêta)** : section
+« Moderation » d'`app.py`, page `/moderation` (bouton « Moderation » du
+menu, pour l'équipe seulement), `moderation.js`. Recherche : Wynncraft
+marque son équipe par des étiquettes de chat ([Mod] nom orange, [Admin]) ;
+Discord : on n'agit que sur plus bas que soi, sourdines à durée (28 j
+max), journal d'audit avec la raison. D'où :
+- **Rangs** : Owner (Yasuro, `OWNER = 1` dans le code, personne ne peut le
+  retirer), Admin, Moderator, Helper (`RANKS`, table `staff`) ; pouvoirs dans
+  `MAY` (le plus petit rang qui a chaque pouvoir) : Helper = photos, cacher
+  un message, sourdine d'1 h max ; Moderator = + sourdine longue, ban,
+  renommer, journal ; Admin = + donner et retirer les rangs.
+- **Règles** : on n'agit que sur plus bas que soi, on ne donne que des
+  rangs plus bas que le sien, jamais le rang Owner, jamais à un invité ;
+  **rien n'est détruit** (message caché et non effacé, ban levable, ancien
+  nom gardé au journal) et le journal (`mod_log`, qui, quoi, sur qui,
+  pourquoi) n'a aucun bouton pour l'effacer.
+- Page : onglets Team (rangs, changer ou retirer — retirer demande deux
+  clics — pour qui est en dessous, formulaire « Give a Rank » avec la raison)
+  et Log (50 par 50, la raison sous chaque action). Étiquettes de rang aux
+  couleurs de Wynncraft (Moderator orange). Tests : `t_ranks.py` (15),
+  `t_mod_page.py` (navigateur, ordinateur et téléphone).
+- **Étiquettes** (2026-10-18, demande de Yasuro : « add the tags a little
+  bit everywhere … tags for #1 in a category … don't make them too
+  obnoxious ») : **une seule** à côté d'un nom, petite (chat, classement,
+  joueurs du salon, résultats ; pas sur l'écran de manche), le profil les
+  montre toutes. Ordre : rang de l'équipe, sinon étiquette donnée (la plus
+  récente), sinon un « #1 » automatique (`top_tags()`, premier de Survival
+  Normal/Hard/Hardcore sans lait, de Classic réglages standard, des
+  niveaux, des victoires ; recalculé toutes les 2 min par processus :
+  0,23 s sur une copie du vrai site). Onglet Tags de Moderation : un Admin
+  fait une étiquette (20 caractères, couleurs de la palette `TAG_COLORS`,
+  aperçu en direct) ou la range (cachée partout, pas effacée) ; un
+  Moderator la donne ou la reprend (règle d'en dessous) ; tout au journal.
+  Tables `tags`, `user_tags`. Tests : `t_tags.py` (15), `t_tags_page.py`.
+- **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
+  Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
+  dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne
+  jusque-là. Son auteur la voit sur `account` (« waiting for a moderator »),
+  l'équipe par `avatar?id=&pending=1` (privé, personne d'autre). Onglet
+  **Photos** de Moderation, ouvert d'office quand il y a de quoi, et un
+  compteur rouge sur le bouton du menu : Yes la met en place, No la jette
+  avec une raison facultative que le joueur lit **une fois** sur `account`
+  (`avatar_note`). Règle d'en dessous : la photo d'un Helper attend un rang
+  plus haut, celle de l'Owner passe directement (personne au-dessus).
+  Retirer une photo depuis un profil passe par le même pouvoir (`pictures`,
+  Helper) et va au journal ; `ADMINS` n'existe plus. Les photos déjà en
+  place avant restent. Tests : `t_pictures.py` (17), `t_photos_page.py`.
+- **Chat** (étape 3, 2026-10-18) — section « Moderation: the chat »
+  d'`app.py`. Recherche : le signalement de Minecraft (1.19.1) part d'un
+  message, et le serveur joint les messages autour ; les serveurs Minecraft
+  masquent les gros mots par des étoiles ; Wynncraft a `/ignore`. D'où :
+  - **Clic sur le message d'un autre** → une rangée **Report** · **Ignore**
+    (+ **Hide** pour l'équipe au-dessus de son auteur). Rien sur ses propres
+    messages.
+  - **Report** : invités compris, une fois par message, 10 en 10 min au plus
+    (`REPORTS_MAX`). Onglet **Reports** de Moderation (premier onglet, ouvert
+    d'office sauf s'il n'y a que des photos ; compté dans le badge du
+    menu) : le message **tel que tapé**, avec les 3 d'avant et d'après, qui
+    l'a signalé ; **Hide It** ou **Dismiss**, raison au journal. Règle
+    d'en dessous : un signalement visant un Moderator n'apparaît qu'aux
+    rangs au-dessus.
+  - **Ignore** (le mot de Wynncraft ; « Mute » reste pour la sanction de
+    l'équipe, étape 4) : pour ce joueur seulement, **dans tous les salons**
+    (table `ignores`), ses messages disparaissent ; une note « You ignore X.
+    Undo », et une icône dans la liste des joueurs du salon pour revenir.
+    Les messages manqués entre-temps ne reviennent pas (pas de rechargement
+    du chat : course possible avec le poll).
+  - **Hide** : le message disparaît pour tous (`room_chat.hidden_by`, le
+    poll envoie `hidden`, les pages l'enlèvent), jamais effacé, signalements
+    fermés, journal.
+  - **Filtre** : `bad_words.txt` (dans git, à la racine, format expliqué en
+    tête), une seule regex : chaque lettre répétée, en chiffres ou signes
+    (`sh1t`, `@ss`), coupée par `. - _` ; mot seul, mot+suite, ou n'importe
+    où dans un mot. Masque en `****` à l'envoi, l'original dans
+    `room_chat.raw` pour l'équipe. Insultes, sexuel, injures racistes et
+    homophobes, « kys », un peu de français ; **les mots légers (damn, hell,
+    crap) restent**. Vérifié contre Scunthorpe, class, assassin, cocktail,
+    Dickens, grape, snigger… Limite connue : « shiitake » est masqué (les
+    lettres répétées de « shit »).
+  - Le poll de salon a maintenant un index (`room_chat_code`).
+  - Tests : `t_chatmod.py` (33), `t_chat_page.py` (navigateur, 13 × 2).
+  - **Piège de test payé** : SQLite redonne le plus grand id effacé ;
+    `clean_zz.py` effaçait les comptes `zz_` mais pas leurs signalements, et
+    le compte suivant héritait de 10 signalements (limite atteinte). Toute
+    table rangée par id de joueur doit être nettoyée avec lui.
+- **Sanctions** (étape 4, 2026-10-18) — section « Moderation: sanctions »
+  d'`app.py`, onglet **Players** (chercher un nom, invités compris ; le nom
+  d'un signalement y mène) : état, actions permises, historique (journal le
+  visant, nombre de signalements, 10 derniers messages tels que tapés).
+  - **Mute** (Helper, 1 h au plus ; au-delà Moderator) : 10 min, 1 h,
+    1 jour, 7 jours, 28 jours (le plafond de Discord). Plus de chat ; sa page
+    le dit à la place de la saisie (« You are muted for 52 more minutes »).
+  - **Ban** (Moderator) : 1 jour, 7, 28, Forever ; demande deux clics. Le
+    joueur est déconnecté **de tous ses navigateurs** à sa requête suivante
+    (`still_logged_in`, invités compris), sa page suivante dit pourquoi
+    **une fois** (la raison est montrée : le champ le dit), la connexion
+    est refusée avec la même phrase. **L'adresse** : chaque connexion,
+    invité et entrée de salon notent la dernière (`users.seen_from`, lue
+    par `place()` dans l'en-tête de Cloudflare) ; un ban la bloque
+    (`place_bans`) pour **créer** un invité ou un compte, le temps du ban et
+    **28 jours au plus** (les adresses changent de main ; un compte existant
+    à la même adresse joue toujours). L'équipe ne voit jamais d'adresse.
+  - **Rename** (Moderator) : mêmes règles qu'un pseudo choisi, et refusé
+    s'il passe par le filtre ; l'ancien nom au journal.
+  - Durées écrites « 6 more days » (`how_long`, une minute de marge : sans
+    elle, une heure lue une milliseconde après disait « 60 more minutes ») :
+    pareilles dans tous les fuseaux.
+  - Sur téléphone, les 6 onglets tiennent sur une ligne dès 360 px.
+  - **Piège payé** : pour n'afficher le message du ban que sur une vraie page
+    (une image ou un appel de script l'aurait consommé sans qu'il se voie),
+    `request.accept_mimetypes.best` ne marche pas : werkzeug classe
+    `application/signed-exchange;v=b3` de Chromium avant `text/html`.
+    `a_page()` lit `Sec-Fetch-Dest: document`, sinon `best_match`.
+  - Piège de test : après un `HUP` du serveur de test à 4 workers, attendre
+    que tous aient redémarré (ils démarrent un par un, `.starting.lock`).
+  - Tests : `t_sanctions.py` (35, une adresse par client par l'en-tête
+    `CF-Connecting-IP`, sinon un ban bloquerait 127.0.0.1 pour tous les
+    tests), `t_players_page.py` (navigateur, 13 × 2).
+- **Pseudos** (étape 5, 2026-10-18) : `name_rule()`, partout où un nom se
+  choisit (inscription, invité, page `account`, « Use my Minecraft name »,
+  Rename de l'équipe). Le même `bad_words.txt`, **aussi sur le nom coupé à
+  ses majuscules** (« BigWord » → « Big Word » : les pseudos sont souvent
+  d'un seul tenant), et des noms réservés : nulle part `admin`, `moderator`,
+  `wynnguessr`, `wynndle` ; seuls `mod`, `owner`, `staff`, `helper`,
+  `system`, `server`. Essayé sur les 289 noms du vrai site : **2 refusés,
+  aucun à tort** — le compte n° 9 « Fuck YammIa » et l'invité n° 134
+  « fag ». Les noms déjà pris ne changent pas d'eux-mêmes : à renommer
+  depuis Players après la 3.0.0 si Yasuro le veut. Test : `t_names.py`.
+  Les noms Minecraft d'un nouveau compte Wynncraft ne passent pas par là
+  (ils viennent de Mojang).
+- **Passe de sécurité** (étape 6, 2026-10-18, fin de la phase 2) :
+  - **Faille trouvée et fermée** : `esc()` (jQuery `text → html`)
+    n'échappait pas les guillemets ; un nom placé dans un attribut
+    (`data-save='…'`, onglets Team et Tags) en sortait. Un compte
+    `x' onclick='…` à qui l'on donnait une étiquette exécutait son code dans
+    la session de l'Admin. `esc()` échappe `"` et `'` dans `room.js`,
+    `board.js`, `moderation.js`. Test : `t_quotes_page.py`.
+  - **Bibliothèques** : `pip-audit` trouvait 27 failles connues (Flask
+    2.2.3, Werkzeug 2.3.6, Flask-Cors 4.0.1). Flask 3.1.3 + Werkzeug 3.1.9 :
+    aucune. **Flask-Cors retiré** (l'API était ouverte à tout site, rien de
+    chez nous n'en a besoin : le mod parle en Java) et Flask-Session retiré
+    (importé, jamais branché : la session est le cookie signé de Flask).
+    `requirements.txt` à jour (Pillow y manquait).
+  - **Adresse d'un joueur** (`place()`) : la **dernière** de
+    `X-Forwarded-For`, que Cloudflare et Funnel écrivent après ce
+    qu'envoie le joueur. Avant : `CF-Connecting-IP` d'abord, qu'un joueur
+    passant par l'ancienne adresse Funnel pouvait écrire lui-même (limites
+    et bans contournés). Vérifié sur la bêta, en passant par Cloudflare avec
+    des en-têtes forgés : l'adresse notée est la vraie (celle du serveur,
+    en IPv6). Cloudflare refuse d'emblée toute requête portant un
+    `CF-Connecting-IP` (erreur 1000).
+  - **Limites par adresse, sur 15 min** (`ACTIONS`, table `actions`) :
+    10 invités, 5 comptes, 20 salons, 10 photos, comptés une fois faits
+    (un nom déjà pris ne coûte rien). L'adresse locale (tests, outils)
+    n'est pas limitée : derrière Cloudflare ou Funnel, une requête a
+    toujours l'adresse de son joueur.
+  - **En-têtes** : HSTS (un an) et une CSP minimale (`frame-ancestors`,
+    `base-uri`, `object-src`, `form-action`). Pas de liste de scripts :
+    les pages ont des scripts en ligne, et unpkg/jsdelivr servent tout npm,
+    une liste n'arrêterait rien.
+  - **Envois** : 32 Mo au plus (`MAX_CONTENT_LENGTH` ; captures du mod
+    ~13 Mo). Photos : déjà refusées au-delà de 40 Mpx avant décodage.
+  - **SRI** sur jQuery et Pannellum (Leaflet l'avait) : fichiers comparés à
+    la copie de jQuery et aux empreintes publiées par jsDelivr.
+  - Vérifié sans faille : SQL (seules des constantes et des `?` sont
+    interpolés), clé de capture (`compare_digest`), et une partie complète
+    (salon Survival, chat, classement, profil, Moderation) jouée avec des
+    joueurs nommés `zz_<zz-q>…` : aucune balise n'entre (`t_xss_page.py`).
+  - **Pièges payés** : (1) `done()` ouvrait une seconde connexion pendant
+    la transaction de l'inscription → « database is locked » après 10 s :
+    toujours passer la connexion de la requête. (2) En test, l'en-tête
+    `X-Forwarded-For` de Playwright (`extra_http_headers`) part aussi vers
+    les CDN ; avec le SRI ces requêtes sont en CORS, le CDN refuse l'en-tête
+    en trop et jQuery ne charge pas : ne l'ajouter qu'aux requêtes du site
+    (`ctx.route`). Aucun effet chez un vrai joueur.
+  - Tests : `t_security.py` (9), `t_quotes_page.py`, tout le reste rejoué
+    sur Flask 3 (moteurs et navigateurs ; `t_classic_page`, `t_sv_page`,
+    `t_mod_page` mis à jour : Survival par défaut, onglet Reports d'abord).
+- **Retouches de Yasuro avant la 3.0.0 (2026-10-18)** : onglet Players =
+  **la liste de tous les joueurs** (les plus récents d'abord, 50 par 50),
+  une recherche qui filtre en tapant (n'importe où dans le nom), des puces
+  All / Accounts / Guests / Staff / Muted / Banned / Reported, une ligne par
+  joueur (tête, nom, étiquette, état, Open) ; la fiche a en plus le **rang**
+  (Admin et au-dessus, comptes en dessous de soi). Un **profil** a un bouton
+  **Moderate** pour l'équipe → `moderation?player=<id>` ouvre sa fiche.
+  « Je ne peux pas mettre Yulo admin » : sur la bêta, `yulo` et `Yulo` sont
+  des **pseudos d'invités** (son compte y est `Yulofox` ; le compte `Yulo`
+  du vrai site est postérieur à la copie de la bêta) ; un rang ne va qu'à
+  un compte (un pseudo d'invité, n'importe qui peut le reprendre). Le refus
+  le dit maintenant en clair.
+- **Classement, retouches du 2026-10-18** : la série en cours (flamme) quitte
+  le nom pour **une colonne à elle, sans titre ni séparation** (Yasuro : « its
+  own column but not visible »), étroite et centrée ; le niveau, la tête et
+  le nom restent ensemble, une étiquette passe dessous (téléphone : colonne
+  du rang et marges réduites ; un nom très long y revient à la ligne). Le
+  lien Wynncraft n'est plus que **la coche verte** (l'icône « ouvrir » est
+  retirée).
+- `REVIEWERS` (tri des lieux) reste à part de Moderation pour l'instant.
+
+**Phase 1, vitesse (2026-10-18, bêta)** — fait :
+- **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
+  `mapTiles()` dans `block.js`) : zoom 0 au pixel près en WebP sans perte
+  (8,4 Mo en tout, une vingtaine de minutes à couper), zooms -1 à -3 réduits
+  en WebP 90. Première manche de Survival : **3,6 Mo téléchargés au lieu de
+  11,9** (la carte : 0,05 Mo au lieu de 8,73). Le clic tombe toujours sur
+  le bloc visé (vérifié). Une nouvelle carte = un nouveau dossier
+  (`map-2027`), car les tuiles sont gardées un an.
+- **Fichiers versionnés gardés un an** par le navigateur et Cloudflare
+  (`?v=`, tuiles de la carte, sons de Mojang) : `kept_long()`.
+- **Tuiles d'un salon** (jeton `room:…`, le même pour tous, jamais mort) :
+  `public, max-age=86400`, Cloudflare les garde et les sert aux autres. Solo
+  et Survival restent `private` (corrigé au passage : l'en-tête disait à la
+  fois « public » et « private »).
+- La vérification de session ne se fait plus pour les tuiles (95 % des
+  requêtes : 2 213 + 1 509 par minute sur le vrai site).
+- **4 workers** : les échecs de connexion (`fails`) passent de la mémoire à la
+  base (sinon chacun aurait son compte) ; les migrations au démarrage se font
+  une à la fois (`.starting.lock`, sinon deux workers ajoutent la même
+  colonne et l'un ne démarre pas) ; base en **WAL** (lire ne bloque plus
+  l'écriture). Vérifié : 4 workers sur une copie fraîche de la base du vrai
+  site, puis une partie complète sur la bêta, aucun « database is locked ».
+- **Lancer de potion** : `potion-throw.webp`, les mêmes pixels et les mêmes
+  durées image par image que le GIF de Yasuro (vérifié), 930 ko au lieu de
+  1,6 Mo ; le GIF reste dans git comme original.
+- **Photos des lieux en WebP 90** (choix de Yasuro sur une comparaison
+  côte à côte : JPEG 90 actuel 6,0 Mo pour le premier regard d'un lieu,
+  JPEG 80 4,3, **WebP 90 4,1**, WebP 80 2,5 mais la pierre et le bois
+  lissés) : `tools/webp_tiles.py` écrit un `.webp` à côté de chaque `.jpg`
+  (service `wynnguessr-webp`, 4 processus au plus bas, ~3 h pour ~765 000
+  tuiles, reprend où il s'est arrêté) ; les nouvelles captures écrivent les
+  deux (`make_tiles`). Les pages ne demandent le WebP qu'une fois tout
+  converti ; les JPEG restent jusque-là (le vrai site les lit). **Fait le 2026-10-18 à 20 h 53** :
+  765 228 tuiles, chacune a son `.webp` (vérifié, aucune manquante), démo
+  de l'accueil comprise ; `room.js` (et son préchargement), `game.js`,
+  `survival.js` et `index.html` demandent du WebP sur la bêta. **Les JPEG
+  restent** : le vrai site (2.3) les lit jusqu'à la 3.0.0, et `make_tiles`
+  écrit toujours les deux.
+- **Piège payé** : la carte en tuiles grandit sous la souris (CSS) sans que
+  Leaflet le sache, il ne chargeait que les tuiles de l'ancienne taille
+  (moitié noire). `mapTiles()` le lui dit (`ResizeObserver` →
+  `invalidateSize({pan: false})`). La base de WynnGuessr n'était pas dans le coffre :
+  **ajoutée le 2026-10-18** (`coffre.sh`, chaque nuit à 4 h : les deux bases
+  en copie cohérente, gardées 7 jours, les photos de profil, les secrets ;
+  pas de bundle git, l'historique pèse 4,6 Go et vit sur GitHub).
+
+Mesures du 2026-10-18 pour la vitesse : la carte `map-2026.webp` pèse
+**8,7 Mo** (chargée avant la première partie) ; un lieu, ~4,6 Mo pour le
+premier regard (niveaux 1-3), 11 Mo de plus au zoom ; le GIF du lancer
+1,6 Mo ; Cloudflare ne garde que 12 % (les tuiles passent par des jetons
+privés, uniques par partie) : 144 Go servis en 24 h, tous par la connexion
+de la maison. Le serveur : 1 processus gunicorn, 8 fils, 12 cœurs libres.
+
 ## Niveaux, XP et séries de victoires
 
 2026-10-17, demande de Yasuro : des niveaux pour les comptes, « genre barre
@@ -702,6 +1079,15 @@ au classement des onglets Levels et Wins ; des séries de victoires en multi.
 - **Sons** : l'orbe de Minecraft à hauteur aléatoire toutes les 100 ms
   pendant le remplissage (comme le jeu : 0,55 à 1,25), son « level up » à
   chaque niveau, plus fort tous les 5 niveaux. Voir « Sons » plus bas.
+- **Séries : piège payé (2026-10-18)**, Yasuro : « on perd notre série au
+  hasard, sûrement en jouant en solo ». Le solo n'a jamais compté (seules
+  les parties à plusieurs). La vraie cause : un salon Classic **fini peut se
+  rejouer seul en différé**, et ce score était classé avec ceux du direct :
+  un joueur venu après coup pouvait prendre la victoire, et la série du
+  gagnant cassait des jours plus tard (8 salons touchés sur le vrai site).
+  `history()` ne classe plus que les joueurs **en direct** (`live = 1`).
+  Pour le reste, les séries cassent sur de vraies défaites (gagner = finir
+  1er, dur à 5 joueurs) : vérifié sur les parties de Yasuro.
 - **Séries de victoires** (salons) : `best`, le record, toujours affiché (plaque
   du profil, colonne du classement) ; `streak`, la série en cours, seulement à
   partir de 2 (flamme sur le profil, dans l'onglet Wins, en fin de salon gagné).
@@ -1022,6 +1408,16 @@ fan, sans rien voler).
   session, écrit une fois par minute au plus, robots exclus), compté **depuis
   le 2026-10-18** (rien n'existait avant : le journal d'accès ne remonte qu'au
   dernier redémarrage) ; en ligne = vu dans les 5 dernières minutes.
+  **Le chiffre « Visitors » affiché vient de Cloudflare** (demande de Yasuro,
+  « there is way more than only 45 people ») : visiteurs distincts depuis le
+  2026-10-15 (`LAUNCH`), API GraphQL `httpRequests1dGroups` **sans
+  dimension** sur la période = chacun compté une fois (1 698 le 2026-10-18,
+  contre 1 912 en additionnant les jours) ; même chiffre que le tableau de
+  bord (vérifié : 1 344 sur 24 h). Jeton en lecture seule (Zone · Analytics ·
+  Read, wynndle.com seulement) dans `cloudflare_token` (0600, **jamais
+  commité** ; la bêta a un lien vers celui du vrai site). Le certificat du
+  tunnel n'a pas ce droit (vérifié). Sans jeton ou sans réponse : notre
+  propre compte. Les créneaux d'une heure ne remontent qu'à 3 jours.
 - Classement (2026-10-18, demande de Yasuro) : **sa propre place épinglée en
   haut** de chaque tableau (ligne verte, mêmes colonnes, trait épais), quelle
   qu'elle soit, ou « You are not on this board yet. » ; **50 lignes à la

@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% import 'cards.html' as cards with context %}
+
+{% block title %}: Multiplayer{% endblock %}
+
+{% block content %}
+    <h1 class="sign">Multiplayer</h1>
+    <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
+    {% if missed %}
+    <p class="world-missed">The game started without you: you were not ready.</p>
+    {% endif %}
+    {# one card per kind of world, the busiest and most played first (app.py,
+       "Multiplayer: worlds"); the numbers refresh, the order stays #}
+    <div class="card-table" id="worlds">
+        {% for w in worlds %}
+        <a class="pcard-slot" href="multiplayer?join={{ w.key }}" data-world="{{ w.key }}">{{ cards.card(w.rank, w.suit, w.milk, tilt = w.look[0], wear = w.look[1]) }}
+            <span class="pcard-slip" style="--slip: {{ w.look[0] * -0.4 }}deg">
+                {% if w.most %}<span class="tier mythic">Most played</span>{% elif w.new %}<span class="tier legendary">New</span>{% endif %}
+                <b>{{ w.title }}</b><span>{{ w.line }}</span>
+                <span class="pcard-heads">{% for h in w.heads %}<img src="{{ h }}" alt="" width="24" height="24">{% endfor %}</span>
+                <small class="world-count">{% if w.waiting %}<span class="live">{{ w.waiting }} waiting</span>{% endif %}{% if w.waiting and w.playing %} · {% endif %}{% if w.playing %}{{ w.playing }} in game{% endif %}{% if not w.waiting and not w.playing %}No one yet{% endif %}</small>
+                <span class="btn">Join</span>
+            </span></a>
+        {% endfor %}
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" integrity="sha256-wS9gmOZBqsqWxgIVgA8Y9WcQOa7PgSIX+rPA0VL2rbQ=" crossorigin=""></script>
+    <script src="{{ asset('js/cards.js') }}"></script>
+    <script src="{{ asset('js/multiplayer.js') }}"></script>
+{% endblock %}
