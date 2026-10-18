@@ -539,8 +539,12 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   Wither, Nausea, Blindness, lait 10 ; Darkness, Regeneration 15. À revoir
   après de vraies parties (étape 4).
 - **Choix faits en codant, à confirmer avec Yasuro si besoin** :
-  - pas de `LAST_CALL` (15 s après le premier guess) : chacun a tout son
-    chrono, comme en solo (Darkness a besoin de ses 10 s d'image) ;
+  - **dernier appel** comme dans les autres salons : dès qu'un vivant a
+    deviné, les autres ont 15 s (`LAST_CALL`), ou moins si leur propre
+    chrono (Swiftness) finit avant. Yasuro : « we don't want other players
+    to troll and lock the other player forever » (j'avais d'abord proposé
+    tout le chrono pour tous). Qui n'a pas deviné à la fermeture reçoit une
+    ligne sans épingle (le creeper) avec le temps qu'il a eu, pour Wither ;
   - la manche 1 a aussi ses 5 s de chargement ;
   - les potions **au hasard sont publiques** dès la révélation (lancées à
     l'étape 1) ; les **achats restent secrets** jusqu'à la fermeture de la

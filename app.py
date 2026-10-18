@@ -2188,9 +2188,11 @@ def survival_tile(token, name):
 # II...), and so on. Like duel, nothing is stored but what the players did
 # (guesses, purchases and random potions in room_shop, milk drunk in
 # room_milk): hearts and emeralds are replayed each time (survivors()).
-# Against cheating, as alone: the server's clock (each player's own,
-# Swiftness shortens it), a purchase checked against the emeralds left and
-# the shop's hours, a guess only in its round. Known limits: the picture
+# As in the other rooms, once someone guessed the others have LAST_CALL
+# seconds (Yasuro: nobody may hold the room up), or less if their own clock
+# (Swiftness) ends sooner. Against cheating, as alone: the server's clock, a
+# purchase checked against the emeralds left and the shop's hours, a guess
+# only in its round. Known limits: the picture
 # loads PREP seconds early (classic rooms load it during the reveal), and
 # what only the page draws (Darkness, Nausea's spin, Mining Fatigue).
 
@@ -2244,6 +2246,11 @@ def room_time(difficulty, fx):
     # the seconds a player has: the difficulty's, or Swiftness's (20, 15, 10)
     k = fx.get('swiftness', 0)
     return max(SWIFT_MIN, SWIFT_TIME - SWIFT_STEP * (k - 1)) if k else ROUND_TIME[difficulty]
+
+def survival_deadline(r, fx, cut):
+    # a player's end of the round: their own clock, or the last call if sooner
+    own = r['round_start'] + room_time(r['difficulty'], fx)
+    return min(own, cut) if cut else own
 
 def room_shop_rows(c, code):
     return (c.execute("SELECT * FROM room_shop WHERE code = ?", (code,)).fetchall(),
@@ -2355,10 +2362,16 @@ def survival_room_tick(c, r):
         shop, milked = room_shop_rows(c, code)
         alive = {u for u, s in survivors(c, r, n - 1).items() if s['out'] is None}
         done = {g[0] for g in c.execute("SELECT user_id FROM room_guesses WHERE code = ? AND round = ?", (code, n))}
-        for u in (alive & present(c, r)) - done:
-            if now < r['round_start'] + room_time(r['difficulty'], room_effects(shop, milked, u, n)) + GRACE:
-                return r
+        cut, _ = round_deadline(c, r)
+        ends = {u: survival_deadline(r, room_effects(shop, milked, u, n), cut) for u in alive - done}
+        here = present(c, r)
+        if any(now < end + GRACE for u, end in ends.items() if u in here):
+            return r
         c.execute("UPDATE rooms SET round_end = ? WHERE code = ?", (now, code))
+        # who did not guess: no pin (the creeper), and the time they had, for Wither
+        for u, end in ends.items():
+            c.execute("""INSERT OR IGNORE INTO room_guesses (code, user_id, round, x, z, score, at, time)
+                    VALUES (?, ?, ?, NULL, NULL, 0, ?, ?)""", (code, u, n, now, max(0, min(now, end) - r['round_start'])))
         r = find_room(c, code)
         # the random potions of the next round, thrown with the reveal (never
         # two random ones in a row for the same player, as alone)
@@ -2413,7 +2426,7 @@ def survival_room_guess(c, r, me, n):
         return False
     shop, milked = room_shop_rows(c, r['code'])
     fx = room_effects(shop, milked, uid, n)
-    deadline = r['round_start'] + room_time(r['difficulty'], fx)
+    deadline = survival_deadline(r, fx, round_deadline(c, r)[0])
     if now > deadline + GRACE or c.execute("SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?",
                                            (r['code'], uid, n)).fetchone():
         return False
@@ -2500,11 +2513,11 @@ def survival_view(c, r, me, out, now):
         fx = room_effects(shop, milked, uid, n) if out['playing'] else {}
         out['url'] = tile_url(c, ids[n - 1], 'room:%s:%d' % (code, n), fog = 'blindness' in fx)
         if out['playing']:
-            seconds = room_time(r['difficulty'], fx)
-            out.update({"time": seconds, "answered": bool(c.execute(
+            out.update({"time": room_time(r['difficulty'], fx), "answered": bool(c.execute(
                 "SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?", (code, uid, n)).fetchone())})
             if phase == 'guess':
-                out['time_left'] = max(0, r['round_start'] + seconds - now)
+                cut, out['first'] = round_deadline(c, r)
+                out['time_left'] = max(0, survival_deadline(r, fx, cut) - now)
     elif n:
         loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (ids[n - 1],)).fetchone()
         out['reveal'] = {"X": loc[0], "Z": loc[1]}
