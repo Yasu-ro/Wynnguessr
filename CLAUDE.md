@@ -414,6 +414,20 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   20 à 60 blocs (`SHAKE`) ; la révélation montre le point visé (rond blanc)
   et le point tombé. Écartées : Tunnel Vision (champ fixé à 35°), Mirror
   (image retournée).
+- **Lait** (2026-10-18, demande de Yasuro : « 2 milk buckets for free …
+  with a nice moment to use them (after potion effect) ») : 2 seaux par
+  partie (`MILK`, `survival_runs.milk`), jamais achetables. Bouton « Drink
+  Milk · N left » sur la carte de la potion lancée (après le GIF) ; il
+  annule la potion de la manche suivante (`api/survival/milk`, gardée dans
+  `survival_guesses.milked`). Bu comme dans Minecraft (recherche : 32 ticks
+  = 1,6 s, `entity.generic.drink` toutes les 4 ticks après les 7
+  premières, pas de rot à la fin) : le seau se lève et penche, 7 gorgées
+  (`random/drink`, son `drink`), puis la carte devient « Milk! No more X. »
+  avec le seau vide (`static/buckets.png`, dessiné par `tools/potions.py`).
+  « Next » n'attend que la réponse du serveur, pas la gorgée. Une manche
+  annulée compte comme une manche sans potion (la suivante peut en avoir
+  une). Panneau de test : « Milk: 2 » remplit. **Mise en prod : copier
+  aussi `static/sounds/drink1.mp3`** (ou relancer `tools/sounds.py`).
 - **Score** = lieux survécus, départage = total des points (formule
   Classic). Un classement par difficulté, plus aucune option (toutes les
   provinces, vue libre), anciens scores Survival effacés.
@@ -462,6 +476,51 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   une horloge déplacée à la main (47 vérifications, dont chaque technique
   de triche) ; page par Playwright (menu, cœurs, cercles, creeper, mort,
   reprise), classement (ordre, une seule partie par joueur).
+
+## Survival à plusieurs (planifié le 2026-10-18, rien de codé)
+
+Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») :
+
+- **Remplace Battle Royale** dans « Create a Room » (Classic · Duel ·
+  Survival). Les 24 salons Battle Royale passés gardent victoires, séries et
+  XP : `progress()` les rejoue par `standings()`, donc la règle Battle Royale
+  y reste, en lecture seule.
+- Règles du Survival solo, en même temps pour tous : même lieu, difficulté
+  choisie par l'hôte (cœurs, zone, chrono, creeper), quasi-parfait ×2 = +½
+  cœur. À 0 cœur, on regarde. **La partie s'arrête dès qu'il ne reste qu'un
+  joueur** (Yasuro : pour monter au classement, jouer en solo ou mieux
+  jouer) ; morts dans la même manche : le plus de points gagne.
+- **Classement : le même que le Survival solo** (lieux survécus, par
+  difficulté), « probablement un peu plus dur, même catégorie ».
+- **Émeraudes** (monnaie de Wynncraft), gagnées **à la distance**, pas aux
+  points : les points des vrais guess de salon sont tassés près de 5 000
+  (4 750 guess : médiane 4 929, 3 sur 4 au-dessus de 4 477). Proposé :
+  ≤ 10 blocs 10, zone verte 6, jaune 2, rouge ou rien 0 — à calibrer par
+  simulation (un joueur correct s'offre une petite potion par manche, une
+  chère toutes les 3).
+- **Potions au hasard gardées** (taux de la difficulté, tirage par joueur),
+  et **tout s'empile** avec celles des joueurs : aucune limite, ni d'achats
+  ni de cibles (« pure chaos »). **Deux fois la même = niveau supérieur**,
+  façon Minecraft (Wither II : ½ cœur toutes les 2,5 s ; Darkness II : noir
+  après 5 s ; Nausea II : tourne plus vite, épingle plus loin ; Swiftness II :
+  15 s ; Blindness et Mining Fatigue : pas plus fort).
+- **Morts** : regardent, et peuvent dépenser leurs dernières émeraudes.
+- **Lait** : en boutique, 2 achats par partie au plus, puis rupture ; il
+  annule tout ce qui vous touche pour la manche.
+- **Entre deux manches, dans l'ordre** (jamais pendant une manche) :
+  1. révélation ; les potions au hasard sont lancées ;
+  2. boutique : on achète et on choisit ses cibles ;
+  3. « Ready » de tous, ou 20 s ;
+  4. les potions achetées sont lancées, un toast pour tout le monde
+     (« X → Darkness → Y ») ;
+  5. 5 s avant la manche : l'image charge sans se montrer, chacun voit ses
+     effets et peut boire du lait.
+- Boutique « Potion Merchant » dans la DA (cases d'inventaire, infobulle
+  d'objet Minecraft/Wynncraft, sons de villageois) : **recherche d'abord**
+  (ce qui fait la magie de Wynncraft, ce qui fait humain, les sons).
+- **Survival solo : 2 laits offerts par partie** (jamais achetables, pas de
+  boutique), à boire au bon moment : sur la carte de la potion lancée —
+  **fait** (voir « Lait » dans la section Survival).
 
 ## Niveaux, XP et séries de victoires
 

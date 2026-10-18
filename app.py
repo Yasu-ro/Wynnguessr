@@ -1693,7 +1693,7 @@ def solo_go():
 
 # ---------- Survival ----------
 # Solo only. Hearts as in Minecraft (counted in half-hearts), a zone that
-# shrinks every round, and the potions. The whole run lives here, never in
+# shrinks every round, the potions, and two milk buckets to cancel them. The whole run lives here, never in
 # the browser: the page gets a picture, sends a guess and is told what it
 # cost. Against cheating:
 # - no answer leaves the server before its guess, and no picture's real
@@ -1727,6 +1727,7 @@ POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkn
 SHAKE = (20, 60)           # Nausea: the pin lands this many blocks off, in any direction
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
+MILK = 2                   # milk buckets a run starts with: each one cancels the potion thrown with a result
 
 def zone(n, effect = None):
     # round n: no damage within `safe` blocks, the most a guess can cost from
@@ -1794,6 +1795,10 @@ with connect() as c:
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(survival_guesses)")]:
         c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_x REAL")
         c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_z REAL")
+    # the milk buckets left, and the potion a bucket cancelled (with the result it was thrown at)
+    if 'milk' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
+        c.execute(f"ALTER TABLE survival_runs ADD COLUMN milk INTEGER DEFAULT {MILK}")
+        c.execute("ALTER TABLE survival_guesses ADD COLUMN milked TEXT")
     if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(scores)")]:
         c.execute("ALTER TABLE scores ADD COLUMN difficulty TEXT")
         c.execute("ALTER TABLE scores ADD COLUMN points INTEGER")
@@ -1950,7 +1955,8 @@ def survival_state(c, run):
                          "kill": kill_radius(g['round'], g['effect'], g['hp'] - g['wither']),
                          "aim_x": g['aim_x'], "aim_z": g['aim_z']}
         if run['phase'] == 'result':
-            out['potion'] = run['next_effect']   # thrown now, for the next round
+            out.update({"potion": run['next_effect'],   # thrown now, for the next round
+                        "milk": run['milk'], "milked": g['milked']})
     return out
 
 def survival_tester():
@@ -1997,6 +2003,8 @@ def survival_test():
                       (max(1, min(DIFFICULTIES[run['difficulty']], int(form['hp']))), run['id']))
         elif what == 'round' and form.get('round', '').isdigit():
             c.execute("UPDATE survival_runs SET round = ? WHERE id = ?", (max(1, min(200, int(form['round']))), run['id']))
+        elif what == 'milk':
+            c.execute("UPDATE survival_runs SET milk = ? WHERE id = ?", (MILK, run['id']))
         elif what == 'creeper' and run['phase'] == 'guess':
             c.execute("UPDATE survival_runs SET deadline = ? WHERE id = ?", (now + 4, run['id']))
         out = survival_state(c, c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone())
@@ -2021,8 +2029,8 @@ def survival_start():
             for r in c.execute("SELECT * FROM survival_runs WHERE user_id = ? AND phase != 'over'", (uid,)).fetchall():
                 survival_end(c, r)
         test = request.form.get('test') == '1' and survival_tester()
-        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started, test) VALUES (?, ?, ?, 'new', ?, ?)",
-                        (uid, difficulty, DIFFICULTIES[difficulty], time.time(), int(test))).lastrowid
+        rid = c.execute("INSERT INTO survival_runs (user_id, difficulty, hp, phase, started, test, milk) VALUES (?, ?, ?, 'new', ?, ?, ?)",
+                        (uid, difficulty, DIFFICULTIES[difficulty], time.time(), int(test), MILK)).lastrowid
         run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone()
         survival_next(c, run)
         session['survival'] = rid
@@ -2073,6 +2081,24 @@ def survival_go():
         ok = run and run['phase'] == 'result' and request.form.get('round') == str(run['round'])
         if ok:
             survival_next(c, run)
+            run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
+        out = survival_state(c, run) if ok else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/survival/milk", methods=['POST'])
+def survival_milk():
+    # a bucket of milk: the potion thrown with this result never happens
+    c = run_tx()
+    try:
+        run = my_run(c)
+        ok = (run and run['phase'] == 'result' and request.form.get('round') == str(run['round'])
+              and run['next_effect'] and run['milk'] > 0)
+        if ok:
+            c.execute("UPDATE survival_guesses SET milked = ? WHERE run_id = ? AND round = ?", (run['next_effect'], run['id'], run['round']))
+            c.execute("UPDATE survival_runs SET next_effect = NULL, milk = milk - 1 WHERE id = ?", (run['id'],))
             run = c.execute("SELECT * FROM survival_runs WHERE id = ?", (run['id'],)).fetchone()
         out = survival_state(c, run) if ok else {"success": False}
         c.execute("COMMIT")

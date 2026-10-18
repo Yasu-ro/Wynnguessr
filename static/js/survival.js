@@ -31,6 +31,10 @@ var SPLASH_MS = 1950;   // it bursts (frame 60): the glass
 var THROW_GIF = document.body.dataset.throw;   // its address, versioned (asset())
 var throwGif = null;    // loaded once; a new address for it each time plays it from its first frame
 fetch(THROW_GIF).then(function (r) { return r.blob(); }).then(function (b) { throwGif = b; }).catch(function () {});
+// the milk: a bucket cancels the potion thrown with a result (2 a run).
+// Drunk as in Minecraft: 1.6 s, a gulp every 0.2 s from the 0.4th on
+var DRINK_MS = 1600;
+var GULPS = [400, 600, 800, 1000, 1200, 1400, 1600];
 var DARK_AFTER = 10;    // Darkness: seconds of picture before the dark
 var NAUSEA_SPIN = -40;  // Nausea: degrees per second the view turns by itself (a turn in 9 s; Yasuro: -9 was far too slow)
 var darkTimer = null, witherShown = null;
@@ -316,6 +320,9 @@ function resultScreen(before) {
     $('#again-button, #menu-button').prop('hidden', !over);
     $('#sv-effect').prop('hidden', true);
     $('#potion-throw, #potion-card').prop('hidden', true);
+    if (s.milked && !s.potion && !over) {
+        showMilked();   // a reload after the milk
+    }
     if (s.potion && !over) {
         // the next round's potion: thrown right after a guess (a reload just shows it)
         $('#next-button').prop('hidden', true);
@@ -364,9 +371,48 @@ function throwPotion() {
 function showPotion() {
     var p = POTIONS[s.potion];
     $('#potion-card').html(potionIcon(s.potion) + '<div><b>' + p[0] + '!</b><span>' + p[1].replace(/\{heart\}/g, heartIcon()) +
-        '</span></div>').prop('hidden', false);
+        '</span>' + (s.milk ? "<button type='button' class='btn wood milk-button' id='milk-button'><i class='bucket-icon'></i>Drink Milk<small>" +
+        s.milk + ' left</small></button>' : '') + '</div>').prop('hidden', false);
+    replay(document.getElementById('potion-card'));
     $('#next-button').prop('hidden', false);
 }
+
+// the potion, gone: what the bucket left
+function showMilked() {
+    $('#potion-card').html("<i class='bucket-icon empty'></i><div><b>Milk!</b><span>No more " + POTIONS[s.milked][0] +
+        '.</span></div>').prop('hidden', false);
+    replay(document.getElementById('potion-card'));
+    $('#next-button').prop('hidden', false);
+}
+
+// the bucket goes up and gulps, as in Minecraft; the card changes once it is
+// empty. Next waits only for the server's answer, not for the drinking
+$('#potion-card').on('click', '#milk-button', function () {
+    var button = $(this).prop('disabled', true), round = s.round, answer = null, drunk = false;
+    $('#next-button').prop('disabled', true);
+    button.find('.bucket-icon').addClass('drinking');
+    GULPS.forEach(function (t) {
+        setTimeout(function () {
+            if (s.round == round && s.phase == 'result') {
+                Sfx.play('drink', .9 + Math.random() * .1);
+            }
+        }, t);
+    });
+    var done = function () {
+        if (!drunk || !answer || s.round != round || s.phase != 'result') {
+            return;
+        }
+        if (answer.success) {
+            s = answer;
+            showMilked();
+        } else {
+            api('').done(show);
+        }
+    };
+    setTimeout(function () { drunk = true; done(); }, DRINK_MS);
+    api('/milk', {round: round}).done(function (r) { answer = r; }).fail(function () { answer = {success: false}; })
+        .always(function () { $('#next-button').prop('disabled', false); done(); });
+});
 
 // what happened, in words and in one sound
 function verdict(r, over) {
@@ -443,6 +489,8 @@ if (TEST) {
             test({'do': 'potion', potion: $('#t-potion').val()});
         } else if (what == 'hearts') {
             test({'do': 'hearts', hp: Math.round(parseFloat($('#t-hp').val()) * 2)});
+        } else if (what == 'milk') {
+            test({'do': 'milk'});
         } else if (what == 'round') {
             test({'do': 'round', round: $('#t-round').val()});
         } else {

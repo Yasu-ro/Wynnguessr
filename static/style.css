@@ -1313,6 +1313,53 @@ button, input {
     font-size: 16px;
     color: var(--ink-soft);
 }
+/* the milk (tools/potions.py draws the bucket, full then empty): drunk from
+   the potion's card, as in Minecraft, lifted and tipped, a gulp at each bob */
+.bucket-icon {
+    display: inline-block;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+    background: url("buckets.png") 0 0 / 48px 24px no-repeat;
+    image-rendering: pixelated;
+}
+.bucket-icon.empty {
+    background-position: -24px 0;
+}
+.potion-card > .bucket-icon {
+    width: 48px;
+    height: 48px;
+    background-size: 96px 48px;
+}
+.potion-card > .bucket-icon.empty {
+    background-position: -48px 0;
+}
+.milk-button {
+    display: flex;
+    width: fit-content;
+    min-height: 38px;
+    margin-top: 10px;
+    padding: 4px 14px 4px 10px;
+    font-size: 15px;
+}
+.milk-button small {
+    font-size: 13px;
+    font-weight: 400;
+    text-transform: none;
+    opacity: .85;
+}
+.bucket-icon.drinking {
+    animation: drink 1.6s linear both;
+}
+@keyframes drink {
+    0% { transform: none; }
+    20% { transform: translateY(-5px) rotate(-50deg); }
+    25%, 50%, 75% { transform: translateY(-3px) rotate(-50deg); }
+    37.5%, 62.5%, 87.5% { transform: translateY(-6px) rotate(-56deg); }
+    95% { transform: translateY(-4px) rotate(-50deg); }
+    100% { transform: none; }
+}
 .guess-screen {
     overflow: hidden;
     background: #000;
