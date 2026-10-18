@@ -982,6 +982,13 @@ max), journal d'audit avec la raison. D'où :
   du vrai site est postérieur à la copie de la bêta) ; un rang ne va qu'à
   un compte (un pseudo d'invité, n'importe qui peut le reprendre). Le refus
   le dit maintenant en clair.
+- **Classement, retouches du 2026-10-18** : la série en cours (flamme) quitte
+  le nom pour **une colonne à elle, sans titre ni séparation** (Yasuro : « its
+  own column but not visible »), étroite et centrée ; le niveau, la tête et
+  le nom restent ensemble, une étiquette passe dessous (téléphone : colonne
+  du rang et marges réduites ; un nom très long y revient à la ligne). Le
+  lien Wynncraft n'est plus que **la coche verte** (l'icône « ouvrir » est
+  retirée).
 - `REVIEWERS` (tri des lieux) reste à part de Moderation pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :

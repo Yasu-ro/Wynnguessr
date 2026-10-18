@@ -1714,6 +1714,12 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     align-items: center;
     row-gap: 4px;
 }
+/* the level, the head and the name stay together; a tag may go under them */
+.board-id {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+}
 .board-name {
     display: inline-flex;
     align-items: center;
@@ -2032,6 +2038,13 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     min-width: 24px;
     margin-right: 8px;
     font-size: 16px;
+    text-align: center;
+}
+/* the streak's column: no title, no line, as narrow as its flame */
+.leaderboard-table .board-streak {
+    width: 1%;
+    padding-inline: 4px;
+    white-space: nowrap;
     text-align: center;
 }
 .board-fire {
@@ -4122,6 +4135,26 @@ body.room-playing {
     }
     .pcard-slip small {
         font-size: 14px;
+    }
+    /* the leaderboard: the streak's column as narrow as can be, so the level,
+       the head and the name keep to one line */
+    .leaderboard-table .board-streak {
+        padding-inline: 0;
+        font-size: 14px;
+    }
+    .board-fire .xp-fire {
+        margin-right: 1px;
+        font-size: 16px;
+    }
+    .leaderboard-table td, .leaderboard-table th {
+        padding-inline: 6px;
+    }
+    .leaderboard-table td:first-child, .leaderboard-table th:first-child {
+        width: 30px;
+    }
+    .name-lvl {
+        min-width: 0;
+        margin-right: 5px;
     }
     .card-table.play-table {
         --card-w: 98px;
