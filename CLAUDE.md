@@ -1022,6 +1022,16 @@ fan, sans rien voler).
   session, écrit une fois par minute au plus, robots exclus), compté **depuis
   le 2026-10-18** (rien n'existait avant : le journal d'accès ne remonte qu'au
   dernier redémarrage) ; en ligne = vu dans les 5 dernières minutes.
+  **Le chiffre « Visitors » affiché vient de Cloudflare** (demande de Yasuro,
+  « there is way more than only 45 people ») : visiteurs distincts depuis le
+  2026-10-15 (`LAUNCH`), API GraphQL `httpRequests1dGroups` **sans
+  dimension** sur la période = chacun compté une fois (1 698 le 2026-10-18,
+  contre 1 912 en additionnant les jours) ; même chiffre que le tableau de
+  bord (vérifié : 1 344 sur 24 h). Jeton en lecture seule (Zone · Analytics ·
+  Read, wynndle.com seulement) dans `cloudflare_token` (0600, **jamais
+  commité** ; la bêta a un lien vers celui du vrai site). Le certificat du
+  tunnel n'a pas ce droit (vérifié). Sans jeton ou sans réponse : notre
+  propre compte. Les créneaux d'une heure ne remontent qu'à 3 jours.
 - Classement (2026-10-18, demande de Yasuro) : **sa propre place épinglée en
   haut** de chaque tableau (ligne verte, mêmes colonnes, trait épais), quelle
   qu'elle soit, ou « You are not on this board yet. » ; **50 lignes à la

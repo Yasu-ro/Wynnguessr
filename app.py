@@ -237,6 +237,30 @@ def discord_counts():
             pass   # the page goes without them
     return DISCORD_COUNTS
 
+# the visitors as Cloudflare counts them (each one once, since the site went
+# behind it), read with a token that may only read wynndle.com's analytics
+# (file cloudflare_token next to this one, not in git); else our own count
+CLOUDFLARE_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cloudflare_token')
+CLOUDFLARE_ZONE = '6123d2ca7e48c20b76cb0da69584f9a5'   # wynndle.com
+LAUNCH = '2026-10-15'      # its first day behind Cloudflare
+VISITS = {'at': 0, 'count': None}
+
+def cloudflare_visitors():
+    if time.time() - VISITS['at'] > 600:
+        VISITS['at'] = time.time()
+        try:
+            with open(CLOUDFLARE_TOKEN_FILE) as f:
+                token = f.read().strip()
+            query = ('{viewer{zones(filter:{zoneTag:"%s"}){httpRequests1dGroups(limit:1, filter:{date_geq:"%s"}){uniq{uniques}}}}}'
+                     % (CLOUDFLARE_ZONE, LAUNCH))
+            req = urllib.request.Request('https://api.cloudflare.com/client/v4/graphql', data = json.dumps({'query': query}).encode(),
+                                         headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout = 5) as r:
+                VISITS['count'] = json.loads(r.read())['data']['viewer']['zones'][0]['httpRequests1dGroups'][0]['uniq']['uniques']
+        except Exception:
+            pass   # no token, Cloudflare silent: our own count instead
+    return VISITS['count']
+
 @app.route("/about")
 def about():
     now = time.time()
@@ -244,7 +268,7 @@ def about():
         one = lambda q, *a: c.execute(q, a).fetchone()[0]
         stats = {
             'online': one("SELECT COUNT(*) FROM visitors WHERE last > ?", now - ONLINE),
-            'visitors': one("SELECT COUNT(*) FROM visitors"),
+            'visitors': cloudflare_visitors() or one("SELECT COUNT(*) FROM visitors"),
             'accounts': one("SELECT COUNT(*) FROM users WHERE COALESCE(guest, 0) = 0"),
             # rooms played to the end, Classic games alone, Survival runs
             'games': one("SELECT COUNT(*) FROM rooms WHERE state = 'finished'")
