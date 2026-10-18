@@ -429,6 +429,8 @@ def name_problem(c, name, uid = None):
     # the Minecraft name Wynncraft proved for someone else
     if not 1 <= len(name) <= 20 or not name.isprintable():
         return "Pick a name of 1 to 20 characters"
+    if name_rule(name):
+        return name_rule(name)
     if c.execute("""SELECT 1 FROM users WHERE id IS NOT ? AND ((username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0)
             OR mc_name = ? COLLATE NOCASE)""", (uid, name, name)).fetchone():
         return "This name is taken"
@@ -542,6 +544,8 @@ def guest():
     name = ' '.join(request.form.get('username', '').split())
     if not name or len(name) > 20:
         return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
+    if name_rule(name):
+        return render_template('apology.html', message = name_rule(name))
     with connect() as c:
         if place_note(c):
             return render_template('apology.html', message = place_note(c))
@@ -3195,6 +3199,17 @@ BAD_WORDS = word_filter()
 def filtered(text):
     return BAD_WORDS.sub(lambda m: '*' * len(m.group()), text)
 
+# Names: the same words, also inside a name written in one piece (BigWord:
+# "Big Word"), and none that would pass for the site or its staff
+RESERVED = ('admin', 'moderator', 'wynnguessr', 'wynndle')         # nowhere in a name
+RESERVED_ALONE = ('mod', 'owner', 'staff', 'helper', 'system', 'server')
+
+def name_rule(name):
+    split = re.sub(r'([a-z])([A-Z])', r'\1 \2', name).replace('_', ' ')
+    plain = re.sub(r'[^a-z]', '', name.lower())
+    if filtered(name) != name or filtered(split) != split or any(w in plain for w in RESERVED) or plain in RESERVED_ALONE:
+        return "This name is not allowed: pick another one"
+
 def reports_waiting(c):
     # the reported messages this staff member may act on (written below them), oldest first
     r = my_rank(c)
@@ -3367,7 +3382,7 @@ def mod_sanction():
             logged(c, 'ban', uid, 'unbanned', reason)
         else:
             name = clean_name(f.get('name', ''))
-            problem = name_problem(c, name, uid) or (filtered(name) != name and "This name is not allowed")
+            problem = name_problem(c, name, uid)
             if problem:
                 return jsonify({"success": False, "error": problem})
             c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))

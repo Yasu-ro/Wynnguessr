@@ -823,9 +823,20 @@ max), journal d'audit avec la raison. D'où :
   - Tests : `t_sanctions.py` (35, une adresse par client par l'en-tête
     `CF-Connecting-IP`, sinon un ban bloquerait 127.0.0.1 pour tous les
     tests), `t_players_page.py` (navigateur, 13 × 2).
-- **À venir** (étapes suivantes) : filtre des pseudos (même
-  `bad_words.txt`) et noms réservés, passe de sécurité. `REVIEWERS` (tri
-  des lieux) reste à part pour l'instant.
+- **Pseudos** (étape 5, 2026-10-18) : `name_rule()`, partout où un nom se
+  choisit (inscription, invité, page `account`, « Use my Minecraft name »,
+  Rename de l'équipe). Le même `bad_words.txt`, **aussi sur le nom coupé à
+  ses majuscules** (« BigWord » → « Big Word » : les pseudos sont souvent
+  d'un seul tenant), et des noms réservés : nulle part `admin`, `moderator`,
+  `wynnguessr`, `wynndle` ; seuls `mod`, `owner`, `staff`, `helper`,
+  `system`, `server`. Essayé sur les 289 noms du vrai site : **2 refusés,
+  aucun à tort** — le compte n° 9 « Fuck YammIa » et l'invité n° 134
+  « fag ». Les noms déjà pris ne changent pas d'eux-mêmes : à renommer
+  depuis Players après la 3.0.0 si Yasuro le veut. Test : `t_names.py`.
+  Les noms Minecraft d'un nouveau compte Wynncraft ne passent pas par là
+  (ils viennent de Mojang).
+- **À venir** : passe de sécurité. `REVIEWERS` (tri des lieux) reste à
+  part pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
 - **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
