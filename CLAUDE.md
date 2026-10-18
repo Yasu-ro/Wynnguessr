@@ -1031,6 +1031,12 @@ fan, sans rien voler).
 - `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet
   (`DISCORD` dans `app.py`). Le texte reprend les mots de Yasuro (« garder ma
   touche ») ; ne rien y ajouter sans lui demander.
+- **Version** du site dans le pied de page (`VERSION` d'`app.py`, lien vers les
+  commits du fork), demandée par Yasuro le 2026-10-18 : **+0.1 à chaque mise
+  en prod**. Reconstituée : 1.0 le jeu de Ched3, 2.0 la nouvelle DA
+  (2026-10-17), 2.1 profils, sons et Survival refait, 2.2 Survival à
+  plusieurs, 2.3 About, place au classement, carte des liens de salon,
+  onglets endormis (2026-10-18).
 - Pied de page hors jeu (`footer.html`) : Made by Ched3, Hosted & modified
   by Yasuro, Wynncraft, Fan-made, not official (séparés par l'espace, plus par
   des points médians).

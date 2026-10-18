@@ -191,6 +191,13 @@ def leaderboard():
     return render_template('leaderboard.html')
 
 DISCORD = 'https://discord.gg/fMqQ2p5mZr'
+# the site's version, in the footer: one more at each push to the live site
+# (2.0 the new look, 2.1 Survival remade, 2.2 Survival with friends; CLAUDE.md)
+VERSION = '2.3'
+
+@app.context_processor
+def site_version():
+    return {'version': VERSION}
 
 # Who comes, for the About page: a random id kept in the session (no
 # account needed) and when it was last seen, written once a minute at most.
