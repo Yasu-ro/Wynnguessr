@@ -1530,10 +1530,16 @@ def make_tiles(data, name):
             os.makedirs(os.path.join(tmp, str(level)), exist_ok=True)
             for i in range(size // TILE):
                 for j in range(size // TILE):
-                    img.crop((j * TILE, i * TILE, (j + 1) * TILE, (i + 1) * TILE)).save(
-                        os.path.join(tmp, str(level), f'{letter}{i}_{j}.jpg'), quality=90)
+                    # each tile twice: WebP 90, what the pages load (a third
+                    # lighter, Yasuro's choice), and JPEG, until no page asks
+                    # for it (tools/webp_tiles.py did the older locations)
+                    tile = img.crop((j * TILE, i * TILE, (j + 1) * TILE, (i + 1) * TILE))
+                    tile.save(os.path.join(tmp, str(level), f'{letter}{i}_{j}.jpg'), quality=90)
+                    tile.save(os.path.join(tmp, str(level), f'{letter}{i}_{j}.webp'), quality=90)
         os.makedirs(os.path.join(tmp, 'fallback'), exist_ok=True)
-        face.resize((1024, 1024), Image.Resampling.LANCZOS).save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
+        small = face.resize((1024, 1024), Image.Resampling.LANCZOS)
+        small.save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
+        small.save(os.path.join(tmp, 'fallback', letter + '.webp'), quality=90)
     os.rename(tmp, os.path.join(TILES_DIR, name))
     return 'static/tiles/' + name + '/'
 
