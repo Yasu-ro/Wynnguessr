@@ -321,6 +321,43 @@ Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
 - Seules les parties Classic (solo et salon) vont au classement ; les comptes
   invités jamais.
 
+## Survival, refonte (2026-10-18, en cours)
+
+Retours des joueurs : « far too lenient », « 500 blocks is huge, 100 max,
+honestly 50 ». Classic (solo et salons) ne change pas : ce sont les modes
+par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
+
+- **Cœurs** (comptés en demi-cœurs) : Normal 10, Hard 5, Hardcore 1.
+- **Zone qui rétrécit**, calibrée par simulation sur 1 029 vrais guess
+  (photos neuves, guess jetés > 2 000 blocs écartés) : pas de dégât sous
+  `150·(1/3)^((n−1)/19)` blocs (150 → 50 à la manche 20, plancher 25),
+  dégâts max au-delà de `2000·0,4^((n−1)/19)` (2 000 → 800, plancher 500),
+  entre les deux `1 + ⌊19·x^1,5⌋` demi-cœurs (x = position dans la bande),
+  plafonnés à 5 cœurs en manche 1 → 10 en manche 20 (un seul mauvais guess
+  ne tue pas au début). Résultat simulé, bons joueurs : médiane 15 en
+  Normal (1 sur 4 atteint 20), 10 en Hard, 3 en Hardcore (20 : 0,3 %).
+- **Quasi-parfait** (≤ 10 blocs) deux fois de suite : +½ cœur, puis le
+  compteur repart de zéro.
+- **Chrono** 60 / 40 / 30 s (Swiftness 20 s). Les 3 dernières secondes, le
+  sifflement du creeper ; à zéro, l'épingle posée part toute seule, sinon
+  le creeper explose : dégâts max de la manche.
+- **Potions** (`POTIONS`) : aucune avant la manche 4, puis 1 manche sur 5 /
+  4 / 3 selon la difficulté, jamais deux de suite, Regeneration plus rare.
+  Swiftness (20 s, zone ×1,5), Mining Fatigue (pas de zoom), Wither (−½
+  cœur toutes les 5 s jusqu'au guess), Regeneration (+2 cœurs si dans la
+  zone), Nausea (le panorama tangue), Darkness (image 5 s puis noir).
+  Blindness attend les photos « brouillard » (distance de rendu 6, sans
+  Distant Horizons, nouvelle tournée du mod), pas d'imitation avant.
+- **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
+  (dégâts), rouge (au-delà, mort avec les cœurs qui restaient).
+- **Score** = lieux survécus, départage = total des points (formule
+  Classic). Un classement par difficulté, plus aucune option (toutes les
+  provinces, vue libre), anciens scores Survival effacés.
+- **Cœurs dessinés** d'après une capture de l'ancien pack Wynncraft fournie
+  par Yasuro (9×9 façon Minecraft) : plein, demi, vide, Hardcore.
+- **Anti-triche complète** demandée : la partie vit sur le serveur (voir
+  le code et les tests de l'étape 2).
+
 ## Niveaux, XP et séries de victoires
 
 2026-10-17, demande de Yasuro : des niveaux pour les comptes, « genre barre
