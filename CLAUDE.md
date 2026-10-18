@@ -998,6 +998,19 @@ fan, sans rien voler).
   et coché par défaut dans « Play Solo » comme dans le classement ; Classic
   reste choisissable. Sous Difficulty, seule la difficulté cochée dit ce
   qu'elle fait (`.difficulty-rules`), pas les trois à la fois.
+- `about` refaite (2026-10-18, demande de Yasuro : chiffres + cartes des
+  modes « humainement compréhensibles ») : joueurs en ligne (panneau à
+  part, carré vert d'un serveur allumé), puis Visitors, Player accounts,
+  Games played, Guesses, Locations sur une bande de papier ; « Game Modes »
+  en deux panneaux (On Your Own : Survival « main mode », Classic ; With
+  Friends : Survival, Classic, Duel), chaque mode montré par ses propres
+  objets dans une case comme celles du marchand (cœur, épingles, potion et
+  émeraude, barre de vie), son but en vert ; le Discord avec ses membres et
+  ses connectés (invitation publique `?with_counts=true`, relue toutes les
+  10 min). **Visiteurs** : `visitors` (un identifiant au hasard dans la
+  session, écrit une fois par minute au plus, robots exclus), compté **depuis
+  le 2026-10-18** (rien n'existait avant : le journal d'accès ne remonte qu'au
+  dernier redémarrage) ; en ligne = vu dans les 5 dernières minutes.
 - Classement (2026-10-18, demande de Yasuro) : **sa propre place épinglée en
   haut** de chaque tableau (ligne verte, mêmes colonnes, trait épais), quelle
   qu'elle soit, ou « You are not on this board yet. » ; **50 lignes à la

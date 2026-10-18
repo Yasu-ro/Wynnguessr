@@ -192,9 +192,62 @@ def leaderboard():
 
 DISCORD = 'https://discord.gg/fMqQ2p5mZr'
 
+# Who comes, for the About page: a random id kept in the session (no
+# account needed) and when it was last seen, written once a minute at most.
+# Robots that say so are not counted. Counting started on 2026-10-18.
+SEEN_EVERY = 60          # seconds between two writes for the same visitor
+ONLINE = 300             # seen this recently: online now
+ROBOTS = re.compile(r'bot|crawl|spider|preview|curl|python|wget|http', re.I)
+
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS visitors (vid TEXT PRIMARY KEY, first REAL, last REAL)")
+
+@app.before_request
+def count_visitor():
+    now = time.time()
+    if (request.endpoint in ('static', 'play_tile', 'survival_tile', 'avatar') or now - session.get('seen', 0) < SEEN_EVERY
+            or ROBOTS.search(request.headers.get('User-Agent', ''))):
+        return
+    session['vid'] = session.get('vid') or secrets.token_hex(8)
+    session['seen'] = now
+    with connect() as c:
+        c.execute("INSERT INTO visitors (vid, first, last) VALUES (?, ?, ?) ON CONFLICT(vid) DO UPDATE SET last = excluded.last",
+                  (session['vid'], now, now))
+
+# the Discord server's members, from its public invite: asked every 10 minutes at most
+DISCORD_COUNTS = {'at': 0, 'members': None, 'online': None}
+
+def discord_counts():
+    if time.time() - DISCORD_COUNTS['at'] > 600:
+        DISCORD_COUNTS['at'] = time.time()
+        try:
+            req = urllib.request.Request('https://discord.com/api/v10/invites/' + DISCORD.rsplit('/', 1)[1] + '?with_counts=true',
+                                         headers = {'User-Agent': 'WynnGuessr (wynndle.com)'})
+            with urllib.request.urlopen(req, timeout = 3) as r:
+                d = json.loads(r.read())
+            DISCORD_COUNTS.update(members = d.get('approximate_member_count'), online = d.get('approximate_presence_count'))
+        except Exception:
+            pass   # the page goes without them
+    return DISCORD_COUNTS
+
 @app.route("/about")
 def about():
-    return render_template('about.html', discord = DISCORD)
+    now = time.time()
+    with connect() as c:
+        one = lambda q, *a: c.execute(q, a).fetchone()[0]
+        stats = {
+            'online': one("SELECT COUNT(*) FROM visitors WHERE last > ?", now - ONLINE),
+            'visitors': one("SELECT COUNT(*) FROM visitors"),
+            'accounts': one("SELECT COUNT(*) FROM users WHERE COALESCE(guest, 0) = 0"),
+            # rooms played to the end, Classic games alone, Survival runs
+            'games': one("SELECT COUNT(*) FROM rooms WHERE state = 'finished'")
+                     + one("SELECT COUNT(*) FROM scores WHERE room IS NULL AND COALESCE(mode, 'classic') = 'classic'")
+                     + one("SELECT COUNT(*) FROM survival_runs WHERE round > 0 AND COALESCE(test, 0) = 0"),
+            'guesses': one("SELECT COUNT(*) FROM room_guesses") + one("SELECT COUNT(*) FROM survival_guesses")
+                       + one("SELECT COUNT(*) FROM solo_guesses"),
+            'locations': one(f"SELECT COUNT(*) FROM locations WHERE review IN {PLAYABLE}"),
+        }
+    return render_template('about.html', discord = DISCORD, stats = stats, server = discord_counts())
 
 @app.route("/game", methods=['POST', 'GET'])
 def game():

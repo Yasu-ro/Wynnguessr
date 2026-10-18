@@ -3,11 +3,85 @@
 {% block title %}: About{% endblock %}
 
 {% block content %}
+{% set pin = "<svg width='26' height='40' viewBox='0 0 26 40' aria-hidden='true'><path d='M13 1.5C6.6 1.5 1.5 6.6 1.5 13c0 8.6 11.5 25 11.5 25s11.5-16.4 11.5-25C24.5 6.6 19.4 1.5 13 1.5z' fill='%s' stroke='black' stroke-width='2.5'/><circle cx='13' cy='13' r='4.5' fill='white'/></svg>" %}
     <h1 class="sign">About</h1>
-    <section class="panel narrow about">
+    <p class="about-lead">WynnGuessr drops you somewhere in Wynncraft. Look around, then pin on the map where you think you are: the closer, the better.</p>
+
+    {# the numbers of the site, the one that moves first #}
+    <section class="about-stats" aria-label="The site in numbers">
+        <div class="about-online">
+            <span class="about-dot"></span>
+            <b>{{ '{:,}'.format(stats.online) }}</b>
+            <span>{{ 'player' if stats.online == 1 else 'players' }} online</span>
+        </div>
+        <dl class="about-numbers">
+            <div><dd>{{ '{:,}'.format(stats.visitors) }}</dd><dt>Visitors</dt></div>
+            <div><dd>{{ '{:,}'.format(stats.accounts) }}</dd><dt>Player accounts</dt></div>
+            <div><dd>{{ '{:,}'.format(stats.games) }}</dd><dt>Games played</dt></div>
+            <div><dd>{{ '{:,}'.format(stats.guesses) }}</dd><dt>Guesses</dt></div>
+            <div><dd>{{ '{:,}'.format(stats.locations) }}</dd><dt>Locations</dt></div>
+        </dl>
+    </section>
+
+    <h2 class="about-title">Game Modes</h2>
+    <div class="about-modes">
+        <section class="panel about-group">
+            <h2>On Your Own</h2>
+            <article class="about-mode">
+                <span class="about-art"><i class="heart full"></i></span>
+                <div>
+                    <h3>Survival <small>main mode</small></h3>
+                    <p>You start with hearts: 10, 5 or just 1. Guess inside the green zone and you lose nothing; the further out, the more hearts you lose. The zone shrinks every round, a creeper waits for the end of the clock, and from round 4 potions get thrown at you.</p>
+                    <p class="about-goal">How many places can you survive?</p>
+                </div>
+            </article>
+            <article class="about-mode">
+                <span class="about-art">{{ (pin | format('#4363d8')) | safe }}</span>
+                <div>
+                    <h3>Classic</h3>
+                    <p>The original game: 3 to 25 rounds, up to 5,000 points each, more the closer you are. Pick the provinces, and add a timer or lock the view for a challenge.</p>
+                    <p class="about-goal">Beat your best score.</p>
+                </div>
+            </article>
+            <a class="btn wide" href="mode?play=solo">Play Solo</a>
+        </section>
+        <section class="panel about-group">
+            <h2>With Friends</h2>
+            <article class="about-mode">
+                <span class="about-art"><i class="potion-icon" style="--i:2"></i><i class="emerald"></i></span>
+                <div>
+                    <h3>Survival</h3>
+                    <p>Everyone plays the same place at once. Good guesses earn emeralds; between rounds, spend them at the Potion Merchant and throw potions at the others.</p>
+                    <p class="about-goal">Be the last one standing.</p>
+                </div>
+            </article>
+            <article class="about-mode">
+                <span class="about-art about-pins">{{ (pin | format('#e6194b')) | safe }}{{ (pin | format('#ffe119')) | safe }}</span>
+                <div>
+                    <h3>Classic</h3>
+                    <p>The same places for everyone, round after round. Each guess scores as alone.</p>
+                    <p class="about-goal">Most points at the end wins.</p>
+                </div>
+            </article>
+            <article class="about-mode">
+                <span class="about-art"><span class="room-hp"><span style="width: 62%"></span></span></span>
+                <div>
+                    <h3>Duel</h3>
+                    <p>Everyone starts with 6,000 health. Each round you lose the gap between your guess and the best one, and it hurts more as the game goes on.</p>
+                    <p class="about-goal">Be the last one alive.</p>
+                </div>
+            </article>
+            <a class="btn wide" href="mode?play=friends">Play With Friends</a>
+        </section>
+    </div>
+
+    <section class="panel narrow about-discord">
         <h2>The Discord</h2>
         <p>It's just a small Discord server to keep up with updates, and with everything that can still get better.</p>
         <p>There's a suggestions channel, so anyone and everyone can help!</p>
+        {% if server.members %}
+        <p class="about-server"><span><b>{{ server.members }}</b> {{ 'member' if server.members == 1 else 'members' }}</span><span><span class="about-dot"></span><b>{{ server.online }}</b> online</span></p>
+        {% endif %}
         <a class="btn big wide" href="{{ discord }}" target="_blank" rel="noopener">Join the Discord</a>
     </section>
 {% endblock %}
