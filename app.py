@@ -146,6 +146,8 @@ def ladder(c, mode):
         return sorted(rows, key = lambda r: -r['xp'])
     return sorted(rows, key = lambda r: (-r['wins'], -r['best'], r['played']))
 
+BOARD_PAGE = 50   # rows of a leaderboard sent at once
+
 @app.route("/api/updaterank", methods=['POST'])
 def update_rank():
     # each player's best game, or the levels, or the wins with friends
@@ -163,12 +165,18 @@ def update_rank():
             for row in rows:
                 row['level'] = known.get(row['id'], {}).get('level', 1)
                 row['streak'] = known.get(row['id'], {}).get('streak', 0)
-        rows = rows[:50]
+        # 50 at a time ("Show more"), and the player's own place on the whole board
+        start = max(0, request.form.get('start', 0, type = int))
+        uid = session.get('user_id')
+        mine = next(({**row, 'rank': i + 1} for i, row in enumerate(rows) if row['id'] == uid), None)
+        total, rows = len(rows), rows[start:start + BOARD_PAGE]
         # each player's picture; a Minecraft head is drawn sharp
-        for row in rows:
-            row['pic'], row['head'] = avatar_url(row), not row.pop('avatar')
-            row.pop('mc_uuid')
-    return jsonify({"rows": rows, "me": session.get('user_id')})
+        for row in rows + ([mine] if mine else []):
+            row['pic'], row['head'] = avatar_url(row), not row.get('avatar')
+            row.pop('avatar', None)
+            row.pop('mc_uuid', None)
+    return jsonify({"rows": rows, "start": start, "total": total, "me": uid, "mine": mine,
+                    "ranked": bool(session.get('loggedin'))})
 
 @app.route("/")
 def index():

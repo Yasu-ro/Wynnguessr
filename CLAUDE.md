@@ -998,6 +998,10 @@ fan, sans rien voler).
   et coché par défaut dans « Play Solo » comme dans le classement ; Classic
   reste choisissable. Sous Difficulty, seule la difficulté cochée dit ce
   qu'elle fait (`.difficulty-rules`), pas les trois à la fois.
+- Classement (2026-10-18, demande de Yasuro) : **sa propre place épinglée en
+  haut** de chaque tableau (ligne verte, mêmes colonnes, trait épais), quelle
+  qu'elle soit, ou « You are not on this board yet. » ; **50 lignes à la
+  fois** (`BOARD_PAGE`) puis « Show 50 more ».
 - `leaderboard` : onglets Survival/Classic (filtres, meilleure partie par
   joueur) et Levels/Wins (voir « Niveaux ») ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
 - `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet

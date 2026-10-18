@@ -766,6 +766,24 @@ button, input {
     font-weight: 700;
     background: #d5e8a4;
 }
+/* your own place, pinned on top of the board whatever it is */
+.leaderboard-table tbody.board-mine tr td {
+    font-weight: 700;
+    background: #d5e8a4;
+    border-top: 0;
+    border-bottom: 3px solid var(--ink);
+}
+.leaderboard-table tbody.board-mine td.board-mine-none {
+    font-weight: 400;
+    font-style: italic;
+    text-align: center;
+    color: var(--ink-soft);
+    background: var(--paper-light);
+}
+.board-next {
+    display: flex;
+    margin: 18px auto 0;
+}
 .leaderboard-table td:first-child, .leaderboard-table th:first-child {
     width: 60px;
     text-align: center;
