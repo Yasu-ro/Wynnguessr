@@ -18,12 +18,12 @@ var POTIONS = {
     wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
     regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
     nausea: ['Nausea', 'The world sways.'],
-    darkness: ['Darkness', 'You see the picture for 5 seconds, then it goes dark.']
+    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.']
 };
 var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
 var THROW_MS = 1050;    // the length of static/potion-throw.gif (a temporary one: Yasuro draws the real one)
 var SPLASH_MS = 560;    // when the bottle breaks in it
-var DARK_AFTER = 5;     // Darkness: seconds of picture before the dark
+var DARK_AFTER = 10;    // Darkness: seconds of picture before the dark
 var darkTimer = null, witherShown = null;
 
 function potionIcon(name) {

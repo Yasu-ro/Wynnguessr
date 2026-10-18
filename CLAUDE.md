@@ -345,7 +345,7 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   4 / 3 selon la difficulté, jamais deux de suite, Regeneration plus rare.
   Swiftness (20 s, zone ×1,5), Mining Fatigue (pas de zoom), Wither (−½
   cœur toutes les 5 s jusqu'au guess), Regeneration (+2 cœurs si dans la
-  zone), Nausea (le panorama tangue), Darkness (image 5 s puis noir).
+  zone), Nausea (le panorama tangue), Darkness (image 10 s puis noir).
   Blindness attend les photos « brouillard » (distance de rendu 6, sans
   Distant Horizons, nouvelle tournée du mod), pas d'imitation avant.
 - **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
@@ -363,7 +363,7 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   nous. Un rechargement montre la carte sans le lancer.
 - Effets côté page : Mining Fatigue (zoom de la carte bloqué), Nausea (le
   panorama tangue, agrandi ×1,22 : à moins, un bord blanc apparaissait ;
-  coupé par le mouvement réduit), Darkness (noir après 5 s, même après un
+  coupé par le mouvement réduit), Darkness (noir après 10 s, Yasuro : 5 était trop court ; même après un
   rechargement), Wither (les cœurs tombent à l'écran toutes les 5 s, le
   serveur compte). Le flacon de la manche est dans le menu (sur téléphone,
   sans son nom, et les points s'effacent pendant la manche : le menu
