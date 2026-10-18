@@ -1256,7 +1256,7 @@ button, input {
     width: 24px;
     height: 24px;
     vertical-align: middle;
-    background: url("potions.png") calc(var(--i) * -24px) 0 / 264px 24px no-repeat;
+    background: url("potions.png") calc(var(--i) * -24px) 0 / 168px 24px no-repeat;
     image-rendering: pixelated;
 }
 .sv-effect {
@@ -1296,7 +1296,7 @@ button, input {
     width: 48px;
     height: 48px;
     background-position: calc(var(--i) * -48px) 0;
-    background-size: 528px 48px;
+    background-size: 336px 48px;
 }
 .potion-card b {
     display: block;
@@ -1306,23 +1306,9 @@ button, input {
     font-size: 16px;
     color: var(--ink-soft);
 }
-/* Nausea: the world sways (cut by the reduced motion setting, like every animation) */
 .guess-screen {
     overflow: hidden;
     background: #000;
-}
-#game-panorama.nausea {
-    animation: nausea 7s ease-in-out infinite;
-}
-@keyframes nausea {
-    0%, 100% { transform: scale(1.22) rotate(0); }
-    25% { transform: scale(1.26) rotate(3deg) translateX(12px); }
-    50% { transform: scale(1.22) rotate(-1deg); }
-    75% { transform: scale(1.26) rotate(-3deg) translateX(-12px); }
-}
-/* Mirror: the world flipped left to right (still: no motion, no lag) */
-#game-panorama.mirror {
-    transform: scaleX(-1);
 }
 /* the beta's test panel */
 .test-panel {

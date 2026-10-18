@@ -1687,9 +1687,7 @@ POTION_RATE = {'normal': 1 / 5, 'hard': 1 / 4, 'hardcore': 1 / 3}
 # name: weight (Regeneration, the only good one, comes half as often).
 # Blindness waits for the fog pictures (CLAUDE.md, "Survival")
 POTIONS = {'swiftness': 2, 'mining_fatigue': 2, 'wither': 2, 'nausea': 2, 'darkness': 2, 'regeneration': 1}
-# drunk only from the test panel, to be compared before one replaces Nausea
-TEST_POTIONS = ['shaky', 'spin', 'tunnel', 'mirror']
-SHAKE = (20, 60)           # Shaky Hands: the pin lands this many blocks off, in any direction
+SHAKE = (20, 60)           # Nausea: the pin lands this many blocks off, in any direction
 WITHER_EVERY = 5           # Wither: half a heart every this many seconds until the guess
 REGEN = 4                  # Regeneration: half-hearts given back for a guess inside the zone
 
@@ -1747,7 +1745,7 @@ with connect() as c:
     if 'next_effect' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
         c.execute("ALTER TABLE survival_runs ADD COLUMN next_effect TEXT")
     # test runs (the beta's test panel), never on the leaderboard; where a
-    # Shaky Hands guess was aimed before it landed off
+    # guess under Nausea was aimed before it landed off
     if 'test' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
         c.execute("ALTER TABLE survival_runs ADD COLUMN test INTEGER DEFAULT 0")
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(survival_guesses)")]:
@@ -1829,8 +1827,8 @@ def survival_settle(c, run, x = None, z = None):
     spent = max(0, min(now, run['deadline']) - run['round_start'])
     wither = int(spent // WITHER_EVERY) if effect == 'wither' else 0
     aim_x, aim_z = x, z
-    if effect == 'shaky' and x is not None:
-        # the hand shakes: the pin lands somewhere around where it was aimed
+    if effect == 'nausea' and x is not None:
+        # Nausea, the hand shakes: the pin lands somewhere around where it was aimed
         angle = secrets.randbelow(360000) / 1000 * math.pi / 180
         off = SHAKE[0] + secrets.randbelow((SHAKE[1] - SHAKE[0]) * 1000) / 1000
         x, z = round(x + off * math.cos(angle)), round(z + off * math.sin(angle))
@@ -1854,7 +1852,7 @@ def survival_settle(c, run, x = None, z = None):
     c.execute("""INSERT INTO survival_guesses (run_id, round, location_id, x, z, distance, hp, damage, wither, heal, points, effect,
             time, at, aim_x, aim_z) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (run['id'], n, loc['location_id'], x, z, d, hp, damage, wither, heal if hp_after > 0 else 0, points, effect, spent, now,
-             aim_x if effect == 'shaky' else None, aim_z if effect == 'shaky' else None))
+             aim_x if effect == 'nausea' else None, aim_z if effect == 'nausea' else None))
     c.execute("""UPDATE survival_runs SET hp = ?, close = ?, survived = ?, points = points + ?, time = time + ?,
             phase = ?, next_effect = ? WHERE id = ?""", (hp_after, close, survived, points, spent, 'result' if hp_after > 0 else 'over',
             potion(run['difficulty'], n + 1, effect) if hp_after > 0 else None, run['id']))
@@ -1922,7 +1920,7 @@ def survival_test():
             return jsonify({"success": False})
         form, now = request.form, time.time()
         what = form.get('do')
-        if what == 'potion' and form.get('potion', '') in [''] + list(POTIONS) + TEST_POTIONS:
+        if what == 'potion' and form.get('potion', '') in [''] + list(POTIONS):
             name = form['potion'] or None
             if run['phase'] == 'guess':
                 # drunk now: the round starts again under it (same place, its clock)

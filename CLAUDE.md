@@ -345,7 +345,8 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   4 / 3 selon la difficulté, jamais deux de suite, Regeneration plus rare.
   Swiftness (20 s, zone ×1,5), Mining Fatigue (pas de zoom), Wither (−½
   cœur toutes les 5 s jusqu'au guess), Regeneration (+2 cœurs si dans la
-  zone), Nausea (le panorama tangue), Darkness (image 10 s puis noir).
+  zone), Nausea (la vue tourne seule et l'épingle tombe à côté), Darkness
+  (image 10 s puis noir).
   Blindness attend les photos « brouillard » (distance de rendu 6, sans
   Distant Horizons, nouvelle tournée du mod), pas d'imitation avant.
 - **Révélation** : cercles autour de la réponse, vert (sans dégât), jaune
@@ -388,15 +389,15 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   manche repart sous elle ; sur un résultat : pour la manche suivante),
   régler les cœurs, sauter à une manche (sentir la zone de la manche 20),
   lancer le creeper dans 4 s. Replié sur téléphone.
-- **Nausea jugée ratée** par Yasuro (« super easy », et elle faisait ramer :
-  un panorama 3D animé en CSS se recalcule à chaque image). Quatre
-  remplaçantes à comparer, buvables seulement depuis le panneau de test
-  (`TEST_POTIONS`), en attente de son choix : Shaky Hands (le serveur
-  décale l'épingle de 20 à 60 blocs, la révélation montre le point visé
-  et le point tombé : la seule que la page ne peut pas défaire), Dizziness
-  (la vue tourne seule, -9 °/s, non maîtrisable), Tunnel Vision (champ fixé
-  à 35°), Mirror (image retournée gauche-droite, transformation fixe donc
-  sans coût). Flacons dessinés dans `tools/potions.py`.
+- **Nausea refaite** (2026-10-18) : la première version (panorama qui
+  tangue en CSS) était « super easy » et faisait ramer (un panorama 3D animé
+  en CSS se recalcule à chaque image). Après essai de quatre remplaçantes
+  au panneau de test, Yasuro a choisi **Shaky Hands + Dizziness** réunies
+  sous le nom Nausea : la vue tourne seule (rotation de Pannellum, -9 °/s,
+  impossible à tenir, aucun coût en plus) et le serveur décale l'épingle de
+  20 à 60 blocs (`SHAKE`) ; la révélation montre le point visé (rond blanc)
+  et le point tombé. Écartées : Tunnel Vision (champ fixé à 35°), Mirror
+  (image retournée).
 - **Score** = lieux survécus, départage = total des points (formule
   Classic). Un classement par difficulté, plus aucune option (toutes les
   provinces, vue libre), anciens scores Survival effacés.

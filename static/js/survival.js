@@ -17,16 +17,10 @@ var POTIONS = {
     mining_fatigue: ['Mining Fatigue', 'No zooming on the map.'],
     wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
     regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
-    nausea: ['Nausea', 'The world sways.'],
-    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.'],
-    // candidates to replace Nausea, only from the beta's test panel for now
-    shaky: ['Shaky Hands', 'Your pin lands a little off from where you click.'],
-    spin: ['Dizziness', "The view turns by itself, and you can't stop it."],
-    tunnel: ['Tunnel Vision', 'You only see a small part of the picture.'],
-    mirror: ['Mirror', 'The world is flipped, like in a mirror.']
+    nausea: ['Nausea', 'The view turns by itself, and your pin lands a little off.'],
+    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.']
 };
-var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness',
-               'shaky', 'spin', 'tunnel', 'mirror'];
+var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
 var TEST = document.body.dataset.test == '1';   // the beta's test panel (reviewers only, runs off the leaderboard)
 // static/potion-throw.gif, Yasuro's (97 frames): someone runs in and throws
 // the bottle, which bursts over the screen. The sounds on its frames
@@ -134,13 +128,11 @@ function guessScreen() {
         viewer.destroy();
     }
     var view = {autoLoad: true};
-    if (s.effect == 'spin') {
-        // Dizziness: the view turns by itself, and the player cannot hold it
+    if (s.effect == 'nausea') {
+        // Nausea: the view turns by itself, and the player cannot hold it (the
+        // server shakes the pin); Pannellum turns it, no costly CSS motion
         view = {autoLoad: true, autoRotate: -9, draggable: false, mouseZoom: false, keyboardZoom: false,
                 disableKeyboardCtrl: true, showControls: false};
-    } else if (s.effect == 'tunnel') {
-        // Tunnel Vision: a third of the usual field, no zooming out
-        view = {autoLoad: true, hfov: 35, minHfov: 35, maxHfov: 35};
     }
     viewer = pannellum.viewer('game-panorama', panoramaConfig(s.url, view));
     if (map) {
@@ -174,7 +166,6 @@ function guessScreen() {
 function effects() {
     var e = s.effect, spent = s.time - s.time_left;
     $('#sv-effect').prop('hidden', !e).html(e ? potionIcon(e) + '<span>' + POTIONS[e][0] + '</span>' : '');
-    $('#game-panorama').toggleClass('nausea', e == 'nausea').toggleClass('mirror', e == 'mirror');
     clearTimeout(darkTimer);
     $('#sv-dark').prop('hidden', true);
     if (e == 'darkness') {
@@ -302,7 +293,7 @@ function resultScreen(before) {
         drop(L.marker(answer, {icon: pin(ANSWER, true), zIndexOffset: 1000}).addTo(scoreMap), true);
         var spots = [answer, L.latLng(answer.lat + r.safe, answer.lng + r.safe), L.latLng(answer.lat - r.safe, answer.lng - r.safe)];
         if (r.aim_x !== null && r.aim_x !== undefined) {
-            // Shaky Hands: where the pin was aimed, before it landed off
+            // Nausea: where the pin was aimed, before it landed off
             var aimed = blockSpot(r.aim_x, r.aim_z);
             L.circleMarker(aimed, {radius: 6, color: '#3f2724', weight: 2, fillColor: '#ffffff', fillOpacity: .8, interactive: false}).addTo(scoreMap);
             if (r.x !== null) {
