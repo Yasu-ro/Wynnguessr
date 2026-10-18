@@ -693,6 +693,35 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
 - Visiteurs : Cloudflare maintenant (fait), la base de données ensuite.
 - **Ordre validé** : 1. vitesse, 2. sécurité et modération, 3. Worlds,
   4. Duel.
+- **Phase 3, réponses de Yasuro (2026-10-18 au soir)** :
+  - Lancement : moitié des joueurs prêts (au moins 2) → compte à rebours de
+    15 s ; **anti-AFK** : « tout joueur qui n'a pas cliqué prêt et a loupé
+    la première partie doit être kick ».
+  - 16 joueurs par monde, et un **Quick Play** : « super duper easy » ; **un
+    salon toujours prêt** par type de partie : plein ou lancé, un autre
+    s'ouvre aussitôt.
+  - Menu Play : **Solo · Play Online · Custom** (« With Friends » devient
+    Custom).
+  - **Une carte par type de partie**, ordonnées et mises en avant par un
+    algorithme « super smart » : les plus jouées en haut, mais un nouveau
+    mode ne doit pas finir enterré en bas.
+  - **Choisir ses provinces : seulement en Custom.**
+  - Les cartes (mondes, choix des modes) sont de **vraies cartes à jouer,
+    « used but not to the extreme »**, après recherche (magie de Wynncraft,
+    humain contre IA). Recherche faite : couleurs des rangs d'objets de
+    Wynncraft (Wynntils `GearTier` : Unique jaune, Rare violet clair,
+    Legendary turquoise, Fabled rouge, Mythic violet foncé) ; tics « vibe
+    coded » (dégradés violets, ombres grises floues, cartes dans des
+    cartes, points qui ne disent rien, une couleur par bloc) ; Balatro
+    (rotation au hasard de quelques degrés, carte qui se lève et dont
+    l'ombre grandit) ; vraies cartes (index dans les coins depuis 1864,
+    rayon ≈ 5 % de la largeur, enseignes du bas imprimées à l'envers, usure
+    surtout aux coins tenus en main). Prototype dans le scratchpad
+    (`tools/cards.py`, `templates/cards.html`, section « Playing cards » de
+    `style.css`) : chaque carte veut dire son jeu (Survival Normal = 10 de
+    cœur, Hard = 5, Hardcore = As ; Classic = 5 de punaises ; Duel = 6
+    d'épées ; Solo = As de punaises avec notre logo, Online = Joker,
+    Custom = Roi). **Montré à Yasuro, en attente de son avis.**
 - **Sortie : tout d'un coup, en version 3.0.0** (Yasuro, 2026-10-18 : « I
   would rather push everything at once as a big 3.0.0 version ») : **plus
   aucune mise en prod partielle** ; le vrai site reste en 2.3 jusque-là.
