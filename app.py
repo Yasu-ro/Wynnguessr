@@ -1842,9 +1842,11 @@ with connect() as c:
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(survival_guesses)")]:
         c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_x REAL")
         c.execute("ALTER TABLE survival_guesses ADD COLUMN aim_z REAL")
-    # the milk buckets left, and the potion a bucket cancelled (with the result it was thrown at)
+    # the milk buckets left, and the potion a bucket cancelled (with the result it was thrown at).
+    # No bucket for the runs already there: on the live site none ever had milk
+    # (a default of MILK gave every run in progress two buckets, and their scores to the milk board)
     if 'milk' not in [col[1] for col in c.execute("PRAGMA table_info(survival_runs)")]:
-        c.execute(f"ALTER TABLE survival_runs ADD COLUMN milk INTEGER DEFAULT {MILK}")
+        c.execute("ALTER TABLE survival_runs ADD COLUMN milk INTEGER DEFAULT 0")
         c.execute("ALTER TABLE survival_guesses ADD COLUMN milked TEXT")
     # milk became an option (Yasuro: the runs with milk apart from the others,
     # on the leaderboard too): the run's choice, and the score's. Before, every
@@ -2244,6 +2246,9 @@ with connect() as c:
     # milk in the shop: an option of the room (off by default), with a leaderboard of its own
     if 'milk' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
         c.execute("ALTER TABLE rooms ADD COLUMN milk INTEGER DEFAULT 0")
+    # a Battle Royale room never started becomes a classic one: the mode is
+    # gone from the settings (its page would find no mode to show)
+    c.execute("UPDATE rooms SET mode = 'classic' WHERE mode = 'royale' AND state = 'waiting'")
     if 'ready' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
         c.execute("ALTER TABLE room_players ADD COLUMN ready INTEGER DEFAULT 0")
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(room_guesses)")]:

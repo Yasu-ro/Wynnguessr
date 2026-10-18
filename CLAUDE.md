@@ -1232,6 +1232,20 @@ git). Sauvegarde de la base juste avant :
 Le même jour, quelqu'un a sondé une injection HTML par `game?rounds=` :
 échappée par Jinja, et `rounds` est validé côté serveur (`SOLO_ROUNDS`).
 
+### Prochaine mise en prod (Survival à plusieurs)
+
+- **Piège évité** (2026-10-18, rejoué sur une copie de la base du vrai
+  site) : la colonne `survival_runs.milk` créée avec `DEFAULT 2` aurait
+  donné deux seaux aux 34 parties solo en cours du vrai site et rangé leurs
+  scores au classement « avec lait ». Défaut ramené à 0 (sans effet sur la
+  bêta, où la colonne existait déjà). Les salons Battle Royale jamais
+  lancés deviennent Classic (leur page ne trouvait plus le mode).
+- À faire : sauvegarde de la base, copier les nouveaux sons de la bêta
+  (`drink`, `trader`, `sold`, `refused`, `pickup`), fusion, `HUP`.
+- **Photos brouillard** : 0 sur 741 sur le vrai site le 2026-10-18 ; tant
+  que Yasuro n'a pas appuyé sur Push, Blindness n'y existe pas (ni tirée,
+  ni vendue) et les salons Survival y prennent tous les lieux.
+
 ### Où on en est (2026-10-17, fin de session)
 
 - Flux : mod → tri sur la bêta → Push. **2026-10-17 au soir, mis en prod**
