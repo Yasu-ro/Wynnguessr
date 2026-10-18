@@ -433,6 +433,69 @@ button, input {
     padding: 4px 16px;
     font-size: 15px;
 }
+/* a reported message among the ones around it, in a little chat of its own */
+.mod-reports {
+    display: grid;
+    gap: 14px;
+    max-width: 640px;
+    margin: 0 auto;
+}
+.mod-report {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: var(--paper-light);
+    border-radius: 4px;
+    box-shadow: 0 3px 0 rgba(63, 39, 36, .2);
+}
+.mod-report-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+    margin: 0;
+}
+.mod-report small, .mod-report-by {
+    margin: 0;
+    color: var(--ink-soft);
+}
+.mod-chat {
+    padding: 6px 10px;
+    background: var(--paper);
+    border-radius: 4px;
+    overflow-wrap: anywhere;
+}
+.mod-chat p {
+    margin: 2px 0;
+    padding: 2px 6px;
+}
+.mod-chat b {
+    margin-right: 6px;
+}
+.mod-chat .reported {
+    background: rgba(179, 48, 42, .14);
+    box-shadow: inset 3px 0 0 var(--red);
+}
+.mod-chat .gone {
+    color: var(--ink-soft);
+    text-decoration: line-through;
+}
+.mod-report .field.small {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 14px;
+}
+.mod-report > div:last-child {
+    display: flex;
+    gap: 8px;
+}
+.mod-report .btn {
+    min-height: 36px;
+    padding: 4px 16px;
+    font-size: 15px;
+}
 .account-waiting {
     display: flex;
     align-items: center;
@@ -2366,6 +2429,41 @@ body.room-playing {
 .room-chat-log b {
     margin-right: 6px;
     white-space: nowrap;
+}
+/* someone else's message opens a row: Report, Ignore, (staff) Hide */
+.room-chat-log p.theirs {
+    margin-inline: -4px;
+    padding-inline: 4px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.room-chat-log p.theirs:hover {
+    background: rgba(63, 39, 36, .08);
+}
+.chat-tools {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px 17px;
+    font-size: 14px;
+}
+.chat-tools .room-tool {
+    height: 24px;
+    font-size: 12px;
+}
+.room-chat-log .chat-note {
+    display: block;
+    color: var(--ink-soft);
+}
+.chat-note button {
+    padding: 0;
+    font: inherit;
+    font-weight: 700;
+    color: var(--ink);
+    text-decoration: underline;
+    background: none;
+    border: 0;
+    cursor: pointer;
 }
 .room-chat-form {
     display: flex;

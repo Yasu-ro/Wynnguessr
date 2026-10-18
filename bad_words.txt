@@ -1,0 +1,91 @@
+# The word filter of the chat (app.py, "Moderation: the chat"): what it
+# masks as ****. One a line:
+#   word     the word alone (ass, not class or assassin)
+#   word*    the word and what follows it (fuck: fucking, fucker)
+#   *word*   anywhere inside a word (motherfucker)
+# Each letter may be repeated (fuuuck), written in digits or signs (sh1t,
+# @ss) or split by dots, dashes or underscores (f.u.c.k). Mild words (damn,
+# hell, crap) are left alone. Lower case only.
+
+# insults and swearing
+*fuck*
+fuk*
+fck*
+shit*
+bullshit
+dipshit
+horseshit
+cunt*
+bitch*
+ass
+arse
+asshole*
+arsehole*
+dumbass
+jackass
+dick
+dickhead*
+cock
+cocksucker*
+pussy
+bastard*
+whore*
+slut*
+wank*
+twat*
+prick
+motherfucker*
+
+# sexual
+porn*
+dildo*
+cum
+blowjob*
+handjob*
+rape
+raped
+raping
+rapist*
+
+# slurs and hate
+nigger*
+nigga*
+faggot*
+fag
+fags
+retard*
+tranny*
+trannies
+spic
+spics
+chink
+chinks
+kike
+kikes
+gook*
+wetback*
+coon
+coons
+dyke*
+paki
+pakis
+heil hitler
+sieg heil
+
+# telling someone to die
+kys
+kill yourself
+kill urself
+kill your self
+
+# French
+encul*
+salope*
+pute
+putes
+putain*
+connard*
+connasse*
+fdp
+ntm
+nique*

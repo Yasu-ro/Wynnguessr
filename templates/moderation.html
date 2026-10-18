@@ -6,8 +6,12 @@
     <h1 class="sign">Moderation</h1>
     <p class="mod-you">You are <span class="rank-tag rank-{{ rank }}">{{ RANKS[rank] }}</span></p>
     <div class="tabs mod-tabs" id="mod-tabs">
+        {% if may.reports %}
+        <input type="radio" name="mod-tab" id="tab-reports" value="reports"{% if first == 'reports' %} checked{% endif %}>
+        <label for="tab-reports" class="tab">Reports</label>
+        {% endif %}
         {% if may.pictures %}
-        <input type="radio" name="mod-tab" id="tab-photos" value="photos" checked>
+        <input type="radio" name="mod-tab" id="tab-photos" value="photos"{% if first == 'photos' %} checked{% endif %}>
         <label for="tab-photos" class="tab">Photos</label>
         {% endif %}
         <input type="radio" name="mod-tab" id="tab-staff" value="staff"{% if not may.pictures %} checked{% endif %}>
@@ -22,8 +26,15 @@
         {% endif %}
     </div>
 
+    {% if may.reports %}
+    <section class="mod-pane" id="pane-reports"{% if first != 'reports' %} hidden{% endif %}>
+        <div class="mod-reports" id="report-list"></div>
+        <p class="hint" id="report-empty" hidden>Nothing reported. In a room, a player clicks a message in the chat to report it.</p>
+    </section>
+    {% endif %}
+
     {% if may.pictures %}
-    <section class="mod-pane" id="pane-photos">
+    <section class="mod-pane" id="pane-photos"{% if first != 'photos' %} hidden{% endif %}>
         <div class="mod-photos" id="photo-list"></div>
         <p class="hint" id="photo-empty" hidden>Nothing to look at. A picture a player sends waits here before anyone else sees it.</p>
     </section>

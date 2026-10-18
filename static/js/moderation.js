@@ -28,6 +28,9 @@ $(function () {
         if (tab == 'photos') {
             photos();
         }
+        if (tab == 'reports') {
+            reports();
+        }
     });
 
     // ---------- the team ----------
@@ -105,6 +108,34 @@ $(function () {
         var card = $(this).closest('.mod-photo');
         card.find('button').prop('disabled', true);
         $.post('api/mod/picture', {id: card.data('id'), 'do': $(this).data('photo'), reason: card.find('input').val()}).always(photos);
+    });
+
+    // ---------- reports ----------
+    // a reported message among the ones around it (what was typed, before
+    // the filter): hide it for everyone, or close the report
+    function reports() {
+        $.getJSON('api/mod/reports').done(function (r) {
+            $('#report-list').html(r.reports.map(function (x) {
+                var by = x.by.length > 3 ? x.by.slice(0, 3).join(', ') + ' and ' + (x.by.length - 3) + ' more' : x.by.join(', ');
+                return "<div class='mod-report' data-id='" + x.id + "'><p class='mod-report-head'>" +
+                    (x.author.guest ? '<span><b>' + esc(x.author.name) + '</b> <small>(guest)</small></span>'
+                                    : "<a class='board-name' href='player?id=" + x.author.id + "'>" + esc(x.author.name) + '</a>') +
+                    '<small>Room ' + esc(x.room) + ' · ' + when(x.at) + '</small></p>' +
+                    "<div class='mod-chat'>" + x.around.map(function (m) {
+                        return '<p' + (m.id == x.id ? " class='reported'" : m.hidden ? " class='gone'" : '') + '><b>' + esc(m.name) + '</b><span>' + esc(m.text) + '</span></p>';
+                    }).join('') + '</div>' +
+                    "<p class='mod-report-by'>Reported by " + esc(by) + '</p>' +
+                    "<input class='field small' placeholder='Why (kept in the log)' aria-label='Why' maxlength='200'>" +
+                    "<div><button type='button' class='btn red' data-report='hide'>Hide It</button>" +
+                    "<button type='button' class='btn wood' data-report='dismiss'>Dismiss</button></div></div>";
+            }).join(''));
+            $('#report-empty').prop('hidden', r.reports.length > 0);
+        });
+    }
+    $('#report-list').on('click', '[data-report]', function () {
+        var card = $(this).closest('.mod-report'), what = $(this).data('report');
+        card.find('button').prop('disabled', true);
+        $.post(what == 'hide' ? 'api/mod/hide' : 'api/mod/report', {id: card.data('id'), 'do': what, reason: card.find('input').val()}).always(reports);
     });
 
     // ---------- tags ----------
@@ -185,7 +216,7 @@ $(function () {
         $.getJSON('api/mod/log', more && oldest ? {before: oldest} : {}).done(function (r) {
             var html = r.log.map(function (e) {
                 // the reason under what was done, on every screen: it is the point of a log
-                var what = '<b>' + esc(e.target || '(gone)') + '</b> ' + esc(e.details || WORDS[e.action] || e.action) +
+                var what = (e.tid ? '<b>' + esc(e.target || '(gone)') + '</b> ' : '') + esc(e.details || WORDS[e.action] || e.action) +
                     (e.reason ? "<small class='mod-why'>" + esc(e.reason) + '</small>' : '');
                 return "<tr class='leaderboard-row'><td class='mod-when'>" + when(e.at) + '</td><td>' + esc(e.by) + '</td><td>' + what + '</td></tr>';
             }).join('');
@@ -202,5 +233,8 @@ $(function () {
     staff();
     if ($('#pane-photos').length) {
         photos();
+    }
+    if ($('#pane-reports').length) {
+        reports();
     }
 });

@@ -113,7 +113,7 @@ function render(data) {
     }
     s = data;
     if (s.next_url) preload(s.next_url);
-    chat(s.chat);
+    chat(s.chat, s.hidden);
     arrivals();
     if (s.next && s.live && s.state == 'finished') {
         leaving = true;
@@ -303,19 +303,31 @@ function chatPlace() {
 var bubbleAt = 0;         // the last chat sound: one every 2 seconds at most
 var chatSeen = false;     // the messages already there when the page opened make no sound
 
-function chat(messages) {
+function chat(messages, hidden) {
     var log = $('#chat-log'), theirs = false;
     (messages || []).forEach(function (m) {
         if (m.id <= chatId) {
             return;
         }
         chatId = m.id;
-        log.append("<p>" + dot(m) + "<b>" + esc(m.name) + tagHtml(m.tag) + "</b><span>" + esc(m.text) + "</span></p>");
-        theirs = theirs || m.name != me().name;
-        if ($('#room-chat').hasClass('folded') && m.name != me().name) {
-            unread++;
+        // the name is kept with .data, never written into an attribute: a guest picks it
+        var line = $("<p>" + dot(m) + "<b>" + esc(m.name) + tagHtml(m.tag) + "</b><span>" + esc(m.text) + "</span></p>")
+            .data({id: m.id, name: m.name, hide: !!m.hide}).appendTo(log);
+        if (m.name != me().name) {
+            line.addClass('theirs');
+            theirs = true;
+            if ($('#room-chat').hasClass('folded')) {
+                unread++;
+            }
         }
     });
+    // hidden by the staff after this page showed them
+    if (hidden && hidden.length) {
+        log.children('p').filter(function () { return hidden.indexOf($(this).data('id')) >= 0; }).each(function () {
+            $(this).next('.chat-tools').remove();
+            $(this).remove();
+        });
+    }
     log.children().slice(0, -100).remove();
     // follow the conversation, unless the player scrolled up to read
     chatPlace();
@@ -341,6 +353,55 @@ $('#chat-form').on('submit', function (e) {
         }
     }).fail(function () { input.val(text); });
 });
+
+// a message of someone else, clicked: report it, ignore who wrote it (for
+// this player only, in every room), or, for the staff above them, hide it
+$('#chat-log').on('click', 'p.theirs', function () {
+    var line = $(this), open = line.next('.chat-tools').length;
+    $('#chat-log .chat-tools').remove();
+    if (!open) {
+        line.after("<div class='chat-tools'><button type='button' class='room-tool' data-chat='report'>Report</button>" +
+            "<button type='button' class='room-tool' data-chat='ignore'>Ignore</button>" +
+            (line.data('hide') ? "<button type='button' class='room-tool armed' data-chat='hide'>Hide</button>" : '') + '</div>');
+        if (!line.next().next().length) {
+            chatStick = true;
+            chatPlace();
+        }
+    }
+}).on('click', '[data-chat]', function () {
+    var tools = $(this).parent(), line = tools.prev(), what = $(this).data('chat');
+    tools.find('button').prop('disabled', true);
+    if (what == 'report') {
+        send('report', {id: line.data('id')}).done(function (r) {
+            tools.html('<span>' + esc(r.success ? 'Reported. Thank you!' : r.error || 'This message is gone') + '</span>');
+            setTimeout(function () { tools.remove(); }, 2500);
+        });
+    } else if (what == 'ignore') {
+        send('ignore', {id: line.data('id')}).done(function (r) {
+            if (r.success) {
+                tools.remove();
+                $('#chat-log p.theirs').filter(function () { return $(this).data('name') == r.name; }).remove();
+                $("<p class='chat-note'>You ignore " + esc(r.name) + ". <button type='button'>Undo</button></p>")
+                    .data('uid', r.uid).appendTo('#chat-log');
+                chatPlace();
+            }
+        });
+    } else {
+        $.post('api/mod/hide', {id: line.data('id')}).done(function () {
+            tools.remove();
+            line.remove();
+        });
+    }
+}).on('click', '.chat-note button', function () {
+    var note = $(this).parent();
+    hearAgain(note.data('uid'));
+    note.remove();
+});
+
+// their next messages show again (the ones missed meanwhile stay missed)
+function hearAgain(uid) {
+    send('ignore', {undo: 1, uid: uid});
+}
 
 // in game the chat can be folded away; its title then counts what was missed
 $('.room-chat-head').on('click', function (e) {
@@ -410,13 +471,15 @@ function lobby() {
         show('lobby');
     }
     $('#lobby-players').html(s.players.map(function (p) {
+        // someone this player ignores: one click to see their messages again;
         // the host can hand the room over, or kick (a second click confirms)
-        var tools = s.host && !p.you ? "<span class='room-tools'>" +
+        var tools = (p.ignored ? "<button type='button' class='room-tool' data-unignore='" + p.uid + "' title='Ignored: click to see their messages again'><i class='material-icons'>speaker_notes_off</i></button>" : '') +
+            (s.host && !p.you ?
             (p.here ? "<button type='button' class='room-tool' data-host='" + p.uid + "' title='Make host'><i class='material-icons'>star_border</i></button>" : '') +
             (kickArmed == p.uid && Date.now() - kickAt < KICK_ARMED
                 ? "<button type='button' class='room-tool armed' data-kick='" + p.uid + "'>Kick?</button>"
-                : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") +
-            "</span>" : '';
+                : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") : '');
+        tools = tools ? "<span class='room-tools'>" + tools + '</span>' : '';
         return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) + tagHtml(p.tag) +
             (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + tools + "</div>";
     }).join(''));
@@ -437,7 +500,9 @@ function lobby() {
 var KICK_ARMED = 3000;     // ms the "Kick?" button waits for the second click
 var kickArmed = null, kickAt = 0;
 
-$('#lobby-players').on('click', '[data-host]', function () {
+$('#lobby-players').on('click', '[data-unignore]', function () {
+    hearAgain($(this).data('unignore'));
+}).on('click', '[data-host]', function () {
     send('host', {uid: $(this).data('host')});
 }).on('click', '[data-kick]', function () {
     var uid = $(this).data('kick');

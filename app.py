@@ -1222,17 +1222,28 @@ def room_state(code):
         tags = tag_of(c, [p['uid'] for p in players])
         for p in out['players']:
             p['tag'] = tags.get(p['uid'])
-        # chat: the messages the page has not seen yet (it says which was its last)
+        # chat: the messages the page has not seen yet (it says which was its last),
+        # but none the staff hid, and none of the players this one ignores
         colors = {p['uid']: p['color'] for p in out['players']}
         since = request.args.get('chat', '')
+        ignored = {i[0] for i in c.execute("SELECT target FROM ignores WHERE user_id = ?", (me['user_id'],))}
         out['chat'] = [dict(m, color = colors.get(m['uid'], 0)) for m in reversed(c.execute(
             '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text FROM room_chat m JOIN users u ON u.id = m.user_id
-            WHERE m.code = ? AND m.id > ? ORDER BY m.id DESC LIMIT 50''',
-            (r['code'], int(since) if since.isnumeric() else 0)).fetchall())]
-        # players keep their id: the host's tools (make host, kick) name them by it
+            WHERE m.code = ? AND m.id > ? AND m.hidden_by IS NULL ORDER BY m.id DESC LIMIT 50''',
+            (r['code'], int(since) if since.isnumeric() else 0)).fetchall()) if m['uid'] not in ignored]
+        # players keep their id: the host's tools (make host, kick) name them by it;
+        # a message does not, but the staff learns which ones it may hide
+        rank = my_rank(c)
         for p in out['chat']:
             p['tag'] = tags.get(p['uid']) or tag_of(c, [p['uid']]).get(p['uid'])
+            if rank >= MAY['hide'] and rank_of(c, p['uid']) < rank:
+                p['hide'] = True
             del p['uid']
+        # hidden after the page showed them: it takes them away
+        out['hidden'] = [m[0] for m in c.execute("SELECT id FROM room_chat WHERE code = ? AND hidden_by IS NOT NULL", (r['code'],))]
+        for p in out['players']:
+            if p['uid'] in ignored:
+                p['ignored'] = True
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
         if r['mode'] == 'survival':
@@ -1276,8 +1287,41 @@ def room_chat(code):
         last = c.execute("SELECT MAX(at) FROM room_chat WHERE code = ? AND user_id = ?", (r['code'], me['user_id'])).fetchone()[0]
         if last and time.time() - last < 0.7:
             return jsonify({"success": False, "error": "Slow down a little"})
-        c.execute("INSERT INTO room_chat (code, user_id, at, text) VALUES (?, ?, ?, ?)", (r['code'], me['user_id'], time.time(), text))
+        shown = filtered(text)
+        c.execute("INSERT INTO room_chat (code, user_id, at, text, raw) VALUES (?, ?, ?, ?, ?)",
+                  (r['code'], me['user_id'], time.time(), shown, text if shown != text else None))
     return jsonify({"success": True})
+
+@app.route("/api/room/<code>/report", methods=['POST'])
+def room_report(code):
+    # a player reports a message of someone else: it waits in Moderation
+    mid = request.form.get('id', type = int)
+    with room_tx() as c:
+        r, me = member(c, code)
+        m = r and c.execute("SELECT user_id FROM room_chat WHERE id = ? AND code = ? AND hidden_by IS NULL", (mid, r['code'])).fetchone()
+        if not m or m['user_id'] == me['user_id']:
+            return jsonify({"success": False})
+        if c.execute("SELECT COUNT(*) FROM chat_reports WHERE by = ? AND at > ?", (me['user_id'], time.time() - 600)).fetchone()[0] >= REPORTS_MAX:
+            return jsonify({"success": False, "error": "That's a lot of reports! The staff is on it"})
+        c.execute("INSERT OR IGNORE INTO chat_reports (message, by, at) VALUES (?, ?, ?)", (mid, me['user_id'], time.time()))
+    return jsonify({"success": True})
+
+@app.route("/api/room/<code>/ignore", methods=['POST'])
+def room_ignore(code):
+    # stop seeing someone's messages, in every room (undo: see them again)
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r:
+            return jsonify({"success": False})
+        if request.form.get('undo'):
+            c.execute("DELETE FROM ignores WHERE user_id = ? AND target = ?", (me['user_id'], request.form.get('uid', type = int)))
+            return jsonify({"success": True})
+        m = c.execute("SELECT m.user_id, u.username FROM room_chat m JOIN users u ON u.id = m.user_id WHERE m.id = ? AND m.code = ?",
+                      (request.form.get('id', type = int), r['code'])).fetchone()
+        if not m or m['user_id'] == me['user_id']:
+            return jsonify({"success": False})
+        c.execute("INSERT OR IGNORE INTO ignores (user_id, target, at) VALUES (?, ?, ?)", (me['user_id'], m['user_id'], time.time()))
+    return jsonify({"success": True, "uid": m['user_id'], "name": m['username']})
 
 @app.route("/api/room/<code>/settings", methods=['POST'])
 def room_set(code):
@@ -2915,16 +2959,17 @@ def staff_menu():
             return my_rank(c)
     def waiting():
         with connect() as c:
-            return len(pictures_waiting(c))
+            return len(pictures_waiting(c)) + len(reports_waiting(c))
     return {'my_rank': rank, 'RANKS': RANKS, 'mod_waiting': waiting}
 
 @app.route("/moderation")
 def moderation():
     with connect() as c:
         r = my_rank(c)
+        first = 'photos' if r and not reports_waiting(c) and pictures_waiting(c) else 'reports'
     if not r:
         return render_template('apology.html', message = "This page is for the moderation team"), 403
-    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()})
+    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()}, first = first)
 
 @app.route("/api/mod/staff")
 def mod_staff():
@@ -3073,10 +3118,107 @@ def mod_log_list():
         if not may(c, 'log'):
             return jsonify({"success": False}), 403
         before = request.args.get('before', type = int) or 2 ** 62
-        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, a.username AS by, t.username AS target
+        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, a.username AS by, m.target AS tid, t.username AS target
             FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
             WHERE m.id < ? ORDER BY m.id DESC LIMIT 50''', (before,))]
     return jsonify({"success": True, "log": rows})
+
+# ---------- Moderation: the chat ----------
+# Minecraft's way (chat reports, 1.19.1): a player reports a message, and the
+# staff reads it among the messages around it. Each player may also ignore
+# someone (Wynncraft's /ignore): their messages stop, for that player only,
+# in every room, until undone from the player list. A word filter masks
+# insults and slurs with stars, as Minecraft servers do; what was typed stays
+# for the staff, who may hide a message for everyone (kept, and in the log).
+
+REPORTS_MAX = 10          # reports a player may send in 10 minutes
+LEET = {'a': 'a4@', 'b': 'b8', 'e': 'e3', 'g': 'g9', 'i': 'i1!|', 'l': 'l1|', 'o': 'o0', 's': 's5$', 't': 't7', 'u': 'uv'}
+
+with connect() as c:
+    if 'raw' not in [col[1] for col in c.execute("PRAGMA table_info(room_chat)")]:
+        c.execute("ALTER TABLE room_chat ADD COLUMN raw TEXT")     # what was typed, when the filter changed it
+        c.execute("ALTER TABLE room_chat ADD COLUMN hidden_by INTEGER")
+        c.execute("ALTER TABLE room_chat ADD COLUMN hidden_at REAL")
+    c.executescript('''
+        CREATE INDEX IF NOT EXISTS room_chat_code ON room_chat (code, id);
+        CREATE TABLE IF NOT EXISTS chat_reports (message INTEGER, by INTEGER, at REAL, done INTEGER DEFAULT 0,
+            PRIMARY KEY (message, by));
+        CREATE TABLE IF NOT EXISTS ignores (user_id INTEGER, target INTEGER, at REAL, PRIMARY KEY (user_id, target));
+    ''')
+
+def word_filter():
+    # bad_words.txt, one regex: each letter repeated, in digits or signs, split by . - _
+    words = []
+    with open('bad_words.txt', encoding = 'utf-8') as f:
+        for line in f:
+            w = line.split('#')[0].strip().lower()
+            if w:
+                body = '[._-]*'.join(r'\s+' if ch == ' ' else '[%s]+' % re.escape(LEET.get(ch, ch)) for ch in w.strip('*'))
+                words.append(('(?:[a-z][._-]?)*' if w.startswith('*') else r'(?<![a-z0-9@$])') + body +
+                             ('(?:[._-]?[a-z])*' if w.endswith('*') else r'(?![a-z0-9])'))
+    return re.compile('|'.join(words), re.IGNORECASE)
+
+BAD_WORDS = word_filter()
+
+def filtered(text):
+    return BAD_WORDS.sub(lambda m: '*' * len(m.group()), text)
+
+def reports_waiting(c):
+    # the reported messages this staff member may act on (written below them), oldest first
+    r = my_rank(c)
+    if r < MAY['reports']:
+        return []
+    return [dict(x) for x in c.execute('''SELECT m.id, m.code, m.user_id AS uid, m.at, COALESCE(m.raw, m.text) AS text, MIN(cr.at) AS first
+        FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE cr.done = 0 AND m.hidden_by IS NULL
+        GROUP BY m.id ORDER BY first''') if rank_of(c, x['uid']) < r]
+
+@app.route("/api/mod/reports")
+def mod_reports():
+    with connect() as c:
+        if not may(c, 'reports'):
+            return jsonify({"success": False}), 403
+        out = []
+        for x in reports_waiting(c):
+            # the messages around it, as Minecraft sends them with a report
+            around = c.execute("SELECT id, user_id, COALESCE(raw, text) AS text, hidden_by FROM room_chat WHERE code = ? AND id < ? ORDER BY id DESC LIMIT 3",
+                               (x['code'], x['id'])).fetchall()[::-1] + c.execute(
+                "SELECT id, user_id, COALESCE(raw, text) AS text, hidden_by FROM room_chat WHERE code = ? AND id >= ? ORDER BY id LIMIT 4",
+                (x['code'], x['id'])).fetchall()
+            users = {u['id']: u for u in c.execute(f"SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE id IN ({','.join('?' * len(around))})",
+                                                   [m['user_id'] for m in around])}
+            by = [b[0] for b in c.execute("SELECT u.username FROM chat_reports cr JOIN users u ON u.id = cr.by WHERE cr.message = ? AND cr.done = 0 ORDER BY cr.at", (x['id'],))]
+            author = users.get(x['uid'])
+            out.append({"id": x['id'], "room": x['code'], "at": x['at'], "by": by,
+                        "author": {"id": x['uid'], "name": author['username'] if author else '?', "guest": bool(author and author['guest'])},
+                        "around": [{"id": m['id'], "name": users[m['user_id']]['username'] if m['user_id'] in users else '?',
+                                    "text": m['text'], "hidden": m['hidden_by'] is not None} for m in around]})
+    return jsonify({"success": True, "reports": out})
+
+@app.route("/api/mod/hide", methods=['POST'])
+def mod_hide():
+    # hide a message for everyone (from the chat, or a report): kept, and in the log
+    mid, reason = request.form.get('id', type = int), request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        m = c.execute("SELECT * FROM room_chat WHERE id = ?", (mid,)).fetchone()
+        if not m or not may(c, 'hide', m['user_id']):
+            return jsonify({"success": False}), 403
+        if m['hidden_by'] is None:
+            c.execute("UPDATE room_chat SET hidden_by = ?, hidden_at = ? WHERE id = ?", (session['user_id'], time.time(), mid))
+            c.execute("UPDATE chat_reports SET done = 1 WHERE message = ?", (mid,))
+            logged(c, 'hide', m['user_id'], 'message hidden: "%s"' % (m['raw'] or m['text']), reason)
+    return jsonify({"success": True})
+
+@app.route("/api/mod/report", methods=['POST'])
+def mod_report():
+    # nothing wrong with it: the report is closed, the message stays
+    mid, reason = request.form.get('id', type = int), request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        m = c.execute("SELECT * FROM room_chat WHERE id = ?", (mid,)).fetchone()
+        if not m or not may(c, 'reports', m['user_id']) or request.form.get('do') != 'dismiss':
+            return jsonify({"success": False}), 403
+        if c.execute("UPDATE chat_reports SET done = 1 WHERE message = ? AND done = 0", (mid,)).rowcount:
+            logged(c, 'report', m['user_id'], 'report dismissed: "%s"' % (m['raw'] or m['text']), reason)
+    return jsonify({"success": True})
 
 fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)
 

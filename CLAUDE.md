@@ -752,10 +752,48 @@ max), journal d'audit avec la raison. D'où :
   Retirer une photo depuis un profil passe par le même pouvoir (`pictures`,
   Helper) et va au journal ; `ADMINS` n'existe plus. Les photos déjà en
   place avant restent. Tests : `t_pictures.py` (17), `t_photos_page.py`.
-- **À venir** (étapes suivantes) : signaler et couper (chat), cacher un
-  message, sourdine/ban/renommer (avec bannissement de la connexion pour les
-  invités), filtre des pseudos et des mots, passe de sécurité.
-  `REVIEWERS` (tri des lieux) reste à part pour l'instant.
+- **Chat** (étape 3, 2026-10-18) — section « Moderation: the chat »
+  d'`app.py`. Recherche : le signalement de Minecraft (1.19.1) part d'un
+  message, et le serveur joint les messages autour ; les serveurs Minecraft
+  masquent les gros mots par des étoiles ; Wynncraft a `/ignore`. D'où :
+  - **Clic sur le message d'un autre** → une rangée **Report** · **Ignore**
+    (+ **Hide** pour l'équipe au-dessus de son auteur). Rien sur ses propres
+    messages.
+  - **Report** : invités compris, une fois par message, 10 en 10 min au plus
+    (`REPORTS_MAX`). Onglet **Reports** de Moderation (premier onglet, ouvert
+    d'office sauf s'il n'y a que des photos ; compté dans le badge du
+    menu) : le message **tel que tapé**, avec les 3 d'avant et d'après, qui
+    l'a signalé ; **Hide It** ou **Dismiss**, raison au journal. Règle
+    d'en dessous : un signalement visant un Moderator n'apparaît qu'aux
+    rangs au-dessus.
+  - **Ignore** (le mot de Wynncraft ; « Mute » reste pour la sanction de
+    l'équipe, étape 4) : pour ce joueur seulement, **dans tous les salons**
+    (table `ignores`), ses messages disparaissent ; une note « You ignore X.
+    Undo », et une icône dans la liste des joueurs du salon pour revenir.
+    Les messages manqués entre-temps ne reviennent pas (pas de rechargement
+    du chat : course possible avec le poll).
+  - **Hide** : le message disparaît pour tous (`room_chat.hidden_by`, le
+    poll envoie `hidden`, les pages l'enlèvent), jamais effacé, signalements
+    fermés, journal.
+  - **Filtre** : `bad_words.txt` (dans git, à la racine, format expliqué en
+    tête), une seule regex : chaque lettre répétée, en chiffres ou signes
+    (`sh1t`, `@ss`), coupée par `. - _` ; mot seul, mot+suite, ou n'importe
+    où dans un mot. Masque en `****` à l'envoi, l'original dans
+    `room_chat.raw` pour l'équipe. Insultes, sexuel, injures racistes et
+    homophobes, « kys », un peu de français ; **les mots légers (damn, hell,
+    crap) restent**. Vérifié contre Scunthorpe, class, assassin, cocktail,
+    Dickens, grape, snigger… Limite connue : « shiitake » est masqué (les
+    lettres répétées de « shit »).
+  - Le poll de salon a maintenant un index (`room_chat_code`).
+  - Tests : `t_chatmod.py` (33), `t_chat_page.py` (navigateur, 13 × 2).
+  - **Piège de test payé** : SQLite redonne le plus grand id effacé ;
+    `clean_zz.py` effaçait les comptes `zz_` mais pas leurs signalements, et
+    le compte suivant héritait de 10 signalements (limite atteinte). Toute
+    table rangée par id de joueur doit être nettoyée avec lui.
+- **À venir** (étapes suivantes) : sourdine/ban/renommer (avec
+  bannissement de la connexion pour les invités), filtre des pseudos (même
+  `bad_words.txt`) et noms réservés, passe de sécurité. `REVIEWERS` (tri
+  des lieux) reste à part pour l'instant.
 
 **Phase 1, vitesse (2026-10-18, bêta)** — fait :
 - **La carte en tuiles** (`tools/map_tiles.py` → `static/map-2026/<z>/<x>_<y>.webp`,
