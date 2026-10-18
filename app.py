@@ -178,6 +178,12 @@ def play():
 def leaderboard():
     return render_template('leaderboard.html')
 
+DISCORD = 'https://discord.gg/fMqQ2p5mZr'
+
+@app.route("/about")
+def about():
+    return render_template('about.html', discord = DISCORD)
+
 @app.route("/game", methods=['POST', 'GET'])
 def game():
     # the mode page sends its settings in the address, so "Play Again" is a plain reload

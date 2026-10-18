@@ -792,6 +792,9 @@ fan, sans rien voler).
   pour ne pas la compter deux fois). Volontairement différent du classement.
 - `leaderboard` : onglets Classic/Survival (filtres, meilleure partie par
   joueur) et Levels/Wins (voir « Niveaux ») ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
+- `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet
+  (`DISCORD` dans `app.py`). Le texte reprend les mots de Yasuro (« garder ma
+  touche ») ; ne rien y ajouter sans lui demander.
 - Pied de page hors jeu (`footer.html`) : Made by Ched3, Hosted & modified
   by Yasuro, Wynncraft, Fan-made, not official (séparés par l'espace, plus par
   des points médians).

@@ -277,6 +277,13 @@ button, input {
     background: radial-gradient(circle, var(--ring) 0 3.5px, transparent 4.5px) center bottom / 12px 12px no-repeat,
                 linear-gradient(var(--line), var(--line)) center bottom 5px / 100% 2px no-repeat;
 }
+.about p {
+    margin: 0 0 14px;
+    text-align: center;
+}
+.about .btn {
+    margin-top: 22px;
+}
 .section-title {
     margin: 0 0 12px;
     font: 700 22px/1.2 var(--sans);

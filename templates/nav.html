@@ -3,6 +3,7 @@
         <a class="nav-btn" href="./"{% if request.path == '/' %} aria-current="page"{% endif %}><i class="material-icons">home</i><span>Home</span></a>
         <a class="nav-btn" href="mode"{% if request.path == '/mode' %} aria-current="page"{% endif %}><i class="material-icons">play_arrow</i><span>Play</span></a>
         <a class="nav-btn" href="leaderboard"{% if request.path == '/leaderboard' %} aria-current="page"{% endif %}><i class="material-icons">leaderboard</i><span>Leaderboard</span></a>
+        <a class="nav-btn" href="about"{% if request.path == '/about' %} aria-current="page"{% endif %}><i class="material-icons">info</i><span>About</span></a>
         <span class="nav-gap"></span>
         {% if session['loggedin'] %}
         {% set me = my_progress() %}
