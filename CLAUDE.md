@@ -682,6 +682,14 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
 - **Avant de grossir les salons** : rendre le site plus rapide (des joueurs
   se plaignent du chargement) et plus sûr, **sans rien casser**.
 - Visiteurs : Cloudflare maintenant (fait), la base de données ensuite.
+- **Ordre validé** : 1. vitesse, 2. sécurité et modération, 3. Worlds,
+  4. Duel.
+- **Modération** : une **page à part** pour les modérateurs, à côté du bouton
+  Profile, avec tout ce qu'il faut pour ajouter des modérateurs et modérer.
+  **Des rangs** (admin, mod…) aux pouvoirs différents **les uns sur les
+  autres** : personne ne peut tout effacer parce qu'il a le rang le plus
+  haut. Yasuro en premier, il ajoutera les autres.
+- **Photos de profil : approuvées par un modérateur avant d'être visibles.**
 
 Mesures du 2026-10-18 pour la vitesse : la carte `map-2026.webp` pèse
 **8,7 Mo** (chargée avant la première partie) ; un lieu, ~4,6 Mo pour le
