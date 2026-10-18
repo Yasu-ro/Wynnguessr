@@ -101,13 +101,17 @@ def adopt(c, uid):
         return
     for p in c.execute("""SELECT * FROM room_players WHERE user_id = ?
             AND code NOT IN (SELECT code FROM room_players WHERE user_id = ?)""", (old, uid)).fetchall():
-        for table in ('room_players', 'room_guesses', 'room_chat'):
+        for table in ('room_players', 'room_guesses', 'room_chat', 'room_milk'):
             c.execute(f"UPDATE {table} SET user_id = ? WHERE code = ? AND user_id = ?", (uid, p['code'], old))
+        for column in ('buyer', 'target'):
+            c.execute(f"UPDATE room_shop SET {column} = ? WHERE code = ? AND {column} = ?", (uid, p['code'], old))
         c.execute("UPDATE rooms SET host_id = ? WHERE code = ? AND host_id = ?", (uid, p['code'], old))
         r = find_room(c, p['code'])
         done = c.execute("SELECT COUNT(*) FROM room_guesses WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()[0]
         if r['state'] == 'finished' and r['mode'] == 'classic' and (p['live'] or done == r['rounds']):
             record(c, r, uid)
+        elif r['state'] == 'finished' and r['mode'] == 'survival':
+            survival_room_record(c, r, uid)
 
 def board(c, form, user_id = None):
     # the games played with exactly the settings of the filters, best first
@@ -727,16 +731,18 @@ def apology():
 # A room is a fixed list of locations, played live by everyone who joins before
 # the end: same round at the same time, the round closes once all have guessed
 # (or the clock runs out) and the next one starts by itself after the reveal.
-# Three modes: classic (most points after N rounds), duel (health points, the
-# gap to the round's best guess hurts, more and more each round) and royale
-# (lives: the worst guess of a round loses one, a bullseye wins one back).
+# Modes: classic (most points after N rounds), duel (health points, the
+# gap to the round's best guess hurts, more and more each round), survival
+# (the solo rules together, plus a shop: see "Survival with friends") and,
+# replaced by survival but still replayed for the games played with it,
+# royale (lives: the worst guess of a round loses one, a bullseye wins one back).
 # Anyone opening a finished classic room plays the same locations alone and
 # lands in the same ranking. Rooms only move forward when someone asks: every
 # room request first runs tick().
 
 PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
 ROUNDS = ['3', '5', '10', '25']
-MODES = ['classic', 'duel', 'royale']
+MODES = ['classic', 'duel', 'royale', 'survival']
 LAST_CALL = 15   # once someone guessed, the others have this long
 REVEAL = 10      # the answer stays on screen this long before the next round
 AWAY = 10        # a page that stopped polling this long is not waited for
@@ -804,7 +810,13 @@ def room_settings(form):
     # the same choices as the mode page; returns (settings, error)
     mode = form.get('mode', 'classic')
     if mode not in MODES:
-        return None, "Survival is played solo" if mode == 'survival' else "Unknown game mode"
+        return None, "Unknown game mode"
+    if mode == 'survival':
+        # as alone: every province, the view free, the clock of the difficulty
+        if form.get('difficulty') not in DIFFICULTIES:
+            return None, "Unknown difficulty"
+        return {'mode': mode, 'provinces': PROVINCES, 'rounds': SURVIVAL_ROUNDS, 'time_limit': -1, 'look': 0,
+                'difficulty': form['difficulty']}, None
     provinces = [p for p in PROVINCES if p in form.getlist('province')]
     if not provinces:
         return None, "Please select at least one province"
@@ -817,11 +829,17 @@ def room_settings(form):
             return None, "Time limit must be between 1 and 1800 seconds"
         time_limit = int(t)
     return {'mode': mode, 'provinces': provinces, 'rounds': int(form['rounds']) if mode == 'classic' else LAST_ROUND,
-            'time_limit': time_limit, 'look': int(form.get('look') == 'on')}, None
+            'time_limit': time_limit, 'look': int(form.get('look') == 'on'), 'difficulty': None}, None
 
 def pick_locations(c, s):
+    # survival: only places with their fog photo, when there are enough, so
+    # that Blindness can always be thrown
+    fog = ''
+    if s['mode'] == 'survival' and c.execute(f"SELECT COUNT(*) FROM locations WHERE review IN {PLAYABLE} AND fog_url IS NOT NULL"
+                                             ).fetchone()[0] >= s['rounds']:
+        fog = ' AND fog_url IS NOT NULL'
     ids = [r[0] for r in c.execute(
-        f"SELECT location_id FROM locations WHERE province IN ({', '.join('?' * len(s['provinces']))}) AND review IN {PLAYABLE} ORDER BY RANDOM() LIMIT ?",
+        f"SELECT location_id FROM locations WHERE province IN ({', '.join('?' * len(s['provinces']))}) AND review IN {PLAYABLE}{fog} ORDER BY RANDOM() LIMIT ?",
         (*s['provinces'], s['rounds']))]
     return json.dumps(ids) if len(ids) == s['rounds'] else None
 
@@ -832,9 +850,9 @@ def new_room(c, host, s):
     code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
     while find_room(c, code):
         code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
-    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0)''',
-        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations))
+    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?)''',
+        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty']))
     c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
     return code
 
@@ -863,6 +881,9 @@ def standings(c, r, upto):
     # duel and royale: replay the rounds up to `upto` for each contestant's
     # health or lives: {user_id: {'left', 'out', 'delta'}}, where out is the
     # round they were knocked out in and delta their change in round `upto`
+    # (survival: hearts, and much more, see survivors())
+    if r['mode'] == 'survival':
+        return survivors(c, r, upto)
     seats = [p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND seat = 1 ORDER BY rowid", (r['code'],))]
     scores = {(g[0], g[1]): g[2] for g in c.execute("SELECT user_id, round, score FROM room_guesses WHERE code = ? AND round <= ?",
                                                      (r['code'], upto))}
@@ -933,6 +954,8 @@ def tick(c, r):
         if heir:
             c.execute("UPDATE rooms SET host_id = ? WHERE code = ?", (heir[0], r['code']))
         return find_room(c, r['code'])
+    if r['mode'] == 'survival':
+        return survival_room_tick(c, r)
     if r['round_end'] is None:
         deadline, _ = round_deadline(c, r)
         here = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], now - AWAY))}
@@ -1016,7 +1039,7 @@ def room_state(code):
             (me['user_id'], r['host_id'], now - AWAY, n, r['code'])).fetchall()
         # duel and royale: health or lives after the last finished round
         st = {}
-        if r['mode'] != 'classic' and r['state'] != 'waiting':
+        if r['mode'] in ('duel', 'royale') and r['state'] != 'waiting':
             st = standings(c, r, r['round'] if r['state'] == 'finished' or r['round_end'] is not None else r['round'] - 1)
         out = {"success": True, "code": r['code'], "mode": r['mode'], "state": r['state'],
                "host": r['host_id'] == me['user_id'], "live": live, "round": n, "rounds": r['rounds'],
@@ -1037,6 +1060,9 @@ def room_state(code):
             del p['uid']
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
+        if r['mode'] == 'survival':
+            out['settings']['difficulty'] = r['difficulty']
+            return jsonify(survival_view(c, r, me, out, now))
         if n == 0 or (live and r['state'] == 'waiting'):
             return jsonify(out)
         loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (json.loads(r['locations'])[n - 1],)).fetchone()
@@ -1089,8 +1115,8 @@ def room_set(code):
         locations = s and pick_locations(c, s)
         if not locations:
             return jsonify({"success": False, "error": error or "Not enough locations in these provinces"})
-        c.execute("UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ? WHERE code = ?",
-                  (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, r['code']))
+        c.execute("UPDATE rooms SET mode = ?, provinces = ?, rounds = ?, time_limit = ?, look = ?, locations = ?, difficulty = ? WHERE code = ?",
+                  (s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], r['code']))
     return jsonify({"success": True})
 
 @app.route("/api/room/<code>/host", methods=['POST'])
@@ -1136,8 +1162,14 @@ def room_start(code):
                 if here < 2:
                     return jsonify({"success": False, "error": "This mode needs at least 2 players"})
                 c.execute("UPDATE room_players SET seat = (last_seen > ?) WHERE code = ? AND live = 1", (now - AWAY, r['code']))
+            # survival: the first picture loads unseen for PREP seconds, like all the others
             c.execute("UPDATE rooms SET state = 'playing', round = 1, round_start = ?, round_end = NULL WHERE code = ?",
-                      (now, r['code']))
+                      (now + (PREP if r['mode'] == 'survival' else 0), r['code']))
+        elif r['state'] == 'playing' and r['round_end'] is not None and r['mode'] == 'survival':
+            # survival: the reveal only, straight to the shop (the shop waits for everyone)
+            if now >= r['round_end'] + REVEAL:
+                return jsonify({"success": False})
+            c.execute("UPDATE rooms SET round_end = ? WHERE code = ?", (now - REVEAL, r['code']))
         elif r['state'] == 'playing' and r['round_end'] is not None:
             next_round(c, r)
         else:
@@ -1154,6 +1186,8 @@ def room_guess(code):
         now = time.time()
         n = request.form.get('round', '')
         n = int(n) if n.isnumeric() else 0
+        if r['mode'] == 'survival':
+            return jsonify({"success": survival_room_guess(c, r, me, n)})
         if me['live']:
             if (r['state'] != 'playing' or n != r['round'] or r['round_end'] is not None
                     or me['user_id'] not in guessers(c, r)):
@@ -1194,8 +1228,12 @@ def room_again(code):
             return jsonify({"success": False})
         nxt = r['next_code']
         if not nxt:
-            nxt = new_room(c, me['user_id'], {'mode': r['mode'], 'provinces': json.loads(r['provinces']),
-                                              'rounds': r['rounds'], 'time_limit': r['time_limit'], 'look': r['look']})
+            # a battle royale goes on as survival, which replaced it
+            mode = 'survival' if r['mode'] == 'royale' else r['mode']
+            nxt = new_room(c, me['user_id'], {'mode': mode, 'provinces': PROVINCES if mode == 'survival' else json.loads(r['provinces']),
+                                              'rounds': SURVIVAL_ROUNDS if mode == 'survival' else r['rounds'],
+                                              'time_limit': r['time_limit'], 'look': r['look'],
+                                              'difficulty': r['difficulty'] or ('normal' if mode == 'survival' else None)})
             c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (nxt, r['code']))
     return jsonify({"success": bool(nxt), "code": nxt})
 
@@ -1490,21 +1528,27 @@ def review_one(lid):
 
 with connect() as c:
     c.execute("CREATE TABLE IF NOT EXISTS tiles (token TEXT PRIMARY KEY, location_id INTEGER, scope TEXT UNIQUE)")
+    # Blindness in a survival room: the same place in the fog
+    if 'fog' not in [col[1] for col in c.execute("PRAGMA table_info(tiles)")]:
+        c.execute("ALTER TABLE tiles ADD COLUMN fog INTEGER DEFAULT 0")
 
-def tile_url(c, lid, scope):
+def tile_url(c, lid, scope, fog = False):
     # the address of a location's pictures for one use: scope names it
-    # ('room:ABC234:3', 'solo:12:2'), the same scope gets the same token
+    # ('room:ABC234:3', 'solo:12:2'), the same scope gets the same token;
+    # fog: its fog photo instead (a scope of its own)
+    if fog:
+        scope += ':fog'
     row = c.execute("SELECT token FROM tiles WHERE scope = ?", (scope,)).fetchone()
     token = row[0] if row else secrets.token_hex(16)
     if not row:
-        c.execute("INSERT INTO tiles (token, location_id, scope) VALUES (?, ?, ?)", (token, lid, scope))
+        c.execute("INSERT INTO tiles (token, location_id, scope, fog) VALUES (?, ?, ?, ?)", (token, lid, scope, int(fog)))
     return 'play/tile/' + token + '/'
 
 @app.route("/play/tile/<token>/<path:name>")
 def play_tile(token, name):
     with connect() as c:
-        row = c.execute("SELECT l.image_url FROM tiles t JOIN locations l ON l.location_id = t.location_id WHERE t.token = ?",
-                        (token,)).fetchone()
+        row = c.execute("""SELECT CASE WHEN t.fog = 1 AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END
+                FROM tiles t JOIN locations l ON l.location_id = t.location_id WHERE t.token = ?""", (token,)).fetchone()
     if not row or not row[0].startswith('static/tiles/'):
         return '', 404
     response = send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 3600)
@@ -2121,6 +2165,410 @@ def survival_tile(token, name):
     # kept by the browser, never by Cloudflare: the address must die with the round
     response.cache_control.private = True
     return response
+
+
+# ---------- Survival with friends ----------
+# Survival in a room (it replaced Battle Royale): everyone plays the same
+# location at the same time under the solo rules (the hearts of the
+# difficulty, the shrinking zone, the clock, the creeper, two near-perfect
+# guesses in a row, the random potions), and the game stops as soon as one
+# player is left: the winner (several dying in the same round: the most
+# points). Each guess earns emeralds by its distance (Wynncraft's money;
+# points are all close to 5,000 and would tell nobody apart), spent between
+# rounds on potions thrown at the others, or on Regeneration and milk for
+# oneself; the dead watch, and may spend what they have left.
+# Between two rounds, in this order (Yasuro's):
+# 1. the reveal (REVEAL seconds), where the random potions are thrown;
+# 2. the shop, until everyone is ready or SHOP seconds;
+# 3. the potions bought are thrown (THROW seconds, only if there are any);
+# 4. PREP seconds: the picture loads unseen, everyone sees what hit them
+#    and may drink milk (it cancels everything, for that round);
+# 5. the round.
+# Everything stacks: the same potion twice is level II (Wither II, Darkness
+# II...), and so on. Like duel, nothing is stored but what the players did
+# (guesses, purchases and random potions in room_shop, milk drunk in
+# room_milk): hearts and emeralds are replayed each time (survivors()).
+# Against cheating, as alone: the server's clock (each player's own,
+# Swiftness shortens it), a purchase checked against the emeralds left and
+# the shop's hours, a guess only in its round. Known limits: the picture
+# loads PREP seconds early (classic rooms load it during the reveal), and
+# what only the page draws (Darkness, Nausea's spin, Mining Fatigue).
+
+SURVIVAL_ROUNDS = 100   # the room's locations: the game ends long before
+SHOP = 20               # seconds the shop stays open, less once everyone is ready
+THROW = 4               # the potions bought fly (Yasuro's animation lasts 3.07 s)
+PREP = 5                # the picture loads unseen; effects; milk
+# emeralds for a guess within NEAR blocks, inside the safe zone, short of
+# its far end (nothing beyond). Calibrated on 4,611 real guesses of 94
+# players: about 9 a round for the strongest tenth, 5.5 for the median, 4
+# for the weakest quarter, much the same from round 1 to 20 (CLAUDE.md)
+EMERALDS = (10, 6, 2)
+# the median player buys a cheap potion every round, a dear one every three
+PRICES = {'mining_fatigue': 5, 'swiftness': 5, 'wither': 10, 'nausea': 10, 'blindness': 10, 'milk': 10,
+          'darkness': 15, 'regeneration': 15}
+SELF = ('regeneration', 'milk')   # bought for oneself; every other potion is thrown at someone else
+MILK_BUYS = 2           # buckets a player may buy in a game (then: out of stock)
+SWIFT_STEP = 5          # Swiftness II gives 5 seconds less than I, III 10 less...
+SWIFT_MIN = 10          # ...never under this
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS room_shop (
+            code TEXT, round INTEGER, buyer INTEGER, target INTEGER, item TEXT, at REAL);
+        CREATE TABLE IF NOT EXISTS room_milk (
+            code TEXT, round INTEGER, user_id INTEGER, at REAL, PRIMARY KEY (code, round, user_id));
+        CREATE INDEX IF NOT EXISTS room_shop_code ON room_shop (code);
+    ''')
+    # a room's difficulty (survival); the shop a player is done with; where a
+    # guess under Nausea was aimed before it landed off
+    if 'difficulty' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
+        c.execute("ALTER TABLE rooms ADD COLUMN difficulty TEXT")
+    if 'ready' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
+        c.execute("ALTER TABLE room_players ADD COLUMN ready INTEGER DEFAULT 0")
+    if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(room_guesses)")]:
+        c.execute("ALTER TABLE room_guesses ADD COLUMN aim_x REAL")
+        c.execute("ALTER TABLE room_guesses ADD COLUMN aim_z REAL")
+
+def room_effects(shop, milked, uid, n):
+    # what hits a player in round n, {potion: level}: random, thrown or drunk;
+    # nothing at all once they drank milk
+    if (uid, n) in milked:
+        return {}
+    fx = {}
+    for row in shop:
+        if row['round'] == n and row['target'] == uid and row['item'] in POTIONS:
+            fx[row['item']] = fx.get(row['item'], 0) + 1
+    return fx
+
+def room_time(difficulty, fx):
+    # the seconds a player has: the difficulty's, or Swiftness's (20, 15, 10)
+    k = fx.get('swiftness', 0)
+    return max(SWIFT_MIN, SWIFT_TIME - SWIFT_STEP * (k - 1)) if k else ROUND_TIME[difficulty]
+
+def room_shop_rows(c, code):
+    return (c.execute("SELECT * FROM room_shop WHERE code = ?", (code,)).fetchall(),
+            {(m[0], m[1]) for m in c.execute("SELECT user_id, round FROM room_milk WHERE code = ?", (code,))})
+
+def survivors(c, r, upto):
+    # replays the rounds up to `upto`: for each contestant, the hearts left
+    # ('left', in half-hearts), the round they died in ('out'), the change in
+    # round `upto` ('delta'), the emeralds left (every purchase so far
+    # counted), the milk in hand, the locations survived, and what round
+    # `upto` did to them ('result')
+    code, full = r['code'], DIFFICULTIES[r['difficulty']]
+    seats = [p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND seat = 1 ORDER BY rowid", (code,))]
+    guesses = {(g['user_id'], g['round']): g for g in c.execute("SELECT * FROM room_guesses WHERE code = ? AND round <= ?", (code, upto))}
+    shop, milked = room_shop_rows(c, code)
+    ids = json.loads(r['locations'])[:upto]
+    where = {l[0]: (l[1], l[2]) for l in c.execute(
+        f"SELECT location_id, x_position, z_position FROM locations WHERE location_id IN ({', '.join('?' * len(ids))})", ids)} if ids else {}
+    st = {u: {'left': full, 'out': None, 'delta': 0, 'emeralds': 0, 'milk': 0, 'milk_bought': 0, 'survived': 0, 'close': 0}
+          for u in seats}
+    for row in shop:
+        if row['buyer'] in st:
+            st[row['buyer']]['emeralds'] -= PRICES[row['item']]
+            if row['item'] == 'milk':
+                st[row['buyer']]['milk'] += 1
+                st[row['buyer']]['milk_bought'] += 1
+    for u, n in milked:
+        if u in st:
+            st[u]['milk'] -= 1
+    for n in range(1, upto + 1):
+        alive = [u for u in seats if st[u]['out'] is None]
+        if len(alive) <= 1:
+            break
+        loc = where[ids[n - 1]]
+        for u in alive:
+            s, fx, g = st[u], room_effects(shop, milked, u, n), guesses.get((u, n))
+            swift = 'swiftness' if 'swiftness' in fx else None
+            safe, far, cap = zone(n, swift)
+            hp = s['left']
+            spent = g['time'] if g else room_time(r['difficulty'], fx)
+            # Wither: half a heart every WITHER_EVERY seconds, k times as often at level k
+            wither = int(spent * fx.get('wither', 0) // WITHER_EVERY)
+            if g and g['x'] is not None:
+                d = math.hypot(loc[0] - g['x'], loc[1] - g['z'])
+                damage, points = hurt(d, n, swift), g['score']
+                earned = EMERALDS[0] if d <= NEAR else EMERALDS[1] if d <= safe else EMERALDS[2] if d < far else 0
+            else:
+                d, damage, points, earned = None, cap, 0, 0   # no pin when the clock ran out: the creeper
+            after, heal = hp - damage - wither, 0
+            if after > 0 and d is not None:
+                if d <= safe:
+                    heal += REGEN * fx.get('regeneration', 0)
+                s['close'] = s['close'] + 1 if d <= NEAR else 0
+                if s['close'] == 2:
+                    heal, s['close'] = heal + 1, 0
+            else:
+                s['close'] = 0
+            after = min(full, after + heal) if after > 0 else 0
+            s['left'] = after
+            s['emeralds'] += earned
+            if after > 0:
+                s['survived'] += 1
+            else:
+                s['out'] = n
+            if n == upto:
+                s['delta'] = after - hp
+                s['result'] = {"x": g and g['x'], "z": g and g['z'], "aim_x": g and g['aim_x'], "aim_z": g and g['aim_z'],
+                               "distance": d, "damage": damage, "wither": wither, "heal": heal if after > 0 else 0,
+                               "points": points, "earned": earned, "effects": fx, "creeper": d is None,
+                               "safe": safe, "far": far, "kill": kill_radius(n, swift, hp - wither)}
+    return st
+
+def next_fog(c, r):
+    # does the next round's location have its fog photo (Blindness possible)?
+    ids = json.loads(r['locations'])
+    return r['round'] < len(ids) and bool(c.execute("SELECT fog_url IS NOT NULL FROM locations WHERE location_id = ?",
+                                                    (ids[r['round']],)).fetchone()[0])
+
+def wares(c, r, s):
+    # what one player may buy in this shop, with the prices: potions to throw
+    # (Blindness only where the next place has its fog photo); for the
+    # living, Regeneration and milk (MILK_BUYS at most, then out of stock)
+    fog = next_fog(c, r)
+    return {k: p for k, p in PRICES.items() if (k not in SELF or s['out'] is None) and (k != 'blindness' or fog)
+            and (k != 'milk' or s['milk_bought'] < MILK_BUYS)}
+
+def present(c, r):
+    return {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND last_seen > ?", (r['code'], time.time() - AWAY))}
+
+def shop_shut(c, r, st):
+    # the shop closes after SHOP seconds, or once everyone here is ready;
+    # who cannot pay for anything is ready already
+    if time.time() >= r['round_end'] + REVEAL + SHOP:
+        return True
+    ready = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND ready = ?", (r['code'], r['round']))}
+    for u in present(c, r) & set(st) - ready:
+        prices = wares(c, r, st[u]).values()
+        if prices and st[u]['emeralds'] >= min(prices):
+            return False
+    return True
+
+def survival_room_tick(c, r):
+    # a round closes once everyone alive and here has guessed, or is past their
+    # own clock; then the reveal, the shop, the potions bought, PREP, the next round
+    now, n, code = time.time(), r['round'], r['code']
+    if r['round_end'] is None:
+        if now < r['round_start']:
+            return r   # potions flying, picture loading
+        shop, milked = room_shop_rows(c, code)
+        alive = {u for u, s in survivors(c, r, n - 1).items() if s['out'] is None}
+        done = {g[0] for g in c.execute("SELECT user_id FROM room_guesses WHERE code = ? AND round = ?", (code, n))}
+        for u in (alive & present(c, r)) - done:
+            if now < r['round_start'] + room_time(r['difficulty'], room_effects(shop, milked, u, n)) + GRACE:
+                return r
+        c.execute("UPDATE rooms SET round_end = ? WHERE code = ?", (now, code))
+        r = find_room(c, code)
+        # the random potions of the next round, thrown with the reveal (never
+        # two random ones in a row for the same player, as alone)
+        left = [u for u, s in survivors(c, r, n).items() if s['out'] is None]
+        if len(left) >= 2 and n < r['rounds']:
+            fog = next_fog(c, r)
+            had = {row['target'] for row in shop if row['round'] == n and row['buyer'] is None}
+            for u in left:
+                drawn = potion(r['difficulty'], n + 1, u in had, fog)
+                if drawn:
+                    c.execute("INSERT INTO room_shop (code, round, buyer, target, item, at) VALUES (?, ?, NULL, ?, ?, ?)",
+                              (code, n + 1, u, drawn, now))
+        return r
+    if now < r['round_end'] + REVEAL:
+        return r
+    st = survivors(c, r, n)
+    if sum(s['out'] is None for s in st.values()) <= 1 or n >= r['rounds']:
+        c.execute("UPDATE rooms SET state = 'finished' WHERE code = ?", (code,))
+        r = find_room(c, code)
+        for u in st:
+            survival_room_record(c, r, u)
+        return r
+    if not shop_shut(c, r, st):
+        return r
+    thrown = c.execute(f"""SELECT 1 FROM room_shop WHERE code = ? AND round = ? AND buyer IS NOT NULL
+            AND item NOT IN {SELF}""", (code, n + 1)).fetchone()
+    c.execute("UPDATE rooms SET round = round + 1, round_start = ?, round_end = NULL WHERE code = ?",
+              (now + (THROW if thrown else 0) + PREP, code))
+    return find_room(c, code)
+
+def survival_room_record(c, r, uid):
+    # a finished game on the Survival leaderboard of its difficulty, like a run
+    # alone: the locations survived, then the points (not for guests)
+    row = c.execute("SELECT recorded FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()
+    if not row or row[0] or c.execute("SELECT COALESCE(guest, 0) FROM users WHERE id = ?", (uid,)).fetchone()[0]:
+        return
+    s = survivors(c, r, r['round']).get(uid)
+    if not s or not s['survived']:
+        return
+    c.execute("UPDATE room_players SET recorded = 1 WHERE code = ? AND user_id = ?", (r['code'], uid))
+    points, spent = c.execute("SELECT COALESCE(SUM(score), 0), COALESCE(SUM(time), 0) FROM room_guesses WHERE code = ? AND user_id = ?",
+                              (r['code'], uid)).fetchone()
+    c.execute("""INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode, difficulty, points, room)
+            VALUES (?, ?, ?, 'No', '', NULL, ?, 'survival', ?, ?, ?)""",
+            (uid, s['survived'], date.today(), round(spent, 2), r['difficulty'], points, r['code']))
+
+def survival_room_guess(c, r, me, n):
+    # a guess in its round, within the player's own clock (Nausea: the hand shakes)
+    now, uid = time.time(), me['user_id']
+    if (not me['live'] or r['state'] != 'playing' or n != r['round'] or r['round_end'] is not None
+            or now < r['round_start'] or uid not in guessers(c, r)):
+        return False
+    shop, milked = room_shop_rows(c, r['code'])
+    fx = room_effects(shop, milked, uid, n)
+    deadline = r['round_start'] + room_time(r['difficulty'], fx)
+    if now > deadline + GRACE or c.execute("SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?",
+                                           (r['code'], uid, n)).fetchone():
+        return False
+    x = z = aim_x = aim_z = None
+    if request.form.get('x'):
+        try:
+            x, z = float(request.form['x']), float(request.form['z'])
+        except (KeyError, ValueError):
+            return False
+        if not (math.isfinite(x) and math.isfinite(z)):
+            return False
+        if fx.get('nausea'):
+            # k times as far at level k
+            k = fx['nausea']
+            angle = secrets.randbelow(360000) / 1000 * math.pi / 180
+            off = k * (SHAKE[0] + secrets.randbelow((SHAKE[1] - SHAKE[0]) * 1000) / 1000)
+            aim_x, aim_z = x, z
+            x, z = round(x + off * math.cos(angle)), round(z + off * math.sin(angle))
+    loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (json.loads(r['locations'])[n - 1],)).fetchone()
+    c.execute("""INSERT OR IGNORE INTO room_guesses (code, user_id, round, x, z, score, at, time, aim_x, aim_z)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (r['code'], uid, n, x, z, guess_score(x, z, loc) if x is not None else 0, now,
+             min(now, deadline) - r['round_start'], aim_x, aim_z))
+    return True
+
+def survival_phase(r, now):
+    if r['state'] != 'playing':
+        return r['state']   # waiting, finished
+    if r['round_end'] is None:
+        return 'throw' if now < r['round_start'] - PREP else 'prep' if now < r['round_start'] else 'guess'
+    return 'reveal' if now < r['round_end'] + REVEAL else 'shop'
+
+def survival_view(c, r, me, out, now):
+    # what a player of a survival room may know: everyone's hearts, what hits
+    # whom once the shop is shut (the random potions as soon as thrown), their
+    # own emeralds and milk; the answer only once the round is over
+    n, code, uid = r['round'], r['code'], me['user_id']
+    phase = survival_phase(r, now)
+    out.update({"difficulty": r['difficulty'], "max": DIFFICULTIES[r['difficulty']], "phase": phase})
+    if phase == 'waiting':
+        return out
+    closed = phase in ('reveal', 'shop', 'finished')
+    st = survivors(c, r, n if closed else n - 1)
+    shop, milked = room_shop_rows(c, code)
+    names = {p['uid']: p['name'] for p in out['players']}
+    ready = {p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND ready = ?", (code, n))}
+    # the potions of the round being played, or of the next one once thrown
+    upcoming = n + 1 if closed else n
+    for p in out['players']:
+        s = st.get(p['uid'])
+        if not s:
+            continue
+        p.update({"left": s['left'], "out": s['out'], "delta": s['delta'], "survived": s['survived']})
+        if s['out'] is None and phase != 'finished':
+            # before the shop shuts, only the random potions are known
+            known = [row for row in shop if row['buyer'] is None] if closed else shop
+            p['effects'] = room_effects(known, milked, p['uid'], upcoming)
+            p['milked'] = (p['uid'], upcoming) in milked
+        if phase == 'shop':
+            p['ready'] = p['uid'] in ready
+        if closed and 'result' in s:
+            p['result'] = {k: v for k, v in s['result'].items() if k != 'earned'}
+    mine = st.get(uid)
+    out['playing'] = bool(mine and mine['out'] is None and me['live'] and phase != 'finished')
+    if mine:
+        out['me'] = {"emeralds": mine['emeralds'], "milk": mine['milk'], "milk_left": MILK_BUYS - mine['milk_bought'],
+                     "earned": mine.get('result', {}).get('earned') if closed else None}
+    if phase == 'shop':
+        out['phase_left'] = max(0, r['round_end'] + REVEAL + SHOP - now)
+        if mine:
+            out['wares'] = wares(c, r, mine)
+    elif phase == 'reveal':
+        out['phase_left'] = max(0, r['round_end'] + REVEAL - now)
+    elif phase in ('throw', 'prep'):
+        out['phase_left'] = max(0, r['round_start'] - (PREP if phase == 'throw' else 0) - now)
+        out['starts_in'] = max(0, r['round_start'] - now)
+    # the potions bought for this round, thrown for everyone to see
+    if not closed:
+        out['throws'] = [{"by": names.get(row['buyer'], '?'), "item": row['item'], "to": names.get(row['target'], '?')}
+                         for row in shop if row['round'] == n and row['buyer'] is not None and row['item'] not in SELF]
+    ids = json.loads(r['locations'])
+    if not closed:
+        # the picture, from the shop's close on: in the fog under Blindness
+        fx = room_effects(shop, milked, uid, n) if out['playing'] else {}
+        out['url'] = tile_url(c, ids[n - 1], 'room:%s:%d' % (code, n), fog = 'blindness' in fx)
+        if out['playing']:
+            seconds = room_time(r['difficulty'], fx)
+            out.update({"time": seconds, "answered": bool(c.execute(
+                "SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?", (code, uid, n)).fetchone())})
+            if phase == 'guess':
+                out['time_left'] = max(0, r['round_start'] + seconds - now)
+    elif n:
+        loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (ids[n - 1],)).fetchone()
+        out['reveal'] = {"X": loc[0], "Z": loc[1]}
+    return out
+
+@app.route("/api/room/<code>/buy", methods=['POST'])
+def room_buy(code):
+    # survival, in the shop: a potion thrown at another player (target), or
+    # Regeneration or milk for oneself, paid in emeralds
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or r['mode'] != 'survival':
+            return jsonify({"success": False})
+        r = tick(c, r)
+        uid, item = me['user_id'], request.form.get('item', '')
+        target = uid if item in SELF else request.form.get('target', type = int)
+        if (survival_phase(r, time.time()) != 'shop' or request.form.get('round') != str(r['round'])
+                or c.execute("SELECT ready FROM room_players WHERE code = ? AND user_id = ?", (r['code'], uid)).fetchone()[0] == r['round']):
+            return jsonify({"success": False, "error": "The shop is closed"})
+        st = survivors(c, r, r['round'])
+        s = st.get(uid)
+        if not s or item not in wares(c, r, s):
+            return jsonify({"success": False, "error": "You cannot buy that"})
+        if target == uid and item not in SELF or target not in st or st[target]['out'] is not None:
+            return jsonify({"success": False, "error": "Pick another player"})
+        if s['emeralds'] < PRICES[item]:
+            return jsonify({"success": False, "error": "Not enough emeralds"})
+        c.execute("INSERT INTO room_shop (code, round, buyer, target, item, at) VALUES (?, ?, ?, ?, ?, ?)",
+                  (r['code'], r['round'] + 1, uid, target, item, time.time()))
+    return jsonify({"success": True, "emeralds": s['emeralds'] - PRICES[item]})
+
+@app.route("/api/room/<code>/ready", methods=['POST'])
+def room_ready(code):
+    # survival: done with the shop (the shop closes once everyone is)
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or r['mode'] != 'survival':
+            return jsonify({"success": False})
+        r = tick(c, r)
+        if survival_phase(r, time.time()) != 'shop' or request.form.get('round') != str(r['round']):
+            return jsonify({"success": False})
+        c.execute("UPDATE room_players SET ready = ? WHERE code = ? AND user_id = ?", (r['round'], r['code'], me['user_id']))
+        tick(c, find_room(c, r['code']))
+    return jsonify({"success": True})
+
+@app.route("/api/room/<code>/milk", methods=['POST'])
+def room_milk(code):
+    # survival: a bucket drunk before the round (as the potions fly or the
+    # picture loads, a second into the round at most): nothing hits this round
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or r['mode'] != 'survival':
+            return jsonify({"success": False})
+        r = tick(c, r)
+        uid, n, now = me['user_id'], r['round'], time.time()
+        if (r['state'] != 'playing' or r['round_end'] is not None or request.form.get('round') != str(n)
+                or now > r['round_start'] + GRACE):
+            return jsonify({"success": False})
+        s = survivors(c, r, n - 1).get(uid)
+        shop, milked = room_shop_rows(c, r['code'])
+        if not s or s['out'] is not None or s['milk'] < 1 or not room_effects(shop, milked, uid, n):
+            return jsonify({"success": False})
+        c.execute("INSERT OR IGNORE INTO room_milk (code, round, user_id, at) VALUES (?, ?, ?, ?)", (r['code'], n, uid, now))
+    return jsonify({"success": True})
 
 
 if __name__ == "__main__":

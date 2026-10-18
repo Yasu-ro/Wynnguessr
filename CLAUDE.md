@@ -477,7 +477,14 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   de triche) ; page par Playwright (menu, cœurs, cercles, creeper, mort,
   reprise), classement (ordre, une seule partie par joueur).
 
-## Survival à plusieurs (planifié le 2026-10-18, rien de codé)
+## Survival à plusieurs (2026-10-18 : moteur fait, interface à venir)
+
+Étapes validées par Yasuro : 1. lait en solo (fait) ; **2. moteur (fait,
+section « Survival with friends » d'`app.py`)** ; 3. boutique « Potion
+Merchant » et page du salon (recherche DA d'abord) ; 4. vraie partie sur la
+bêta, puis réglage des prix. **Tant que l'étape 3 n'est pas là, Battle Royale
+reste dans `MODES`** (le salon le propose encore) et le Survival à plusieurs
+n'existe que par l'API ; l'étape 3 retire Battle Royale de la création.
 
 Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») :
 
@@ -521,6 +528,63 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
 - **Survival solo : 2 laits offerts par partie** (jamais achetables, pas de
   boutique), à boire au bon moment : sur la carte de la potion lancée —
   **fait** (voir « Lait » dans la section Survival).
+
+**Le moteur (étape 2)**, ce que le code ne dit pas d'un coup d'œil :
+
+- **Calibrage des émeraudes** (4 611 vrais guess de 94 joueurs, salons du vrai
+  site + parties Survival de la bêta) : par manche, ~9 pour le dixième le
+  plus fort, ~5,5 pour le joueur médian, ~4 pour le quart le plus faible,
+  presque constant de la manche 1 à 20 (la zone rétrécit, mais les gains
+  suivent). D'où les prix **5 / 10 / 15** : Mining Fatigue, Swiftness 5 ;
+  Wither, Nausea, Blindness, lait 10 ; Darkness, Regeneration 15. À revoir
+  après de vraies parties (étape 4).
+- **Choix faits en codant, à confirmer avec Yasuro si besoin** :
+  - pas de `LAST_CALL` (15 s après le premier guess) : chacun a tout son
+    chrono, comme en solo (Darkness a besoin de ses 10 s d'image) ;
+  - la manche 1 a aussi ses 5 s de chargement ;
+  - les potions **au hasard sont publiques** dès la révélation (lancées à
+    l'étape 1) ; les **achats restent secrets** jusqu'à la fermeture de la
+    boutique, puis tout le monde voit qui a lancé quoi sur qui ;
+  - les émeraudes de chacun ne sont visibles que de lui ;
+  - Regeneration et le lait s'achètent pour soi, ne se lancent pas, et ne
+    déclenchent pas la phase de lancer (pas de toast) ;
+  - la boutique se ferme dès que tous les présents sont prêts **ou ne
+    peuvent plus rien payer** (pas de 20 s d'attente pour rien) ; un joueur
+    prêt n'achète plus ;
+  - le lait se boit pendant le lancer ou les 5 s (jusqu'à 1 s après le
+    départ), seulement si quelque chose vous touche ; il annule tout, même
+    Regeneration ;
+  - l'hôte peut écourter la révélation (vers la boutique), pas la boutique ;
+  - un salon Survival ne prend que des lieux qui ont leur photo brouillard
+    (s'il y en a au moins 100 : sinon tous, et Blindness n'est ni tirée ni
+    vendue là où la photo manque) ;
+  - 100 lieux par salon (`SURVIVAL_ROUNDS`) : à 100 manches avec plusieurs
+    vivants, le plus de cœurs gagne, puis les points ;
+  - un « Play Again » de Battle Royale repart en Survival normal.
+- **Niveaux des potions** : Wither k = ½ cœur toutes les 5/k s ; Swiftness
+  20, 15, 10 s (`SWIFT_STEP`, `SWIFT_MIN`), zone ×1,5 ; Nausea k = épingle
+  k fois plus loin (et la page tournera k fois plus vite) ; Regeneration k
+  = 2k cœurs ; Darkness k = noir après 10/k s (côté page).
+- **API** pour l'étape 3 : `api/room/<code>` renvoie `phase` (waiting,
+  prep, throw, guess, reveal, shop, finished), `phase_left`, `starts_in`,
+  `time`/`time_left` (le chrono **du joueur**), `url` (brouillard sous
+  Blindness), `throws` (achats lancés), `me` (émeraudes, lait en main,
+  laits encore achetables, gain de la manche), `wares` (ce que **ce**
+  joueur peut acheter, avec les prix), et par joueur `left` (demi-cœurs),
+  `out`, `delta`, `survived`, `effects` ({potion: niveau}), `milked`,
+  `ready`, `result` (guess, visée Nausea, dégâts, Wither, soin, zone).
+  Actions : `buy` (item, target, round), `ready` (round), `milk` (round).
+- Classement : une partie finie entre au classement Survival de sa
+  difficulté (`scores.room` = code, donc pas deux fois au profil), lieux
+  survécus = manches traversées vivant (le gagnant : toutes) ; 0 lieu ou
+  invité : rien. XP comme les autres salons (points/100 + victoire).
+- Tests (scratchpad, à refaire) : `t_multi.py`, 93 vérifications au client
+  Flask avec une horloge à la main et des pages qui interrogent chaque
+  seconde comme `room.js` (règles, phases, chaque triche essayée, fin à
+  deux morts, Classic et Duel inchangés) ; Classic et Duel rejoués en
+  navigateur (`t_room.py`). Piège de test : la manche se ferme à
+  l'interrogation **suivante** le dernier guess, la révélation finit donc
+  une seconde plus tard que le guess + 10 s.
 
 ## Niveaux, XP et séries de victoires
 
