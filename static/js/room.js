@@ -205,6 +205,11 @@ function color(p) {
     return COLORS[p.color % COLORS.length];
 }
 
+// the tag next to a name (staff rank, a tag, a "#1"), small: one at most
+function tagHtml(t) {
+    return t ? " <span class='name-tag " + esc(t.color) + "'>" + esc(t.label) + '</span>' : '';
+}
+
 function dot(p) {
     return "<span class='room-dot' style='background-color:" + color(p) + "'></span>";
 }
@@ -305,7 +310,7 @@ function chat(messages) {
             return;
         }
         chatId = m.id;
-        log.append("<p>" + dot(m) + "<b>" + esc(m.name) + "</b><span>" + esc(m.text) + "</span></p>");
+        log.append("<p>" + dot(m) + "<b>" + esc(m.name) + tagHtml(m.tag) + "</b><span>" + esc(m.text) + "</span></p>");
         theirs = theirs || m.name != me().name;
         if ($('#room-chat').hasClass('folded') && m.name != me().name) {
             unread++;
@@ -412,7 +417,7 @@ function lobby() {
                 ? "<button type='button' class='room-tool armed' data-kick='" + p.uid + "'>Kick?</button>"
                 : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") +
             "</span>" : '';
-        return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) +
+        return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) + tagHtml(p.tag) +
             (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + tools + "</div>";
     }).join(''));
     if (!pending && JSON.stringify(s.settings) != settingsKey) {
@@ -963,7 +968,7 @@ function results() {
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
         var v = value(p);
         return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + (i < hidden ? ' podium-wait' : '') + (i == plankNow ? ' plank-in' : '') + "'>" +
-            "<td>" + place + "</td><td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td><td>" + v[1] + "</td></tr>";
+            "<td>" + place + "</td><td class='room-name'>" + dot(p) + esc(p.name) + tagHtml(p.tag) + v[0] + "</td><td>" + v[1] + "</td></tr>";
     }).join('');
     var plain = html.replace(" plank-in'", "'");
     if (plankNow >= 0 || plain != resultRows) {

@@ -726,6 +726,19 @@ max), journal d'audit avec la raison. D'où :
   et Log (50 par 50, la raison sous chaque action). Étiquettes de rang aux
   couleurs de Wynncraft (Moderator orange). Tests : `t_ranks.py` (15),
   `t_mod_page.py` (navigateur, ordinateur et téléphone).
+- **Étiquettes** (2026-10-18, demande de Yasuro : « add the tags a little
+  bit everywhere … tags for #1 in a category … don't make them too
+  obnoxious ») : **une seule** à côté d'un nom, petite (chat, classement,
+  joueurs du salon, résultats ; pas sur l'écran de manche), le profil les
+  montre toutes. Ordre : rang de l'équipe, sinon étiquette donnée (la plus
+  récente), sinon un « #1 » automatique (`top_tags()`, premier de Survival
+  Normal/Hard/Hardcore sans lait, de Classic réglages standard, des
+  niveaux, des victoires ; recalculé toutes les 2 min par processus :
+  0,23 s sur une copie du vrai site). Onglet Tags de Moderation : un Admin
+  fait une étiquette (20 caractères, couleurs de la palette `TAG_COLORS`,
+  aperçu en direct) ou la range (cachée partout, pas effacée) ; un
+  Moderator la donne ou la reprend (règle d'en dessous) ; tout au journal.
+  Tables `tags`, `user_tags`. Tests : `t_tags.py` (15), `t_tags_page.py`.
 - **À venir** (étapes suivantes) : photos à approuver, signaler et couper
   (chat), cacher un message, sourdine/ban/renommer (avec bannissement de la
   connexion pour les invités), filtre des pseudos et des mots, passe de

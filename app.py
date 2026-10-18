@@ -192,6 +192,9 @@ def update_rank():
         uid = session.get('user_id')
         mine = next(({**row, 'rank': i + 1} for i, row in enumerate(rows) if row['id'] == uid), None)
         total, rows = len(rows), rows[start:start + BOARD_PAGE]
+        tags = tag_of(c, [r['id'] for r in rows] + ([mine['id']] if mine else []))
+        for row in rows + ([mine] if mine else []):
+            row['tag'] = tags.get(row['id'])
         # each player's picture; a Minecraft head is drawn sharp
         for row in rows + ([mine] if mine else []):
             row['pic'], row['head'] = avatar_url(row), not row.get('avatar')
@@ -543,7 +546,8 @@ def show_profile(uid):
         if not user:
             return render_template('apology.html', message = "This player does not exist"), 404
         p = progress(c, uid)
-    return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'],
+        tags = tags_of(c, [uid])[uid]
+    return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
                            avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
                            admin = session.get('loggedin') and session.get('user_id') in ADMINS,
                            games = p['history'][:30], p = p)
@@ -1198,6 +1202,10 @@ def room_state(code):
                             "time_limit": r['time_limit'], "look": bool(r['look'])},
                # the colour of a player is their place in the join order
                "players": [dict(p, color = i, **st.get(p['uid'], {})) for i, p in enumerate(players)]}
+        # the tag next to each name (Moderation: staff rank, a tag, a "#1")
+        tags = tag_of(c, [p['uid'] for p in players])
+        for p in out['players']:
+            p['tag'] = tags.get(p['uid'])
         # chat: the messages the page has not seen yet (it says which was its last)
         colors = {p['uid']: p['color'] for p in out['players']}
         since = request.args.get('chat', '')
@@ -1207,6 +1215,7 @@ def room_state(code):
             (r['code'], int(since) if since.isnumeric() else 0)).fetchall())]
         # players keep their id: the host's tools (make host, kick) name them by it
         for p in out['chat']:
+            p['tag'] = tags.get(p['uid']) or tag_of(c, [p['uid']]).get(p['uid'])
             del p['uid']
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
@@ -2799,6 +2808,8 @@ MAY = {                   # the lowest rank with each power
     'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
     'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
     'staff': 3,           # give and take ranks (below one's own)
+    'tags': 2,            # give and take tags
+    'make_tags': 3,       # make a tag, or put one away
 }
 HELPER_MUTE = 3600        # a Helper mutes for an hour at most
 
@@ -2826,6 +2837,57 @@ def may(c, power, target = None):
 def logged(c, action, target, details = '', reason = ''):
     c.execute("INSERT INTO mod_log (at, by, action, target, details, reason) VALUES (?, ?, ?, ?, ?, ?)",
               (time.time(), session['user_id'], action, target, details, reason))
+
+# Tags: a small word next to a name, Wynncraft style, and only one (Yasuro:
+# "don't make them too obnoxious"): the staff rank first, else a tag the
+# staff gave (newest first), else a "#1" earned by leading a board, which
+# moves by itself to whoever leads it next. The profile shows them all.
+TAG_COLORS = ('gold', 'red', 'orange', 'green', 'teal', 'purple', 'stone')
+TOPS = {'at': 0, 'tags': {}}
+TOPS_EVERY = 120          # seconds a computed "#1" list is kept (the levels are long to work out)
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT, color TEXT,
+            by INTEGER, at REAL, retired INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS user_tags (user_id INTEGER, tag_id INTEGER, by INTEGER, at REAL,
+            PRIMARY KEY (user_id, tag_id));
+    ''')
+
+def top_tags(c):
+    # who leads each board: {user id: ["#1 Survival Hard", ...]}
+    if time.time() - TOPS['at'] > TOPS_EVERY:
+        tops = {}
+        boards = [('#1 Survival ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
+        boards.append(('#1 Classic', board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'})))
+        boards += [('#1 Level', ladder(c, 'levels')), ('#1 Wins', ladder(c, 'wins'))]
+        for label, rows in boards:
+            if rows:
+                tops.setdefault(rows[0]['id'], []).append(label)
+        TOPS.update(at = time.time(), tags = tops)
+    return TOPS['tags']
+
+def tags_of(c, uids):
+    # every tag of these players, in the order they are shown: {id: [{label, color}]}
+    uids = list({u for u in uids if u})
+    out = {u: [] for u in uids}
+    if not uids:
+        return out
+    marks = ','.join('?' * len(uids))
+    for u, rank in [(OWNER, 4)] + c.execute(f"SELECT user_id, rank FROM staff WHERE user_id IN ({marks})", uids).fetchall():
+        if u in out:
+            out[u].append({"label": RANKS[rank], "color": 'rank-%d' % rank})
+    for t in c.execute(f'''SELECT ut.user_id, t.label, t.color FROM user_tags ut JOIN tags t ON t.id = ut.tag_id
+            WHERE ut.user_id IN ({marks}) AND t.retired = 0 ORDER BY ut.at DESC''', uids):
+        out[t[0]].append({"label": t[1], "color": 'tag-' + t[2]})
+    for u, labels in top_tags(c).items():
+        if u in out:
+            out[u] += [{"label": l, "color": 'tag-top'} for l in labels]
+    return out
+
+def tag_of(c, uids):
+    # the one tag shown next to each name
+    return {u: (t[0] if t else None) for u, t in tags_of(c, uids).items()}
 
 @app.context_processor
 def staff_menu():
@@ -2887,6 +2949,59 @@ def mod_rank():
         else:
             c.execute("DELETE FROM staff WHERE user_id = ?", (user['id'],))
         logged(c, 'rank', user['id'], '%s → %s' % (RANKS.get(old, 'Player'), RANKS.get(new, 'Player')), reason)
+    return jsonify({"success": True})
+
+@app.route("/api/mod/tags")
+def mod_tags():
+    # every tag the staff made, with who holds it
+    with connect() as c:
+        if not may(c, 'tags'):
+            return jsonify({"success": False}), 403
+        tags = [dict(t) for t in c.execute("SELECT id, label, color, retired FROM tags ORDER BY retired, at DESC")]
+        for t in tags:
+            t['holders'] = [dict(h) for h in c.execute('''SELECT u.id, u.username AS name FROM user_tags ut JOIN users u ON u.id = ut.user_id
+                WHERE ut.tag_id = ? ORDER BY ut.at''', (t['id'],))]
+        r = my_rank(c)
+    return jsonify({"success": True, "tags": tags, "colors": TAG_COLORS, "make": r >= MAY['make_tags']})
+
+@app.route("/api/mod/tag", methods=['POST'])
+def mod_tag():
+    # make a tag, put it away (or back), give it or take it
+    form, what = request.form, request.form.get('do')
+    with room_tx() as c:
+        if what in ('make', 'retire'):
+            if not may(c, 'make_tags'):
+                return jsonify({"success": False, "error": "Only an Admin can make tags"}), 403
+            if what == 'make':
+                label = ' '.join(form.get('label', '').split())[:20]
+                if not label or form.get('color') not in TAG_COLORS:
+                    return jsonify({"success": False, "error": "A tag needs a word and a colour"})
+                tid = c.execute("INSERT INTO tags (label, color, by, at) VALUES (?, ?, ?, ?)",
+                                (label, form['color'], session['user_id'], time.time())).lastrowid
+                logged(c, 'tag', None, 'made the tag ' + label, form.get('reason', '')[:200])
+            else:
+                t = c.execute("SELECT * FROM tags WHERE id = ?", (form.get('tag', type = int),)).fetchone()
+                if not t:
+                    return jsonify({"success": False})
+                c.execute("UPDATE tags SET retired = ? WHERE id = ?", (int(not t['retired']), t['id']))
+                logged(c, 'tag', None, ('put back the tag ' if t['retired'] else 'put away the tag ') + t['label'])
+            return jsonify({"success": True})
+        t = c.execute("SELECT * FROM tags WHERE id = ? AND retired = 0", (form.get('tag', type = int),)).fetchone()
+        user = c.execute("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0",
+                         (' '.join(form.get('name', '').split()),)).fetchone()
+        if not t or not user:
+            return jsonify({"success": False, "error": "No such tag or player account"})
+        if not may(c, 'tags', user['id']):
+            return jsonify({"success": False, "error": "You can only tag players below you"}), 403
+        if what == 'give':
+            c.execute("INSERT OR IGNORE INTO user_tags (user_id, tag_id, by, at) VALUES (?, ?, ?, ?)",
+                      (user['id'], t['id'], session['user_id'], time.time()))
+            logged(c, 'tag', user['id'], 'given the tag ' + t['label'], form.get('reason', '')[:200])
+        elif what == 'take':
+            c.execute("DELETE FROM user_tags WHERE user_id = ? AND tag_id = ?", (user['id'], t['id']))
+            logged(c, 'tag', user['id'], 'lost the tag ' + t['label'], form.get('reason', '')[:200])
+        else:
+            return jsonify({"success": False})
     return jsonify({"success": True})
 
 @app.route("/api/mod/log")

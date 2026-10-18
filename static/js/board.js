@@ -104,7 +104,8 @@ $(function () {
             "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
         return "<tr class='leaderboard-row" + (row.id == me ? ' you' : '') + (cls || '') + "'><td>" + place + "</td>" +
             "<td><span class='board-who'>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
-            player(row) + fire + "</span></td>" + cells(row, mode).map(function (c, i) {
+            player(row) + (row.tag ? " <span class='name-tag " + esc(row.tag.color) + "'>" + esc(row.tag.label) + '</span>' : '') +
+            fire + "</span></td>" + cells(row, mode).map(function (c, i) {
                 return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';
             }).join('') + "</tr>";
     }

@@ -7,6 +7,7 @@
 <div class="profile">
     <h1 class="sign">{{ username }}</h1>
     <img class="avatar{{ ' head' if not user.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
+    {% if tags %}<p class="profile-tags">{% for t in tags %}<span class="name-tag {{ t.color }}">{{ t.label }}</span>{% endfor %}</p>{% endif %}
     <div class="profile-head">
         {% if mc_name %}
             <a class="pill" href="https://wynncraft.com/stats/player/{{ mc_name | urlencode }}" target="_blank" rel="noopener">

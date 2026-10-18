@@ -8,6 +8,10 @@
     <div class="tabs mod-tabs" id="mod-tabs">
         <input type="radio" name="mod-tab" id="tab-staff" value="staff" checked>
         <label for="tab-staff" class="tab">Team</label>
+        {% if may.tags %}
+        <input type="radio" name="mod-tab" id="tab-tags" value="tags">
+        <label for="tab-tags" class="tab">Tags</label>
+        {% endif %}
         {% if may.log %}
         <input type="radio" name="mod-tab" id="tab-log" value="log">
         <label for="tab-log" class="tab">Log</label>
@@ -31,6 +35,32 @@
         {% endif %}
         <p class="hint">You can only act on players below you, and give ranks below yours. Every change goes to the log.</p>
     </section>
+
+    {% if may.tags %}
+    <section class="mod-pane" id="pane-tags" hidden>
+        <div class="mod-tags" id="tag-list"></div>
+        <p class="hint" id="tag-empty" hidden>No tag yet.</p>
+        <form class="panel narrow mod-form" id="tag-give" autocomplete="off">
+            <h2>Give a Tag</h2>
+            <select class="field" name="tag" id="tag-select" aria-label="Tag"></select>
+            <input class="field" name="name" placeholder="Player name" aria-label="Player name" maxlength="20" required>
+            <input class="field" name="reason" placeholder="Why (kept in the log)" aria-label="Why" maxlength="200">
+            <button class="btn wide" type="submit">Give the Tag</button>
+            <p class="note" id="tag-give-note" hidden></p>
+        </form>
+        {% if may.make_tags %}
+        <form class="panel narrow mod-form" id="tag-make" autocomplete="off">
+            <h2>Make a Tag</h2>
+            <input class="field" name="label" placeholder="Its word, e.g. Beta Tester" aria-label="Word" maxlength="20" required>
+            <div class="chips" id="tag-colors"></div>
+            <p class="mod-preview">Next to a name: <b>Steve</b><span class="name-tag" id="tag-preview">Beta Tester</span></p>
+            <button class="btn wide" type="submit">Make the Tag</button>
+            <p class="note" id="tag-make-note" hidden></p>
+        </form>
+        {% endif %}
+        <p class="hint">One tag at most next to a name: the staff rank first, then the newest tag given, then a "#1", earned by leading a leaderboard (it moves by itself). The profile shows them all.</p>
+    </section>
+    {% endif %}
 
     {% if may.log %}
     <section class="mod-pane" id="pane-log" hidden>

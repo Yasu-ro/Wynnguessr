@@ -277,6 +277,60 @@ button, input {
     background: radial-gradient(circle, var(--ring) 0 3.5px, transparent 4.5px) center bottom / 12px 12px no-repeat,
                 linear-gradient(var(--line), var(--line)) center bottom 5px / 100% 2px no-repeat;
 }
+/* a tag next to a name: small, one at most (the profile shows them all) */
+.name-tag {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 0 5px 1px;
+    font: 700 11px/1.35 var(--sans);
+    color: var(--ink);
+    white-space: nowrap;
+    vertical-align: 1px;
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+}
+.name-tag.rank-3, .tag-red, .tag-purple {
+    color: #fff;
+}
+.tag-gold {
+    background: var(--gold);
+}
+.tag-red {
+    background: #c4372b;
+}
+.tag-orange {
+    background: #f58231;
+}
+.tag-green {
+    background: var(--green);
+}
+.tag-teal {
+    background: var(--teal-light);
+}
+.tag-purple {
+    background: #8a5cc4;
+}
+.tag-stone {
+    background: #c9c5ba;
+}
+/* a "#1", earned: quieter than what the staff gives */
+.tag-top {
+    color: #6b4a00;
+    background: #fbe7a6;
+    border-color: #8a6100;
+}
+.profile-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin: 10px 0 0;
+}
+.profile-tags .name-tag {
+    margin: 0;
+    font-size: 13px;
+}
+
 /* Moderation: the staff's tags, as Wynncraft's chat tags ([Mod] in orange) */
 .rank-tag {
     display: inline-block;
@@ -326,6 +380,57 @@ button, input {
 .chip.armed {
     color: #fff;
     background-color: var(--red);
+}
+.mod-tags {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.mod-tag {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--paper-light);
+    border-radius: 4px;
+    box-shadow: 0 3px 0 rgba(63, 39, 36, .2);
+}
+.mod-tag > .name-tag {
+    margin: 0;
+    font-size: 13px;
+}
+.mod-tag.retired {
+    opacity: .55;
+}
+.mod-holders {
+    display: flex;
+    flex-wrap: wrap;
+    flex: 1;
+    gap: 6px;
+}
+.mod-holder {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 700;
+}
+.mod-holder .chip.small {
+    min-height: 24px;
+    padding: 0 7px;
+}
+.mod-nobody {
+    color: var(--ink-soft);
+}
+.mod-preview {
+    margin: 0;
+    text-align: center;
+}
+#tag-colors .chip {
+    padding: 4px 8px;
+}
+#tag-colors .name-tag {
+    margin: 0;
 }
 .mod-why {
     display: block;

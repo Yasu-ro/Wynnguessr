@@ -22,6 +22,9 @@ $(function () {
         if (tab == 'log' && !$('#log-rows').children().length) {
             log();
         }
+        if (tab == 'tags') {
+            tags();
+        }
     });
 
     // ---------- the team ----------
@@ -78,6 +81,77 @@ $(function () {
         }).fail(function (x) {
             $('#give-note').prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused');
         });
+    });
+
+    // ---------- tags ----------
+    var takeArmed = null, takeAt = 0, colorsDrawn = false;
+    function tags() {
+        $.getJSON('api/mod/tags').done(function (r) {
+            $('#tag-list').html(r.tags.map(function (t) {
+                return "<div class='mod-tag" + (t.retired ? ' retired' : '') + "'><span class='name-tag tag-" + esc(t.color) + "'>" + esc(t.label) + '</span>' +
+                    "<span class='mod-holders'>" + (t.holders.length ? t.holders.map(function (h) {
+                        var key = t.id + ':' + h.name, sure = takeArmed == key && Date.now() - takeAt < ARMED;
+                        return "<span class='mod-holder'>" + esc(h.name) + (t.retired ? '' : "<button type='button' class='chip small" + (sure ? ' armed' : '') +
+                            "' data-take='" + t.id + "' data-name='" + esc(h.name) + "' title='Take it'>" + (sure ? 'Sure?' : '×') + '</button>') + '</span>';
+                    }).join('') : "<i class='mod-nobody'>nobody</i>") + '</span>' +
+                    (r.make ? "<button type='button' class='chip small' data-retire='" + t.id + "'>" + (t.retired ? 'Put back' : 'Put away') + '</button>' : '') + '</div>';
+            }).join(''));
+            $('#tag-empty').prop('hidden', r.tags.length > 0);
+            $('#tag-select').html(r.tags.filter(function (t) { return !t.retired; }).map(function (t) {
+                return "<option value='" + t.id + "'>" + esc(t.label) + '</option>';
+            }).join(''));
+            $('#tag-give').prop('hidden', !r.tags.some(function (t) { return !t.retired; }));
+            if (!colorsDrawn) {
+                colorsDrawn = true;
+                $('#tag-colors').html(r.colors.map(function (c, i) {
+                    return "<input type='radio' name='color' id='color-" + c + "' value='" + c + "'" + (i == 0 ? ' checked' : '') + '>' +
+                        "<label class='chip' for='color-" + c + "'><span class='name-tag tag-" + c + "'>" + c + '</span></label>';
+                }).join(''));
+                preview();
+            }
+        });
+    }
+    function preview() {
+        var f = $('#tag-make');
+        $('#tag-preview').attr('class', 'name-tag tag-' + f.find('[name=color]:checked').val()).text(f.find('[name=label]').val() || 'Beta Tester');
+    }
+    $('#tag-make').on('input change', preview);
+    function tagSend(data, note) {
+        return $.post('api/mod/tag', data).done(function (r) {
+            if (note) {
+                $(note).prop('hidden', false).toggleClass('bad', !r.success).text(r.success ? 'Done!' : r.error);
+            }
+        }).fail(function (x) {
+            if (note) {
+                $(note).prop('hidden', false).addClass('bad').text((x.responseJSON && x.responseJSON.error) || 'Refused');
+            }
+        }).always(tags);
+    }
+    $('#tag-make').on('submit', function (e) {
+        e.preventDefault();
+        var f = $(this);
+        tagSend({'do': 'make', label: f.find('[name=label]').val(), color: f.find('[name=color]:checked').val()}, '#tag-make-note')
+            .done(function (r) { if (r.success) { f.find('[name=label]').val(''); preview(); } });
+    });
+    $('#tag-give').on('submit', function (e) {
+        e.preventDefault();
+        var f = $(this);
+        tagSend({'do': 'give', tag: f.find('[name=tag]').val(), name: f.find('[name=name]').val(), reason: f.find('[name=reason]').val()}, '#tag-give-note')
+            .done(function (r) { if (r.success) { f.find('[name=name], [name=reason]').val(''); } });
+    });
+    $('#tag-list').on('click', '[data-take]', function () {
+        var key = $(this).data('take') + ':' + $(this).data('name');
+        if (takeArmed == key && Date.now() - takeAt < ARMED) {
+            takeArmed = null;
+            tagSend({'do': 'take', tag: $(this).data('take'), name: $(this).data('name')});
+        } else {
+            takeArmed = key;
+            takeAt = Date.now();
+            tags();
+            setTimeout(function () { if (takeArmed == key) { takeArmed = null; tags(); } }, ARMED + 50);
+        }
+    }).on('click', '[data-retire]', function () {
+        tagSend({'do': 'retire', tag: $(this).data('retire')});
     });
 
     // ---------- the log ----------
