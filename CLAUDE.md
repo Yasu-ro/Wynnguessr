@@ -688,6 +688,16 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
 - Visiteurs : Cloudflare maintenant (fait), la base de données ensuite.
 - **Ordre validé** : 1. vitesse, 2. sécurité et modération, 3. Worlds,
   4. Duel.
+- **Sortie : tout d'un coup, en version 3.0.0** (Yasuro, 2026-10-18 : « I
+  would rather push everything at once as a big 3.0.0 version ») : **plus
+  aucune mise en prod partielle** ; le vrai site reste en 2.3 jusque-là.
+- **État au 2026-10-18 au soir** : phase 1 faite sur la bêta, sauf la
+  bascule des pages en WebP (attendre la fin du service `wynnguessr-webp`,
+  ~4 h à partir de 17 h 11 : `journalctl --user -u wynnguessr-webp`, puis
+  `extension: 'webp'` dans `room.js`, `survival.js`, `game.js`, le
+  préchargement de `room.js` (`.jpg` en dur) et la démo de `index.html`,
+  et vérifier que chaque lieu s'ouvre). À la mise en prod : passer le
+  vrai site à 4 workers (unité systemd hors git) et `VERSION = '3.0'`.
 - **Modération** : une **page à part** pour les modérateurs, à côté du bouton
   Profile, avec tout ce qu'il faut pour ajouter des modérateurs et modérer.
   **Des rangs** (admin, mod…) aux pouvoirs différents **les uns sur les
