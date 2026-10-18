@@ -336,6 +336,12 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   plafonnés à 5 cœurs en manche 1 → 10 en manche 20 (un seul mauvais guess
   ne tue pas au début). Résultat simulé, bons joueurs : médiane 15 en
   Normal (1 sur 4 atteint 20), 10 en Hard, 3 en Hardcore (20 : 0,3 %).
+  **Durcie le 2026-10-18** (joueurs : « within 5 blocks », 21 % des vrais
+  guess tombent à moins de 5 blocs ; Yasuro : « just a tad bit harder ») :
+  sans dégât sous 110 → 35 blocs à la manche 20, plancher 15 ; dégâts max
+  au-delà de 1 700 → 650, plancher 400. Simulé sur 4 255 guess (salons +
+  vraies parties Survival) : Normal, manche 20 atteinte 15 % → 7 % ; Hard
+  3 % → 1 %.
 - **Quasi-parfait** (≤ 10 blocs) deux fois de suite : +½ cœur, puis le
   compteur repart de zéro.
 - **Chrono** 60 / 40 / 30 s (Swiftness 20 s). Les 3 dernières secondes, le

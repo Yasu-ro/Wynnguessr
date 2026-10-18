@@ -1726,8 +1726,11 @@ def zone(n, effect = None):
     # round n: no damage within `safe` blocks, the most a guess can cost from
     # `far` on, and that most (`cap`, in half-hearts). Calibrated on the real
     # guesses of the rooms (CLAUDE.md, "Survival")
-    safe = max(25, 150 * (50 / 150) ** ((n - 1) / 19))
-    far = max(500, 2000 * (800 / 2000) ** ((n - 1) / 19))
+    # 2026-10-18, "a tad bit harder" (players: "if you know the spot you get
+    # within 5 blocks easily"): 110 -> 35 at round 20, floor 15 (was 150 ->
+    # 50, floor 25); the far end 1700 -> 650, floor 400 (was 2000 -> 800, 500)
+    safe = max(15, 110 * (35 / 110) ** ((n - 1) / 19))
+    far = max(400, 1700 * (650 / 1700) ** ((n - 1) / 19))
     cap = min(20, 10 + round(10 * (n - 1) / 19))
     if effect == 'swiftness':
         safe, far = safe * SWIFT_ZONE, far * SWIFT_ZONE
