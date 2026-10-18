@@ -477,14 +477,13 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   de triche) ; page par Playwright (menu, cœurs, cercles, creeper, mort,
   reprise), classement (ordre, une seule partie par joueur).
 
-## Survival à plusieurs (2026-10-18 : moteur fait, interface à venir)
+## Survival à plusieurs (2026-10-18, bêta)
 
-Étapes validées par Yasuro : 1. lait en solo (fait) ; **2. moteur (fait,
-section « Survival with friends » d'`app.py`)** ; 3. boutique « Potion
-Merchant » et page du salon (recherche DA d'abord) ; 4. vraie partie sur la
-bêta, puis réglage des prix. **Tant que l'étape 3 n'est pas là, Battle Royale
-reste dans `MODES`** (le salon le propose encore) et le Survival à plusieurs
-n'existe que par l'API ; l'étape 3 retire Battle Royale de la création.
+Étapes validées par Yasuro : 1. lait en solo ; 2. moteur (section « Survival
+with friends » d'`app.py`) ; 3. boutique « Potion Merchant » et page du
+salon (section « survival » de `room.js`) — **faites** ; 4. vraie partie sur
+la bêta, puis réglage des prix. Battle Royale ne se crée plus (`MODES`) ;
+ses parties passées restent rejouées pour les profils.
 
 Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») :
 
@@ -582,6 +581,55 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   difficulté (`scores.room` = code, donc pas deux fois au profil), lieux
   survécus = manches traversées vivant (le gagnant : toutes) ; 0 lieu ou
   invité : rien. XP comme les autres salons (points/100 + victoire).
+- **Interface (étape 3, 2026-10-18)**, d'après la recherche demandée par
+  Yasuro (« research what makes wynncraft's magic … don't forget sounds ») :
+  - **Wynncraft 2.1** habille ses menus en bois et papier (des packs de
+    joueurs le trouvent même « trop poli ») : la boutique reprend nos
+    matériaux, pas le gris de Minecraft. Ses marchands sont des PNJ au nom
+    magenta qui ouvrent un écran d'échange ; sa police remplace `²` `½` `¼`
+    par l'émeraude, le bloc, l'émeraude liquide ; ses objets marquent une
+    condition remplie `✔` (vert) ou non `✖` (rouge) : repris pour le prix.
+  - **Minecraft** : effet bon en bleu `#447FFF`, mauvais en rouge
+    `#FF5555`, niveau en chiffres romains (« Wither II ») ; un échange
+    épuisé barré d'une croix rouge ; une potion lancée s'appelle « Splash
+    Potion of … » ; ses sons de lancer (`random/bow`) et de bris
+    (`random/glass`) sont déjà nos `throw`/`splash`.
+  - **Voix du marchand** : le *wandering trader* de Minecraft, le seul
+    marchand qui boit lui-même potions et lait : `trader` (son « hmm » à
+    l'ouverture), `sold` (oui, achat), `refused` (non : pas assez
+    d'émeraudes, avec la bourse qui tremble) ; `pickup` (`random/pop`,
+    ramasser un objet) quand la manche rapporte des émeraudes.
+  - **Ergonomie d'une boutique de jeu** (doc Fortnite/Roblox, retours de
+    joueurs) : prix toujours visible, ce qui est trop cher reste lisible
+    (prix en rouge) au lieu d'être grisé, un refus se dit par un son et une
+    secousse, un achat se récompense (la bouteille saute, le marchand dit
+    oui).
+  - Écrans : **couvercle** de pierre pendant le lancer et les 5 s (« Round
+    3 · Starts in 4 s », les effets du joueur, « Drink Milk · N left ») ; le
+    panneau du haut et le chat restent au-dessus. **Manche** : cœurs en bas
+    à gauche comme en solo, potions du joueur sur le panneau, celles de
+    chacun en petites bouteilles à côté des noms, creeper (sifflement à
+    3 s, explosion sans épingle à 0). **Révélation** : la zone du joueur
+    (vert/jaune/rouge), où visaient les Nausea, « −3.5 ♥ · +6 émeraude »,
+    tableau Joueur / Manche (Safe, −3.5 ♥) / Cœurs, la potion au hasard
+    lancée avec la révélation (GIF puis carte). **Boutique** (page encadrée,
+    panneau « Potion Merchant ») : bourse, chrono, 8 cases d'inventaire
+    creusées dans le papier (case choisie dorée), infobulle violette à la
+    Minecraft (nom, effet coloré, texte, `✔ Price: 10` ou `✖`), « Throw it
+    at: » (les vivants, leurs cœurs et potions connues) ou « Drink it /
+    Buy it », ce que le joueur a acheté, Ready, qui est prêt. **Lancers** :
+    un toast par lancer pour tous (« A → Wither ×2 → B »), le GIF pour qui
+    est touché. **Fin** : le dernier debout, les autres « Out in round N ».
+  - `static/js/potions.js` : noms, textes **par niveau** (Wither II toutes
+    les 2,5 s…), bouteilles, cœurs, émeraude, creeper et GIF, partagés par
+    `survival.js` (solo, refait dessus) et `room.js` (section « survival »).
+    `templates/difficulty.html` : le choix de difficulté, partagé par le
+    menu solo et le salon (son script ne montre « Rounds » qu'en Classic,
+    sinon Duel le réaffichait). Émeraude dessinée par `tools/potions.py`.
+  - Pièges de test payés : `wait_for_selector(state='hidden')` sur le
+    couvercle répond tout de suite hors de l'écran de manche (son écran
+    parent est caché) : attendre `s.phase == 'guess'` ; les boutons sont
+    en capitales par le CSS (« SHOP (7) »).
 - Tests (scratchpad, à refaire) : `t_multi.py`, 93 vérifications au client
   Flask avec une horloge à la main et des pages qui interrogent chaque
   seconde comme `room.js` (règles, phases, chaque triche essayée, fin à

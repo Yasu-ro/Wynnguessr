@@ -9,7 +9,7 @@
 {% include "share.html" %}
 </head>
 
-<body class="game-page survival-page" data-difficulty="{{ difficulty }}" data-throw="{{ asset('potion-throw.gif') }}" data-test="{{ 1 if test else 0 }}">
+<body class="game-page survival-page" data-difficulty="{{ difficulty }}" data-test="{{ 1 if test else 0 }}">
     <nav class="navbar">
         <a class="nav-logo" href="./" title="Home"><img src="static/wynnlogo.png" alt="WynnGuessr" width="40" height="40"></a>
         <a class="nav-btn" href="./"><i class="material-icons">home</i><span>Home</span></a>
@@ -36,7 +36,7 @@
             <div class="hearts small" id="hearts-result"></div>
             <p id="sv-verdict"></p>
             <p id="sv-detail" class="score-info"></p>
-            <div class="potion-throw" id="potion-throw" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
+            <div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.gif') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
             <div class="potion-card" id="potion-card" hidden></div>
             <div id="xp-slot" class="xp-slot"></div>
             <div class="sv-actions">
@@ -65,6 +65,7 @@
     <script src="{{ asset('js/xp.js') }}"></script>
     <script src="{{ asset('js/block.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+    <script src="{{ asset('js/potions.js') }}"></script>
     <script src="{{ asset('js/survival.js') }}"></script>
 </body>
 </html>

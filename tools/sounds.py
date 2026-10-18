@@ -34,6 +34,14 @@ SOUNDS = {
     'throw': ['random/bow'],
     'splash': ['random/glass1', 'random/glass2', 'random/glass3'],
     'drink': ['random/drink'],
+    # the Potion Merchant (Survival with friends) speaks like Minecraft's
+    # wandering trader, the merchant who drinks potions and milk himself
+    'trader': ['mob/wandering_trader/idle1', 'mob/wandering_trader/idle2', 'mob/wandering_trader/idle3',
+               'mob/wandering_trader/idle4', 'mob/wandering_trader/idle5'],
+    'sold': ['mob/wandering_trader/yes1', 'mob/wandering_trader/yes2', 'mob/wandering_trader/yes3', 'mob/wandering_trader/yes4'],
+    'refused': ['mob/wandering_trader/no1', 'mob/wandering_trader/no2', 'mob/wandering_trader/no3',
+                'mob/wandering_trader/no4', 'mob/wandering_trader/no5'],
+    'pickup': ['random/pop'],
 }
 
 def get(url):

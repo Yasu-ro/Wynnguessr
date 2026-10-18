@@ -33,7 +33,7 @@ $(window).on('resize', setNav);
 // asks first; the page's own moves (next room, reload on error) do not
 var leaving = false;
 window.addEventListener('beforeunload', function (e) {
-    if (!leaving && (view.indexOf('guess') == 0 || view.indexOf('reveal') == 0)) {
+    if (!leaving && (view.indexOf('guess') == 0 || view.indexOf('reveal') == 0 || view.indexOf('shop') == 0)) {
         e.preventDefault();
         e.returnValue = '';
     }
@@ -120,6 +120,8 @@ function render(data) {
         lobby();
     } else if (s.live ? s.state == 'finished' : finished) {
         results();
+    } else if (s.phase == 'shop') {
+        shop();
     } else if (s.reveal) {
         reveal();
     } else {
@@ -159,14 +161,15 @@ function setNav() {
 }
 
 function show(id) {
-    ['lobby', 'guess-screen', 'reveal-screen', 'results'].forEach(function (x) {
+    ['lobby', 'guess-screen', 'reveal-screen', 'shop-screen', 'results'].forEach(function (x) {
         $('#' + x).prop('hidden', x != id);
     });
     var playing = id == 'guess-screen' || id == 'reveal-screen';
     $('body').toggleClass('room-playing', playing);
     // one chat, moved where it belongs: under the players, over the panorama,
     // in the side panel of a reveal (never over the map), under the results
-    var slot = {'guess-screen': '#chat-slot-game', 'reveal-screen': '#chat-slot-reveal', 'results': '#chat-slot-results'}[id] || '#chat-slot-lobby';
+    var slot = {'guess-screen': '#chat-slot-game', 'reveal-screen': '#chat-slot-reveal', 'shop-screen': '#chat-slot-shop',
+                'results': '#chat-slot-results'}[id] || '#chat-slot-lobby';
     if (!$('#room-chat').parent().is(slot)) {
         // on a phone the panorama is small: the chat starts folded over it
         $('#room-chat').appendTo(slot).toggleClass('folded', id == 'guess-screen' && window.innerWidth <= 800);
@@ -339,10 +342,11 @@ $('.room-chat-head').on('click', function (e) {
 });
 
 // ---------- modes ----------
-// duel: health points; royale: lives. Both come from the server (left, out,
-// delta) for the contestants (seat) after the last finished round.
+// duel: health points; royale (replaced by survival, its old games still
+// shown): lives; survival: hearts, in halves. All come from the server
+// (left, out, delta) for the contestants (seat) after the last finished round.
 
-var MODE_NAMES = {classic: 'Classic', duel: 'Duel', royale: 'Battle Royale'};
+var MODE_NAMES = {classic: 'Classic', duel: 'Duel', royale: 'Battle Royale', survival: 'Survival'};
 var DUEL_HP = 6000, LIVES = 3, BULLSEYE = 4950;
 
 function hearts(n) {
@@ -361,7 +365,7 @@ function health(p) {
 
 // what a contestant has left
 function standing(p) {
-    return s.mode == 'duel' ? health(p) + p.left.toLocaleString('en-US') : hearts(p.left);
+    return s.mode == 'duel' ? health(p) + p.left.toLocaleString('en-US') : s.mode == 'survival' ? lifeLeft(p.left) : hearts(p.left);
 }
 
 // what the last round did to them
@@ -371,6 +375,9 @@ function change(p) {
     }
     if (s.mode == 'duel') {
         return " <span class='room-loss'>" + p.delta.toLocaleString('en-US') + "</span>";
+    }
+    if (s.mode == 'survival') {
+        return " <span class='" + (p.delta < 0 ? "room-loss'>−" : "room-gain'>+") + amount(Math.abs(p.delta)) + heartIcon(hardcore()) + "</span>";
     }
     return " <span class='" + (p.delta < 0 ? "room-loss'>-1" : "room-gain'>+1") + "<i class='material-icons room-heart'>favorite</i></span>";
 }
@@ -451,6 +458,12 @@ function showSettings(st) {
         $('#time-limit').val(st.time_limit);
     }
     $('#no-look').prop('checked', st.look);
+    if (st.difficulty) {
+        $('#room-settings [name=difficulty]').each(function () {
+            this.checked = this.value == st.difficulty;
+        });
+    }
+    showDifficulty();
     showRules();
 }
 
@@ -504,6 +517,9 @@ $('#start-button').on('click', function () {
 // ---------- a round ----------
 
 function guess() {
+    if (s.mode == 'survival') {
+        return guessSurvival();
+    }
     var key = 'guess' + s.round;
     var watching = s.live && !s.playing;
     if (view != key) {
@@ -635,6 +651,9 @@ function clocks() {
     if (!s) {
         return;
     }
+    if (s.mode == 'survival') {
+        return clocksSurvival();
+    }
     if (view.indexOf('guess') != 0) {
         $('#room-countdown').prop('hidden', true);
     }
@@ -668,7 +687,7 @@ function clocks() {
 // ---------- end of a round ----------
 
 function reveal() {
-    var key = 'reveal' + s.round, fresh = view != key;
+    var key = 'reveal' + s.round, fresh = view != key, from = view;
     if (view != key) {
         view = key;
         show('reveal-screen');
@@ -697,6 +716,9 @@ function reveal() {
                 Sfx.play('note', noteBlock(SCALE[Math.min(i, SCALE.length - 1)]));
             }, DROP * (i + 1));
         });
+        if (s.mode == 'survival') {
+            zones(answer, spots);
+        }
         revealMap.fitBounds(L.latLngBounds(spots), {padding: [60, 60], maxZoom: 1});
         // then your points count up, and one sound says how it went
         counting = {key: key, from: Date.now() + DROP * (drops.length + 1), score: 0, done: false};
@@ -712,7 +734,9 @@ function reveal() {
         line = 'Bullseye! ' + line;
     }
     var bad = "<span class='room-loss'> · ", good = "<span class='room-gain'> · ";
-    if (s.mode != 'classic' && you.seat && (you.out == null || you.out == s.round)) {
+    if (s.mode == 'survival' && you.seat && (you.out == null || you.out == s.round)) {
+        line = survivalLine(you, guessed ? line : 'Boom! No guess in time', bad, good);
+    } else if (s.mode != 'classic' && you.seat && (you.out == null || you.out == s.round)) {
         if (you.out == s.round) {
             line += bad + "you're out!</span>";
         } else if (s.mode == 'duel') {
@@ -729,14 +753,19 @@ function reveal() {
             : s.mode != 'classic' && you.out == s.round ? 'out'
             : guessed && mine.score >= BULLSEYE ? 'perfect'
             : s.mode != 'classic' && you.delta < 0 ? 'hurt'
+            : s.mode == 'survival' ? 'good'
             : guessed && mine.score >= GOOD ? 'good'
             : guessed && mine.score > BAD ? null : 'bad';
+        counting.earned = s.me && s.me.earned;
         requestAnimationFrame(count);
+        if (s.mode == 'survival') {
+            randomPotion(from == 'guess' + s.round);
+        }
     }
     $('#reveal-title').text(s.mode == 'classic' ? 'Round ' + s.round + '/' + s.rounds
         : 'Round ' + s.round + (s.mode == 'duel' && s.multiplier > 1 ? ' · damage ×' + s.multiplier : ''));
     $('#reveal-mine').html(line).toggleClass('none', !guessed).toggleClass('room-bullseye', bullseye);
-    $('#reveal-total').text({classic: 'Total', duel: 'HP', royale: 'Lives'}[s.mode]);
+    $('#reveal-total').text({classic: 'Total', duel: 'HP', royale: 'Lives', survival: 'Hearts'}[s.mode]);
 
     var rows = s.players.map(function (p) {
         var g = s.reveal.guesses.filter(function (x) { return x.name == p.name; })[0];
@@ -754,6 +783,10 @@ function reveal() {
     var knock = counting && counting.key == key && counting.done && !counting.knocked;
     var html = rows.map(function (r) {
         var gone = r.p.out != null && r.p.out < s.round, last;
+        var round = r.score >= 0 ? '+' + r.score.toLocaleString('en-US') : '-';
+        if (s.mode == 'survival') {
+            round = gone ? '-' : roundCost(r.p);
+        }
         if (s.mode == 'classic') {
             last = r.total.toLocaleString('en-US');
         } else if (gone) {
@@ -762,14 +795,16 @@ function reveal() {
             last = (s.mode == 'royale' ? hearts(0) + ' ' : '') + "<span class='room-loss'>Out!</span>";
         } else if (s.mode == 'duel') {
             last = '<div>' + r.p.left.toLocaleString('en-US') + change(r.p) + '</div>' + health(r.p);
+        } else if (s.mode == 'survival') {
+            last = lifeLeft(r.p.left);
         } else {
             last = hearts(r.p.left) + change(r.p);
         }
         var hit = knock && !gone && s.mode != 'classic' && (r.p.out == s.round || r.p.delta < 0);
         var heal = knock && !gone && s.mode == 'royale' && r.p.delta > 0;
         return "<tr class='" + (r.p.you ? 'you' : '') + (gone ? ' room-out' : '') + (hit ? ' hit' : '') + (heal ? ' heal' : '') + "'>" +
-            "<td>" + dot(r.p) + esc(r.p.name) + "</td>" +
-            "<td class='num'>" + (r.score >= 0 ? '+' + r.score.toLocaleString('en-US') : '-') + "</td>" +
+            "<td>" + dot(r.p) + esc(r.p.name) + (s.mode == 'survival' ? bottles(r.p.effects || {}) : '') + "</td>" +
+            "<td class='num'>" + round + "</td>" +
             "<td class='num'>" + last + "</td></tr>";
     }).join('');
     var plain = html.replace(/ (hit|heal)'/g, "'");
@@ -783,6 +818,8 @@ function reveal() {
 
     if (s.next_in !== undefined) {
         nextAt = Date.now() + s.next_in * 1000;
+    } else if (s.phase_left !== undefined) {
+        nextAt = Date.now() + s.phase_left * 1000;
     }
     nextButton();
 }
@@ -813,6 +850,10 @@ function count() {
         if (c.verdict) {
             Sfx.play(c.verdict);
         }
+        if (c.earned) {
+            // the emeralds, picked up as in Minecraft
+            setTimeout(function () { Sfx.play('pickup'); }, 300);
+        }
         return;
     }
     if (el) {
@@ -831,7 +872,7 @@ function lastRound() {
 }
 
 function nextButton() {
-    var b = $('#next-button'), label = lastRound() ? 'See Results' : 'Next Round';
+    var b = $('#next-button'), label = lastRound() ? 'See Results' : s.mode == 'survival' ? 'Shop' : 'Next Round';
     if (!s.live) {
         b.prop('disabled', false).text(lastRound() ? label : 'Next Location');
         return;
@@ -935,7 +976,7 @@ function results() {
         }
         gain();
     }
-    $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives'}[s.mode]);
+    $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives', survival: 'Hearts'}[s.mode]);
     $('#again-button').prop('hidden', !(s.live && s.host));
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
@@ -1021,3 +1062,541 @@ function panoramaConfig(url, options) {
     for (var k in options) config[k] = options[k];
     return config;
 }
+
+// ---------- survival ----------
+// Survival with friends (app.py, "Survival with friends"): the hearts, the
+// zone, the clock and the potions of the solo game (potions.js), emeralds
+// for each guess, and between two rounds the Potion Merchant. The server
+// says the phase: throw (the potions bought fly), prep (the picture loads
+// under a cover, everyone sees what hit them and may drink milk), guess,
+// reveal (the random potions are thrown), shop.
+
+var SHOP_ITEMS = ['mining_fatigue', 'swiftness', 'wither', 'nausea', 'blindness', 'darkness', 'regeneration', 'milk'];
+var SELF = ['regeneration', 'milk'];      // bought for oneself, never thrown
+var FUSE = 3;              // seconds of hissing before the creeper explodes
+var DRINK_MS = 1600;       // milk, drunk as in Minecraft (survival.js has the same)
+var GULPS = [400, 600, 800, 1000, 1200, 1400, 1600];
+var startsAt = null;       // when the round starts, local clock (throw, prep)
+var shopAt = null;         // when the shop closes, local clock
+var madeFor = null;        // the picture and the effects the panorama and the map were made for
+var covered = false;       // the cover was up on this page: its lifting is the start
+var started = null;        // the round whose clock and effects have started
+var startedAt = 0;         // when it started, local clock
+var darkTimer = null, witherShown = null, fused = false, exploded = false, drinking = false;
+var announced = null;      // the round whose throws were announced
+var coverHtml = null, shopPick = null, shopSlots = '', targetsHtml = '', shopSays = null;
+
+function hardcore() {
+    return s.difficulty == 'hardcore';
+}
+
+// hearts left, from half-hearts: "8.5" and a heart
+function lifeLeft(half) {
+    return amount(half) + ' ' + heartIcon(hardcore());
+}
+
+function myEffects() {
+    var p = me();
+    return (p && p.effects) || {};
+}
+
+// the potions of a set, in the bottles' order
+function effectList(fx) {
+    return BOTTLES.filter(function (k) { return fx[k]; });
+}
+
+function bottles(fx) {
+    return effectList(fx).map(function (k) {
+        return "<span class='room-bottle' title='" + POTIONS[k][0] + roman(fx[k]) + "'>" + potionIcon(k) + "</span>";
+    }).join('');
+}
+
+function itemIcon(k) {
+    return k == 'milk' ? "<i class='bucket-icon'></i>" : potionIcon(k);
+}
+
+// as Minecraft names them: thrown, a splash potion
+function itemName(k) {
+    return k == 'milk' ? 'Milk Bucket' : (SELF.indexOf(k) >= 0 ? 'Potion of ' : 'Splash Potion of ') + POTIONS[k][0];
+}
+
+function guessSurvival() {
+    var key = 'guess' + s.round, fx = myEffects(), you = me(), round = s.phase == 'guess';
+    if (view != key) {
+        if (view == 'lobby') {
+            Sfx.play('start');
+        }
+        view = key;
+        show('guess-screen');
+        marker = null;
+        madeFor = null;
+        coverHtml = null;
+        covered = false;
+        submitted = s.answered;
+        heard = null;
+        deadline = null;
+        fused = exploded = drinking = false;
+        witherShown = null;
+        clearTimeout(darkTimer);
+        $('#room-dark').prop('hidden', true);
+        $('#guess-button').prop('disabled', false).removeClass('room-warn').text('Guess!');
+    }
+    // the panorama and the map, made for the effects (milk may still take them away before the round)
+    var made = s.url + ' ' + JSON.stringify(s.playing ? fx : {});
+    if (made != madeFor) {
+        madeFor = made;
+        survivalViews(s.playing ? fx : {});
+    }
+    // the potions bought fly first, for everyone to see
+    if (s.phase == 'throw' && announced != s.round) {
+        announced = s.round;
+        announce();
+    }
+    if (!round) {
+        covered = true;
+        startsAt = Date.now() + s.starts_in * 1000;
+        cover(fx);
+    } else if (started != s.round) {
+        started = s.round;
+        if (covered) {
+            Sfx.play('round');
+        }
+        startRound(fx);
+    }
+    $('#room-cover').prop('hidden', round);
+    $('#guess-screen').toggleClass('covered', !round);
+
+    if (round) {
+        // a sound each time another player guesses (not for those already in when the round appeared)
+        var now = s.players.filter(function (p) { return p.guessed && !p.you; }).map(function (p) { return p.name; });
+        if (heard && now.some(function (n) { return heard.indexOf(n) < 0; })) {
+            Sfx.play('other');
+        }
+        heard = now;
+        if (s.time_left !== undefined) {
+            var d = Date.now() + s.time_left * 1000;
+            if (deadline === null || Math.abs(d - deadline) > 700) {
+                deadline = d;
+            }
+        }
+    }
+    if (s.answered) {
+        submitted = true;
+    }
+    if (!s.playing) {
+        $('#guess-button').prop('disabled', true).text(you && you.seat ? "You're out" : 'Spectating');
+    } else if (submitted && !exploded) {
+        $('#guess-button').prop('disabled', true).text('Waiting for the others...');
+    }
+
+    // your hearts where Minecraft keeps them; the round's potions on the sign
+    var hearts = document.getElementById('room-hearts');
+    $(hearts).prop('hidden', !s.playing);
+    if (s.playing) {
+        drawHearts(hearts, witherShown === null ? you.left : witherShown, s.max, hardcore());
+    }
+    $('#hud-round').text('Round ' + s.round);
+    $('#hud-mult').html(s.playing ? effectList(fx).map(function (k) {
+        return "<b class='room-effect'>" + potionIcon(k) + POTIONS[k][0] + roman(fx[k]) + '</b>';
+    }).join(' ') : '');
+    $('#hud-score').text(s.playing ? '' : 'Watching');
+    $('#hud-call').text(round && s.first && !submitted && s.playing ? s.first + ' has guessed, hurry up!' : '');
+    $('#hud-players').html(standingNow().map(function (p) {
+        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + ' ' + lifeLeft(p.left) + bottles(p.effects || {}) +
+            (round ? "<i class='material-icons'>" + (p.guessed ? 'check_circle' : 'more_horiz') + "</i>" : '') + "</span>";
+    }).join(''));
+}
+
+// the map and the panorama of a round, with what the potions do to them
+function survivalViews(fx) {
+    if (map) {
+        map.remove();
+    }
+    map = makeMap('map', -2);
+    blockCursor(map);
+    map.on('click', function (e) {
+        if (submitted || !s.playing || s.phase != 'guess') {
+            return;
+        }
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        var b = blockAt(e.latlng);
+        marker = L.marker(blockSpot(b.x, b.z), {icon: pin(color(me()))}).addTo(map);
+        drop(marker);
+        Sfx.play('pin');
+        $('#guess-button').removeClass('room-warn').text('Guess!');
+    });
+    if (fx.mining_fatigue) {
+        // Mining Fatigue: no zoom at all, the map stays as it opens
+        map.setMinZoom(map.getZoom()).setMaxZoom(map.getZoom());
+        ['scrollWheelZoom', 'doubleClickZoom', 'touchZoom', 'boxZoom', 'keyboard'].forEach(function (h) { map[h].disable(); });
+        map.zoomControl.remove();
+    }
+    if (viewer) {
+        viewer.destroy();
+    }
+    var options = {autoLoad: true};
+    if (fx.nausea) {
+        // Nausea: the view turns by itself, faster at each level, and cannot be held
+        options = {autoLoad: true, autoRotate: NAUSEA_SPIN * fx.nausea, draggable: false, mouseZoom: false, keyboardZoom: false,
+                   disableKeyboardCtrl: true, showControls: false};
+    }
+    viewer = pannellum.viewer('room-panorama', panoramaConfig(s.url, options));
+}
+
+// the round starts: what counts from its start (a reload included): Darkness, Wither
+function startRound(fx) {
+    var elapsed = s.elapsed || 0;
+    startedAt = Date.now() - elapsed * 1000;
+    witherShown = null;
+    clearTimeout(darkTimer);
+    if (s.playing && fx.darkness) {
+        var round = s.round;
+        darkTimer = setTimeout(function () {
+            if (view == 'guess' + round) {
+                $('#room-dark').prop('hidden', false);
+            }
+        }, Math.max(0, DARK_AFTER / fx.darkness - elapsed) * 1000);
+    }
+}
+
+// Wither: the hearts the server will take, shown as they go
+function wither() {
+    var fx = myEffects(), you = me();
+    if (!s.playing || !fx.wither || submitted) {
+        return;
+    }
+    var hp = Math.max(0, you.left - Math.floor((Date.now() - startedAt) / 1000 * fx.wither / WITHER_EVERY));
+    if (hp != witherShown) {
+        var el = document.getElementById('room-hearts');
+        if (witherShown !== null) {
+            drawHearts(el, hp, s.max, hardcore());
+            replay(el, 'hurt');
+            Sfx.play('hurt', 1, .6);
+        }
+        witherShown = hp;
+    }
+}
+
+// before the round the picture loads under a cover, which says what hit
+// you; the milk is drunk here
+function cover(fx) {
+    $('#cover-title').text('Round ' + s.round);
+    if (drinking) {
+        return;   // the bucket is still going down
+    }
+    var you = me(), list = effectList(fx), html = '';
+    if (s.playing && you.milked) {
+        html = "<div class='cover-effect'><i class='bucket-icon empty'></i><div><b>Milk!</b><span>No potion this round.</span></div></div>";
+    } else if (s.playing && list.length) {
+        html = list.map(function (k) {
+            return "<div class='cover-effect'>" + potionIcon(k) + "<div><b class='" + (k == 'regeneration' ? 'good' : 'bad') + "'>" +
+                POTIONS[k][0] + roman(fx[k]) + '</b><span>' + potionText(k, hardcore(), fx[k]) + '</span></div></div>';
+        }).join('');
+    } else if (s.playing) {
+        html = "<p class='cover-none'>No potion on you.</p>";
+    }
+    if (html != coverHtml) {
+        $('#cover-effects').html(html);
+        coverHtml = html;
+    }
+    var milk = s.playing && list.length && !you.milked && s.me && s.me.milk > 0;
+    $('#room-milk').prop('hidden', !milk).prop('disabled', false)
+        .html("<i class='bucket-icon'></i>Drink Milk<small>" + (s.me ? s.me.milk : 0) + ' left</small>');
+}
+
+// the bucket goes up and gulps (as alone); the cover changes once it is empty
+$('#room-milk').on('click', function () {
+    var b = $(this).prop('disabled', true), round = s.round;
+    drinking = true;
+    b.find('.bucket-icon').addClass('drinking');
+    GULPS.forEach(function (t) {
+        setTimeout(function () {
+            if (s.round == round) {
+                Sfx.play('drink', .9 + Math.random() * .1);
+            }
+        }, t);
+    });
+    var sent = send('milk', {round: round});
+    setTimeout(function () {
+        sent.always(function () {
+            drinking = false;
+            coverHtml = null;
+            if (view == 'guess' + round && s.phase != 'guess') {
+                cover(myEffects());
+            }
+        });
+    }, DRINK_MS);
+});
+
+// the potions bought, for everyone: a toast each (the same throw twice: ×2);
+// whoever they hit sees them fly
+function announce() {
+    var seen = {}, list = [], you = me();
+    (s.throws || []).forEach(function (t) {
+        var k = t.by + '>' + t.item + '>' + t.to;
+        if (!seen[k]) {
+            seen[k] = {t: t, n: 0};
+            list.push(seen[k]);
+        }
+        seen[k].n++;
+    });
+    if (!list.length) {
+        return;
+    }
+    Sfx.play('toast');
+    list.forEach(function (x) {
+        toast(esc(x.t.by) + ' → ' + POTIONS[x.t.item][0] + (x.n > 1 ? ' ×' + x.n : '') + ' → ' + esc(x.t.to),
+              "<span class='toast-item'>" + potionIcon(x.t.item) + '</span>');
+    });
+    if (s.playing && you && list.some(function (x) { return x.t.to == you.name; }) && !REDUCED) {
+        throwAnimation(function () {});
+    }
+}
+
+function clocksSurvival() {
+    if (view.indexOf('guess') == 0) {
+        if (s.phase != 'guess') {
+            $('#room-countdown').prop('hidden', true);
+            var wait = Math.max(0, Math.ceil((startsAt - Date.now()) / 1000));
+            $('#cover-left').text(wait ? 'Starts in ' + wait + ' s' : 'Go!');
+            return;
+        }
+        if (deadline === null) {
+            $('#room-countdown').prop('hidden', true);
+            return;
+        }
+        var left = Math.max(0, (deadline - Date.now()) / 1000), guessing = !submitted && s.playing;
+        $('#room-countdown').prop('hidden', false).html("<i class='material-icons'>timer</i>" + clock(left))
+            .toggleClass('urgent', left <= 10);
+        wither();
+        // the creeper hisses for the last seconds; then the pin goes by itself, or it explodes
+        if (guessing && left <= FUSE && !fused) {
+            fused = true;
+            Sfx.play('fuse');
+        }
+        if (guessing && left <= 0.2) {
+            if (marker) {
+                submit(true);
+            } else if (!exploded) {
+                exploded = submitted = true;
+                explode();
+                $('#guess-button').prop('disabled', true).text('Boom!');
+            }
+        }
+    } else if (view.indexOf('shop') == 0) {
+        var shut = Math.max(0, Math.ceil((shopAt - Date.now()) / 1000));
+        $('#shop-clock').html("<i class='material-icons'>timer</i>" + shut + ' s').toggleClass('urgent', shut <= 5);
+    } else if (view.indexOf('reveal') == 0) {
+        nextButton();
+    }
+}
+
+// the reveal: your zone around the answer (green, no damage; yellow, damage;
+// red, death with the hearts you had), and where the Nausea pins were aimed
+function zones(answer, spots) {
+    var you = me(), r = you && you.result;
+    if (r) {
+        L.circle(answer, {radius: r.kill || r.far, color: '#c9a227', weight: 2, fillColor: '#ffd75e', fillOpacity: .14, interactive: false}).addTo(revealMap);
+        if (r.kill) {
+            L.circle(answer, {radius: r.kill, color: '#b3302a', weight: 3, dashArray: '10 6', fill: false, interactive: false}).addTo(revealMap);
+        }
+        L.circle(answer, {radius: r.safe, color: '#2f7a22', weight: 2, fillColor: '#88cc42', fillOpacity: .22, interactive: false}).addTo(revealMap);
+        spots.push(L.latLng(answer.lat + r.safe, answer.lng + r.safe), L.latLng(answer.lat - r.safe, answer.lng - r.safe));
+    }
+    s.players.forEach(function (p) {
+        var g = p.result;
+        if (g && g.aim_x !== null && g.aim_x !== undefined) {
+            var aimed = blockSpot(g.aim_x, g.aim_z);
+            L.circleMarker(aimed, {radius: 6, color: '#3f2724', weight: 2, fillColor: '#ffffff', fillOpacity: .8, interactive: false}).addTo(revealMap);
+            if (g.x !== null) {
+                L.polyline([aimed, blockSpot(g.x, g.z)], {color: '#3f2724', weight: 2, dashArray: '2 5', interactive: false}).addTo(revealMap);
+            }
+        }
+    });
+}
+
+// your line of the reveal: what the round cost, what it brought
+function survivalLine(you, line, bad, good) {
+    var r = you.result || {}, lost = (r.damage || 0) + (r.wither || 0), heart = heartIcon(hardcore());
+    if (you.out == s.round) {
+        line += bad + "you're out!</span>";
+    } else if (lost) {
+        line += bad + '−' + amount(lost) + ' ' + heart + (r.heal ? ' +' + amount(r.heal) + ' ' + heart : '') + '</span>';
+    } else {
+        line += good + (r.heal ? '+' + amount(r.heal) + ' ' + heart : 'safe') + '</span>';
+    }
+    if (s.me && s.me.earned) {
+        line += " <span class='room-earn'>+" + s.me.earned + emeraldIcon() + '</span>';
+    }
+    return line;
+}
+
+// what the round cost a player, for the table
+function roundCost(p) {
+    var r = p.result;
+    if (!r) {
+        return '-';
+    }
+    var lost = r.damage + r.wither;
+    return lost ? "<span class='room-loss'>−" + amount(lost) + ' ' + heartIcon(hardcore()) + '</span>' : "<span class='room-gain'>Safe</span>";
+}
+
+// a random potion thrown at you with the reveal, as alone: it flies (when
+// coming from the round, not on a reload), then its card stays in the panel
+function randomPotion(thrown) {
+    var fx = myEffects(), k = effectList(fx)[0], key = view, card = $('#reveal-potion').prop('hidden', true);
+    if (!k || !s.playing) {
+        return;
+    }
+    var shown = function () {
+        if (view == key) {
+            card.html(potionIcon(k) + '<div><b>' + POTIONS[k][0] + '!</b><span>' + potionText(k, hardcore()) + '</span></div>').prop('hidden', false);
+        }
+    };
+    if (thrown && !REDUCED) {
+        setTimeout(function () { throwAnimation(shown); }, 900);
+    } else {
+        shown();
+    }
+}
+
+// ---------- the Potion Merchant ----------
+// Between two rounds: an inventory of potions (Minecraft's slots, its item
+// tooltips, Wynncraft's ✔ and ✖), paid in emeralds, thrown at a player; the
+// merchant speaks like Minecraft's wandering trader. What others buy stays
+// secret until the shop shuts (then the throws).
+
+function shop() {
+    var key = 'shop' + s.round, you = me();
+    if (view != key) {
+        view = key;
+        show('shop-screen');
+        shopPick = null;
+        shopSlots = targetsHtml = '';
+        Sfx.play('trader');
+    }
+    shopAt = Date.now() + s.phase_left * 1000;
+    var mine = s.me, wares = s.wares || {}, alive = you && you.seat && you.out == null;
+    $('#shop-purse').html(mine ? emeraldIcon() + '<b>' + mine.emeralds + '</b>' : '').prop('hidden', !mine);
+    var says = shopSays && Date.now() < shopSays.until ? shopSays.text
+        : !mine ? 'You are watching.' : !alive ? "You're out, but your emeralds still work." : '';
+    $('#shop-note').prop('hidden', !says).text(says).toggleClass('bad', !!(shopSays && Date.now() < shopSays.until));
+    var items = !mine ? [] : SHOP_ITEMS.filter(function (k) { return k in wares || (k == 'milk' && alive && mine.milk_left <= 0); });
+    var slots = items.map(function (k) {
+        var price = wares[k], sold = price === undefined, dear = !sold && mine.emeralds < price;
+        return "<button type='button' class='shop-slot" + (k == shopPick ? ' picked' : '') + (dear ? ' dear' : '') + (sold ? ' sold' : '') +
+            "' data-item='" + k + "' aria-label='" + itemName(k) + "'>" + itemIcon(k) +
+            "<span class='shop-price'>" + (sold ? '' : price + emeraldIcon()) + "</span></button>";
+    }).join('');
+    if (slots != shopSlots) {
+        $('#shop-slots').html(slots);
+        shopSlots = slots;
+    }
+    tip(shopPick);
+    targets(shopPick);
+    $('#shop-bought').html(!s.bought || !s.bought.length ? '' : 'You bought: ' + s.bought.map(function (b) {
+        return "<span class='shop-had'>" + itemIcon(b.item) + (SELF.indexOf(b.item) < 0 ? '→ ' + esc(b.to) : '') + '</span>';
+    }).join(' '));
+    var ready = you && you.ready;
+    $('#ready-button').prop('hidden', !mine).prop('disabled', !!ready).text(ready ? 'Waiting for the others...' : 'Ready');
+    $('#shop-ready').html(contestants().filter(function (p) { return p.here; }).map(function (p) {
+        return "<span class='room-hud-player'>" + dot(p) + esc(p.name) + "<i class='material-icons'>" + (p.ready ? 'check_circle' : 'more_horiz') + "</i></span>";
+    }).join(''));
+}
+
+// the item's tooltip, drawn as Minecraft draws them: its name, its effect
+// (red: bad for whoever it hits, blue: good), what it does, and the price,
+// marked ✔ or ✖ as Wynncraft marks what you can or cannot use
+function tip(k) {
+    var box = $('#shop-tip');
+    if (!k || !s.me) {
+        box.prop('hidden', true);
+        return;
+    }
+    var price = (s.wares || {})[k], ok = price !== undefined && s.me.emeralds >= price;
+    var html = "<b class='tip-name'>" + itemName(k) + '</b>';
+    if (k == 'milk') {
+        html += "<span class='tip-text'>Drink it before a round: no potion hits you that round. " +
+            s.me.milk + ' in hand, ' + s.me.milk_left + ' left to buy.</span>';
+    } else {
+        html += "<span class='tip-effect " + (k == 'regeneration' ? 'good' : 'bad') + "'>" + POTIONS[k][0] + '</span>' +
+            "<span class='tip-text'>" + potionText(k, hardcore()) + '</span>';
+    }
+    html += price === undefined ? "<span class='tip-price no'>✖ Out of stock</span>"
+        : "<span class='tip-price " + (ok ? 'ok' : 'no') + "'>" + (ok ? '✔' : '✖') + ' Price: ' + price + emeraldIcon() + '</span>';
+    box.html(html).prop('hidden', false);
+}
+
+// who a potion can go to: the players still standing, or yourself
+function targets(k) {
+    var box = $('#shop-targets'), html;
+    if (!s.me) {
+        html = '';
+    } else if (!k) {
+        var prices = Object.keys(s.wares || {}).map(function (w) { return s.wares[w]; });
+        html = "<p class='shop-hint'>" + (prices.length && s.me.emeralds >= Math.min.apply(null, prices) ? 'Pick a potion.' : 'Not enough emeralds for anything.') + '</p>';
+    } else if (SELF.indexOf(k) >= 0) {
+        html = "<p class='shop-hint'>For you.</p><button type='button' class='btn wide shop-buy' data-buy='" + k + "'>" +
+            (k == 'milk' ? 'Buy it' : 'Drink it') + '</button>';
+    } else {
+        html = "<p class='shop-hint'>Throw it at:</p>" + standingNow().filter(function (p) { return !p.you; }).map(function (p) {
+            return "<button type='button' class='shop-target' data-buy='" + k + "' data-target='" + p.uid + "'>" + dot(p) +
+                "<span class='shop-name'>" + esc(p.name) + '</span>' + bottles(p.effects || {}) + "<span class='shop-life'>" + lifeLeft(p.left) + '</span></button>';
+        }).join('');
+    }
+    if (html != targetsHtml) {
+        box.html(html);
+        targetsHtml = html;
+    }
+    box.find('button').prop('disabled', !!(me() && me().ready));
+}
+
+$('#shop-slots').on('click', '.shop-slot', function () {
+    shopPick = $(this).data('item');
+    Sfx.play('click');
+    shop();
+}).on('mouseenter', '.shop-slot', function () {
+    tip($(this).data('item'));
+}).on('mouseleave', function () {
+    tip(shopPick);
+});
+
+$('#shop-targets').on('click', '[data-buy]', function () {
+    buy($(this).data('buy'), $(this).data('target'));
+});
+
+// paid at once if the emeralds are there: the merchant says yes; if not, no
+function buy(item, target) {
+    var price = (s.wares || {})[item];
+    if (price === undefined || s.me.emeralds < price) {
+        refuse(price === undefined ? 'Out of stock' : 'Not enough emeralds');
+        return;
+    }
+    send('buy', {round: s.round, item: item, target: target || ''}).done(function (r) {
+        if (r.success) {
+            Sfx.play('sold');
+            s.me.emeralds = r.emeralds;
+            $('#shop-purse b').text(r.emeralds);
+            replay(document.querySelector('.shop-slot[data-item="' + item + '"]'), 'bought');
+        } else {
+            refuse(r.error);
+        }
+    }).fail(function () {
+        refuse('Connection problem, try again');
+    });
+}
+
+function refuse(text) {
+    Sfx.play('refused');
+    replay(document.getElementById('shop-purse'), 'refused');
+    shopSays = {text: text || 'Not enough emeralds', until: Date.now() + 2500};
+    shop();
+}
+
+$('#ready-button').on('click', function () {
+    $(this).prop('disabled', true);
+    Sfx.play('click');
+    send('ready', {round: s.round});
+});

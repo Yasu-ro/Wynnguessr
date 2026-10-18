@@ -2403,6 +2403,421 @@ body.room-playing {
     z-index: 1;
 }
 
+/* ---------- Survival with friends ---------- */
+
+/* your hearts on the picture, bottom left, as alone */
+#room-hearts {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    z-index: 400;
+    filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45));
+}
+/* the round's potions on the sign; everyone's, small, by their names */
+.room-effect {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+.room-effect + .room-effect {
+    margin-left: 10px;
+}
+.room-effect .potion-icon {
+    width: 22px;
+    height: 22px;
+    background-position: calc(var(--i) * -22px) 0;
+    background-size: 154px 22px;
+}
+.room-bottle {
+    display: inline-flex;
+    margin-left: 3px;
+}
+.room-bottle .potion-icon {
+    width: 18px;
+    height: 18px;
+    background-position: calc(var(--i) * -18px) 0;
+    background-size: 126px 18px;
+}
+/* emeralds, Wynncraft's money (tools/potions.py) */
+.emerald {
+    display: inline-block;
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    vertical-align: -3px;
+    background: url("emerald.png") 0 0 / 100% 100% no-repeat;
+    image-rendering: pixelated;
+}
+.room-earn {
+    color: var(--green-dark);
+    white-space: nowrap;
+}
+
+/* before a round the picture loads under a cover of stone, which says what
+   hit you; the sign and the chat stay over it */
+.room-cover {
+    position: absolute;
+    inset: 0;
+    z-index: 510;
+    display: grid;
+    place-items: center;
+    padding: 110px 16px 16px;
+    overflow-y: auto;
+    background: var(--stone) var(--tex-stone);
+}
+.room-screen.covered .room-top, .room-screen.covered .room-chat-game {
+    z-index: 520;
+}
+.room-cover-card {
+    width: min(440px, 100%);
+    padding: 16px 22px 22px;
+    text-align: center;
+    background: var(--paper);
+    border-radius: 4px;
+    box-shadow: var(--frame-thin);
+}
+.room-cover-card h2 {
+    margin: 0;
+    font: 400 32px/1.2 var(--hand);
+}
+.room-cover-left {
+    margin: 2px 0 6px;
+    font: 700 20px/1.3 var(--sans);
+    font-variant-numeric: tabular-nums;
+}
+.cover-effect {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    text-align: left;
+    background: var(--paper-light);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+}
+.cover-effect .potion-icon {
+    width: 40px;
+    height: 40px;
+    background-position: calc(var(--i) * -40px) 0;
+    background-size: 280px 40px;
+}
+.cover-effect .bucket-icon {
+    width: 40px;
+    height: 40px;
+    background-size: 80px 40px;
+}
+.cover-effect .bucket-icon.empty {
+    background-position: -40px 0;
+}
+.cover-effect b {
+    display: block;
+    font-size: 18px;
+}
+.cover-effect span {
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+/* as Minecraft colours an effect: red, bad for you; blue, good */
+.cover-effect b.bad {
+    color: var(--red);
+}
+.cover-effect b.good {
+    color: #2c5fc9;
+}
+.cover-none {
+    margin: 10px 0 0;
+    color: var(--ink-soft);
+}
+.room-cover .milk-button {
+    margin: 14px auto 0;
+}
+/* a throw's toast: the bottle in the ink square */
+.toast > .toast-item {
+    display: grid;
+    place-items: center;
+    flex: none;
+    align-self: stretch;
+    width: 40px;
+    padding: 0;
+    background: var(--ink);
+}
+
+/* ---------- the Potion Merchant ---------- */
+
+.shop {
+    max-width: 900px;
+    margin: 0 auto;
+}
+.shop-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+/* your emeralds, and the time the shop stays open */
+.shop-purse, .shop-clock {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 42px;
+    padding: 0 14px;
+    font: 700 22px/1 var(--sans);
+    font-variant-numeric: tabular-nums;
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+}
+.shop-purse {
+    background: var(--paper-light);
+    box-shadow: inset 0 -3px 0 rgba(63, 39, 36, .14);
+}
+.shop-purse .emerald {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+}
+.shop-clock {
+    margin-left: auto;
+    background: var(--sign);
+}
+.shop-clock .material-icons {
+    font-size: 24px;
+}
+.shop-clock.urgent {
+    color: var(--red);
+    border-color: var(--red);
+}
+.shop-note {
+    margin: 0 0 12px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--ink-soft);
+}
+.shop-note.bad {
+    color: var(--red);
+}
+.shop-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+}
+/* the merchant's inventory: Minecraft's slots, sunk into the paper */
+.shop-slots {
+    display: grid;
+    grid-template-columns: repeat(4, 76px);
+    gap: 8px;
+    justify-content: center;
+}
+.shop-slot {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 76px;
+    height: 76px;
+    padding: 0;
+    font: 700 15px/1 var(--sans);
+    color: var(--ink);
+    background: #c4b283;
+    border: 3px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: inset 3px 3px 0 rgba(63, 39, 36, .35), inset -3px -3px 0 rgba(255, 255, 255, .28);
+    cursor: pointer;
+}
+.shop-slot:hover {
+    background-color: #d3c193;
+}
+.shop-slot.picked {
+    background-color: var(--gold);
+}
+.shop-slot .potion-icon {
+    width: 44px;
+    height: 44px;
+    background-position: calc(var(--i) * -44px) 0;
+    background-size: 308px 44px;
+}
+.shop-slot .bucket-icon {
+    width: 44px;
+    height: 44px;
+    background-size: 88px 44px;
+}
+.shop-price {
+    display: inline-flex;
+    align-items: center;
+}
+.shop-price .emerald {
+    width: 14px;
+    height: 14px;
+}
+.shop-slot.dear .shop-price {
+    color: var(--red);
+}
+/* out of stock, as Minecraft marks a trade: a red cross */
+.shop-slot.sold {
+    cursor: default;
+}
+.shop-slot.sold::after {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'><path d='M1 1h1v1h1v1h2V2h1V1h1v1H6v1H5v2h1v1h1v1H6V6H5V5H3v1H2v1H1V6h1V5h1V3H2V2H1z' fill='%23b3302a'/></svg>") center / 100% 100% no-repeat;
+}
+/* its tooltip, as Minecraft draws them (flat, as everything here) */
+.shop-tip {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 344px;
+    margin: 16px auto 0;
+    padding: 8px 12px 10px;
+    font-size: 15px;
+    line-height: 1.35;
+    text-align: left;
+    color: #fff;
+    background: #160a19;
+    border: 3px solid #3b1868;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px #160a19, 0 4px 0 2px rgba(0, 0, 0, .3);
+}
+.tip-name {
+    font-size: 17px;
+}
+.tip-effect.bad, .tip-price.no {
+    color: #ff5555;
+}
+.tip-effect.good {
+    color: #6f9bff;
+}
+.tip-text {
+    color: #aaa;
+}
+.tip-price.ok {
+    color: #55ff55;
+}
+/* who to throw it at */
+.shop-hint {
+    margin: 0 0 8px;
+    font-weight: 700;
+}
+.shop-targets {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.shop-target {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    padding: 8px 12px;
+    font: 500 17px/1.2 var(--sans);
+    color: var(--ink);
+    text-align: left;
+    background: var(--paper-light);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: inset 0 -3px 0 rgba(63, 39, 36, .14);
+    cursor: pointer;
+}
+.shop-target:hover:not(:disabled) {
+    background-color: var(--gold);
+}
+.shop-target:disabled, .shop-buy:disabled {
+    opacity: .6;
+    cursor: default;
+}
+.shop-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.shop-life {
+    margin-left: 8px;
+    white-space: nowrap;
+}
+.shop-bought {
+    min-height: 1.4em;
+    margin: 12px 0;
+    color: var(--ink-soft);
+}
+.shop-had {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-right: 8px;
+    white-space: nowrap;
+}
+.shop-had .potion-icon {
+    width: 22px;
+    height: 22px;
+    background-position: calc(var(--i) * -22px) 0;
+    background-size: 154px 22px;
+}
+.shop-had .bucket-icon {
+    width: 22px;
+    height: 22px;
+    background-size: 44px 22px;
+}
+.shop-ready {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 10px;
+    font-size: 15px;
+}
+.shop-ready .material-icons {
+    margin-left: 3px;
+    font-size: 18px;
+}
+/* a purchase: the bottle hops; refused: the purse shakes */
+.shop-slot.bought > i {
+    animation: heart-pop .4s cubic-bezier(.2, 1.8, .4, 1);
+}
+.shop-purse.refused {
+    animation: knock .32s both;
+}
+
+@media (max-width: 700px) {
+    .shop-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .shop-slots {
+        grid-template-columns: repeat(4, 64px);
+        gap: 6px;
+    }
+    .shop-slot {
+        width: 64px;
+        height: 64px;
+    }
+    .shop-slot .potion-icon {
+        width: 36px;
+        height: 36px;
+        background-position: calc(var(--i) * -36px) 0;
+        background-size: 252px 36px;
+    }
+    .shop-slot .bucket-icon {
+        width: 36px;
+        height: 36px;
+        background-size: 72px 36px;
+    }
+    .shop-purse, .shop-clock {
+        height: 38px;
+        font-size: 19px;
+    }
+    .room-cover {
+        padding-top: 130px;
+    }
+}
+
 @media (max-width: 900px) {
     .nav-btn span, .pill span {
         display: none;

@@ -10,59 +10,17 @@ var s = null;                               // the last state from the server
 var viewer = null, map = null, scoreMap = null, marker = null;
 var deadline = null, clockTimer = null, fused = false, sending = false;
 
-// the potions: name, what they do; their bottles in static/potions.png, in
-// this order (tools/potions.py draws them)
-var POTIONS = {
-    swiftness: ['Swiftness', '20 seconds to find it, but a bigger safe zone.'],
-    mining_fatigue: ['Mining Fatigue', 'No zooming on the map.'],
-    wither: ['Wither', 'You lose 0.5 {heart} every 5 seconds until you guess.'],
-    regeneration: ['Regeneration', 'Guess inside the safe zone to get 2 {heart} back.'],
-    nausea: ['Nausea', 'The view turns by itself, and your pin lands a little off.'],
-    darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.'],
-    blindness: ['Blindness', 'Thick fog: you only see what is close.']
-};
-var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
+// the potions, the hearts and the throw: potions.js
+var HARDCORE = DIFFICULTY == 'hardcore';
 var TEST = document.body.dataset.test == '1';   // the beta's test panel (reviewers only, runs off the leaderboard)
-// static/potion-throw.gif, Yasuro's (97 frames): someone runs in and throws
-// the bottle, which bursts over the screen. The sounds on its frames
-var THROW_MS = 3070;    // its length
-var THROWN_MS = 1690;   // the bottle leaves the hand (frame 51): the throw
-var SPLASH_MS = 1950;   // it bursts (frame 60): the glass
-var THROW_GIF = document.body.dataset.throw;   // its address, versioned (asset())
-var throwGif = null;    // loaded once; a new address for it each time plays it from its first frame
-fetch(THROW_GIF).then(function (r) { return r.blob(); }).then(function (b) { throwGif = b; }).catch(function () {});
 // the milk: a bucket cancels the potion thrown with a result (2 a run).
 // Drunk as in Minecraft: 1.6 s, a gulp every 0.2 s from the 0.4th on
 var DRINK_MS = 1600;
 var GULPS = [400, 600, 800, 1000, 1200, 1400, 1600];
-var DARK_AFTER = 10;    // Darkness: seconds of picture before the dark
-var NAUSEA_SPIN = -40;  // Nausea: degrees per second the view turns by itself (a turn in 9 s; Yasuro: -9 was far too slow)
 var darkTimer = null, witherShown = null;
-
-function potionIcon(name) {
-    return "<i class='potion-icon' style='--i:" + BOTTLES.indexOf(name) + "'></i>";
-}
-
-// a heart drawn in the text, and an amount of half-hearts: 13 -> "6.5"
-function heartIcon() {
-    return "<i class='heart inline" + (DIFFICULTY == 'hardcore' ? ' hc' : '') + "'></i>";
-}
-function amount(half) {
-    return String(half / 2);
-}
 
 function api(path, data) {
     return $.ajax({url: 'api/survival' + path, type: data ? 'POST' : 'GET', data: data, dataType: 'json', timeout: 10000});
-}
-
-// the hearts, as in Minecraft: max is counted in half-hearts
-function drawHearts(el, hp, max) {
-    var html = '', hard = DIFFICULTY == 'hardcore' ? ' hc' : '';
-    for (var i = 0; i < max / 2; i++) {
-        var left = hp - 2 * i;
-        html += "<i class='heart " + (left >= 2 ? 'full' : left == 1 ? 'half' : 'empty') + hard + "'></i>";
-    }
-    el.innerHTML = html;
 }
 
 function stats() {
@@ -125,7 +83,7 @@ function guessScreen() {
     $('body').addClass('guessing');
     $('#score-screen').prop('hidden', true);
     $('#guess-screen').prop('hidden', false);
-    drawHearts(document.getElementById('hearts'), s.hp, s.max);
+    drawHearts(document.getElementById('hearts'), s.hp, s.max, HARDCORE);
     marker = null;
     fused = false;
     sending = false;
@@ -191,11 +149,11 @@ function wither(left) {
     if (s.effect != 'wither') {
         return;
     }
-    var hp = Math.max(0, s.hp - Math.floor((s.time - left) / 5));
+    var hp = Math.max(0, s.hp - Math.floor((s.time - left) / WITHER_EVERY));
     if (hp != witherShown) {
         witherShown = hp;
         var el = document.getElementById('hearts');
-        drawHearts(el, hp, s.max);
+        drawHearts(el, hp, s.max, HARDCORE);
         replay(el, 'hurt');
         Sfx.play('hurt', 1, .6);
     }
@@ -255,16 +213,6 @@ function send(auto) {
     });
 }
 
-// the creeper: a flash, the screen shakes, the bang
-function explode() {
-    Sfx.play('boom');
-    var flash = document.createElement('div');
-    flash.className = 'boom';
-    document.body.appendChild(flash);
-    replay(document.getElementById('guess-screen'), 'shake');
-    setTimeout(function () { flash.remove(); }, 900);
-}
-
 // ---------- what the guess cost ----------
 
 function resultScreen(before) {
@@ -278,7 +226,7 @@ function resultScreen(before) {
         viewer = null;
     }
     var hearts = document.getElementById('hearts-result');
-    drawHearts(hearts, s.hp, s.max);
+    drawHearts(hearts, s.hp, s.max, HARDCORE);
     if (r && (r.damage || r.wither)) {
         replay(hearts, 'hurt');
     }
@@ -344,33 +292,16 @@ function resultScreen(before) {
 }
 
 // the potion flies, breaks, and shows what it is; then the next round may start
+// (no picture: the potion at once, never a game stuck without its button)
 function throwPotion() {
-    if (s.phase != 'result') {
-        return;
+    if (s.phase == 'result') {
+        throwAnimation(showPotion);
     }
-    var url = throwGif ? URL.createObjectURL(throwGif) : THROW_GIF + '&' + Date.now();
-    // the sounds count from when the picture is there, not from when it is asked for
-    $('#potion-gif').one('load', function () {
-        setTimeout(function () { Sfx.play('throw'); }, THROWN_MS);
-        setTimeout(function () { Sfx.play('splash'); }, SPLASH_MS);
-        setTimeout(function () {
-            $('#potion-throw').prop('hidden', true);
-            if (throwGif) {
-                URL.revokeObjectURL(url);
-            }
-            showPotion();
-        }, THROW_MS);
-    }).one('error', function () {
-        // no picture: the potion at once, never a game stuck without its button
-        $('#potion-throw').prop('hidden', true);
-        showPotion();
-    }).attr('src', url);
-    $('#potion-throw').prop('hidden', false);
 }
 
 function showPotion() {
     var p = POTIONS[s.potion];
-    $('#potion-card').html(potionIcon(s.potion) + '<div><b>' + p[0] + '!</b><span>' + p[1].replace(/\{heart\}/g, heartIcon()) +
+    $('#potion-card').html(potionIcon(s.potion) + '<div><b>' + p[0] + '!</b><span>' + potionText(s.potion, HARDCORE) +
         '</span>' + (s.milk ? "<button type='button' class='btn wood milk-button' id='milk-button'><i class='bucket-icon'></i>Drink Milk<small>" +
         s.milk + ' left</small></button>' : '') + '</div>').prop('hidden', false);
     replay(document.getElementById('potion-card'));
@@ -418,11 +349,11 @@ $('#potion-card').on('click', '#milk-button', function () {
 function verdict(r, over) {
     var lost = r.damage + r.wither, words;
     if (r.creeper) {
-        words = 'Boom! No guess in time · −' + amount(lost) + ' ' + heartIcon();
+        words = 'Boom! No guess in time · −' + amount(lost) + ' ' + heartIcon(HARDCORE);
     } else if (!lost) {
-        words = r.heal ? 'Spot on! +' + amount(r.heal) + ' ' + heartIcon() : 'Safe!';
+        words = r.heal ? 'Spot on! +' + amount(r.heal) + ' ' + heartIcon(HARDCORE) : 'Safe!';
     } else {
-        words = '−' + amount(lost) + ' ' + heartIcon() + (r.heal ? ' · +' + amount(r.heal) + ' ' + heartIcon() : '');
+        words = '−' + amount(lost) + ' ' + heartIcon(HARDCORE) + (r.heal ? ' · +' + amount(r.heal) + ' ' + heartIcon(HARDCORE) : '');
     }
     if (r.wither) {
         words += ' <small>(Wither: −' + amount(r.wither) + ')</small>';

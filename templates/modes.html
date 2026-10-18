@@ -1,6 +1,7 @@
 {% set rules = {
     'classic': "Closer guess, more points.",
-    'survival': "Far guesses cost hearts, and the zone shrinks every round. How long can you last?",
+    'survival': "Far guesses cost hearts. Earn emeralds, buy potions, throw them at the others. Last one standing wins."
+                if friends else "Far guesses cost hearts, and the zone shrinks every round. How long can you last?",
     'duel': "6,000 HP each. Worse guess, more damage. Damage grows every round. Last one alive wins.",
     'royale': "3 lives each. Worst guess loses a life. Perfect guess wins one back. Last one alive wins."
 } %}

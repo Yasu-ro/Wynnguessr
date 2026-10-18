@@ -1,6 +1,7 @@
 """Draw the Survival potions: static/potions.png, one 12x12 bottle per effect,
-in the order of POTIONS below, coloured like Minecraft's effects; and
-static/buckets.png, the milk bucket, then the same bucket empty once drunk.
+in the order of POTIONS below, coloured like Minecraft's effects;
+static/buckets.png, the milk bucket, then the same bucket empty once drunk;
+static/emerald.png, Wynncraft's money (Survival with friends).
 (The throw animation, static/potion-throw.gif, is Yasuro's: not drawn here;
 its timings are in survival.js.) Run: python3 tools/potions.py"""
 import os
@@ -43,6 +44,22 @@ BUCKET = """
 ............
 """
 
+# a cut gem, lit from the top left
+EMERALD = """
+.....oo.....
+....oLLo....
+...oLhLMo...
+..oLhLLMMo..
+.oLhLLLMMdo.
+.oLLLLMMMdo.
+.oLLLMMMddo.
+.oMLMMMMddo.
+..oMMMMddo..
+...oMMddo...
+....oddo....
+.....oo.....
+"""
+
 def shade(c, k):
     return tuple(max(0, min(255, int(v * k))) for v in c)
 
@@ -72,5 +89,7 @@ buckets = Image.new('RGBA', (24, 12), (0, 0, 0, 0))
 buckets.alpha_composite(bucket(True), (0, 0))
 buckets.alpha_composite(bucket(False), (12, 0))
 buckets.save(os.path.join(static, 'buckets.png'))
+draw(EMERALD, {'.': None, 'o': (24, 14, 18), 'h': (214, 255, 222), 'L': (65, 222, 120), 'M': (23, 176, 72),
+               'd': (12, 122, 52)}).save(os.path.join(static, 'emerald.png'))
 
-print('potions.png, buckets.png')
+print('potions.png, buckets.png, emerald.png')

@@ -43,8 +43,9 @@
             </div>
             <form id="room-settings" class="room-column panel settings" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
-{% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('royale', 'Battle Royale')] %}{% include "modes.html" %}{% endwith %}
+{% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('survival', 'Survival')], friends = True %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
+{% include "difficulty.html" %}
                 </fieldset>
                 <p id="settings-error" class="room-error"></p>
             </form>
@@ -54,6 +55,8 @@
 
     <section id="guess-screen" class="room-screen" hidden>
         <div id="room-panorama"></div>
+        <div class="sv-dark" id="room-dark" hidden></div>
+        <div class="hearts" id="room-hearts" hidden></div>
         <div class="room-top">
             <div class="room-hud">
                 <div class="room-hud-line"><span id="hud-round"></span><span id="hud-mult"></span><span id="hud-score"></span></div>
@@ -67,6 +70,15 @@
             <div id="map"></div>
             <button type="button" id="guess-button" class="guess-button">Guess!</button>
         </div>
+        <!-- survival: before the round, the picture loads under this -->
+        <div class="room-cover" id="room-cover" hidden>
+            <div class="room-cover-card">
+                <h2 id="cover-title"></h2>
+                <p id="cover-left" class="room-cover-left"></p>
+                <div id="cover-effects" class="room-cover-effects"></div>
+                <button type="button" id="room-milk" class="btn wood milk-button" hidden></button>
+            </div>
+        </div>
     </section>
 
     <section id="reveal-screen" class="room-screen room-reveal" hidden>
@@ -74,6 +86,7 @@
         <div class="room-panel">
             <h2 id="reveal-title"></h2>
             <p id="reveal-mine" class="room-mine"></p>
+            <div class="potion-card" id="reveal-potion" hidden></div>
             <table class="room-table">
                 <thead><tr><th>Player</th><th class="num">Round</th><th class="num" id="reveal-total">Total</th></tr></thead>
                 <tbody id="reveal-rows"></tbody>
@@ -81,6 +94,30 @@
             <button type="button" id="next-button" class="next-button room-next"></button>
             <div class="room-chat-panel" id="chat-slot-reveal"></div>
         </div>
+    </section>
+
+    <section id="shop-screen" class="room-page" hidden>
+        <h1 class="sign">Potion Merchant</h1>
+        <div class="shop panel">
+            <div class="shop-head">
+                <span class="shop-purse" id="shop-purse" title="Your emeralds"></span>
+                <span class="shop-clock" id="shop-clock"></span>
+            </div>
+            <p class="shop-note" id="shop-note" hidden></p>
+            <div class="shop-body">
+                <div class="shop-wares">
+                    <div class="shop-slots" id="shop-slots"></div>
+                    <div class="shop-tip" id="shop-tip" hidden></div>
+                </div>
+                <div class="shop-side">
+                    <div class="shop-targets" id="shop-targets"></div>
+                    <p class="shop-bought" id="shop-bought"></p>
+                    <button type="button" id="ready-button" class="btn big wide">Ready</button>
+                    <div class="shop-ready" id="shop-ready"></div>
+                </div>
+            </div>
+        </div>
+        <div class="room-chat-slot" id="chat-slot-shop"></div>
     </section>
 
     <section id="results" class="room-page" hidden>
@@ -105,5 +142,7 @@
 <script src="{{ asset('js/motion.js') }}"></script>
 <script src="{{ asset('js/xp.js') }}"></script>
 <script src="{{ asset('js/block.js') }}"></script>
+<div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.gif') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
+<script src="{{ asset('js/potions.js') }}"></script>
 <script src="{{ asset('js/room.js') }}"></script>
 {% endblock %}

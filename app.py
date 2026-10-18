@@ -580,7 +580,8 @@ def history(c, uid):
         rank = 1 + sum(key(u) > key(uid) for u in players)
         games.append({'multi': True, 'code': r['code'], 'mode': r['mode'], 'rank': rank, 'of': len(players), 'win': rank == 1,
                       'score': totals.get(uid, 0), 'rounds': r['round'], 'when': when or 0,
-                      'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out')})
+                      'left': st.get(uid, {}).get('left'), 'out': st.get(uid, {}).get('out'),
+                      'survived': st.get(uid, {}).get('survived')})
     for g in c.execute('''SELECT score, rounds, time, date, COALESCE(mode, 'classic') AS mode, difficulty FROM scores
             WHERE user_id = ? AND room IS NULL''', (uid,)).fetchall():
         try:
@@ -742,7 +743,7 @@ def apology():
 
 PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
 ROUNDS = ['3', '5', '10', '25']
-MODES = ['classic', 'duel', 'royale', 'survival']
+MODES = ['classic', 'duel', 'survival']   # royale: no new games
 LAST_CALL = 15   # once someone guessed, the others have this long
 REVEAL = 10      # the answer stays on screen this long before the next round
 AWAY = 10        # a page that stopped polling this long is not waited for
@@ -2486,7 +2487,9 @@ def survival_view(c, r, me, out, now):
             p['effects'] = room_effects(known, milked, p['uid'], upcoming)
             p['milked'] = (p['uid'], upcoming) in milked
         if phase == 'shop':
-            p['ready'] = p['uid'] in ready
+            # who cannot pay for anything is ready already (shop_shut)
+            prices = wares(c, r, s).values()
+            p['ready'] = p['uid'] in ready or not prices or s['emeralds'] < min(prices)
         if closed and 'result' in s:
             p['result'] = {k: v for k, v in s['result'].items() if k != 'earned'}
     mine = st.get(uid)
@@ -2498,6 +2501,9 @@ def survival_view(c, r, me, out, now):
         out['phase_left'] = max(0, r['round_end'] + REVEAL + SHOP - now)
         if mine:
             out['wares'] = wares(c, r, mine)
+            # what this player bought in this shop (the others' stay secret until it shuts)
+            out['bought'] = [{"item": row['item'], "to": names.get(row['target'], '?')} for row in shop
+                             if row['round'] == n + 1 and row['buyer'] == uid]
     elif phase == 'reveal':
         out['phase_left'] = max(0, r['round_end'] + REVEAL - now)
     elif phase in ('throw', 'prep'):
@@ -2517,10 +2523,14 @@ def survival_view(c, r, me, out, now):
                 "SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?", (code, uid, n)).fetchone())})
             if phase == 'guess':
                 cut, out['first'] = round_deadline(c, r)
-                out['time_left'] = max(0, survival_deadline(r, fx, cut) - now)
+                # elapsed: since the start, for what counts from it (Darkness, Wither)
+                out.update({"time_left": max(0, survival_deadline(r, fx, cut) - now), "elapsed": now - r['round_start']})
     elif n:
         loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (ids[n - 1],)).fetchone()
-        out['reveal'] = {"X": loc[0], "Z": loc[1]}
+        totals = {p['uid']: p['total'] for p in out['players']}
+        out['reveal'] = {"X": loc[0], "Z": loc[1], "guesses": [
+            {"name": names[u], "x": s['result']['x'], "z": s['result']['z'], "score": s['result']['points'], "upto": totals.get(u, 0)}
+            for u, s in st.items() if 'result' in s and u in names]}
     return out
 
 @app.route("/api/room/<code>/buy", methods=['POST'])

@@ -48,6 +48,7 @@
                 <td><span class="result {{ 'win' if g.win else 'loss' }}">{{ 'Victory' if g.win else '#' ~ g.rank ~ ' of ' ~ g.of }}</span></td>
                 <td>{{ names[g.mode] }}<small>{{ g.of }} players · {{ g.rounds }} rounds</small></td>
                 <td class="num">{% if g.mode == 'classic' %}{{ '{:,}'.format(g.score) }} pts
+                    {% elif g.mode == 'survival' %}{{ g.survived }} {{ 'location' if g.survived == 1 else 'locations' }}
                     {% elif g.out %}Out in round {{ g.out }}
                     {% elif g.mode == 'duel' %}{{ '{:,}'.format(g.left) }} HP
                     {% else %}{{ g.left }} {{ 'life' if g.left == 1 else 'lives' }}{% endif %}</td>
