@@ -333,7 +333,7 @@ function crisp(m) {
 function panoramaConfig(url, options) {
     var config = url.slice(-1) == '/'
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
-            extension: 'jpg', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
+            extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
     for (var k in options) config[k] = options[k];
     return config;

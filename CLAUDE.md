@@ -1004,7 +1004,12 @@ max), journal d'audit avec la raison. D'où :
   (service `wynnguessr-webp`, 4 processus au plus bas, ~3 h pour ~765 000
   tuiles, reprend où il s'est arrêté) ; les nouvelles captures écrivent les
   deux (`make_tiles`). Les pages ne demandent le WebP qu'une fois tout
-  converti ; les JPEG restent jusque-là (le vrai site les lit).
+  converti ; les JPEG restent jusque-là (le vrai site les lit). **Fait le 2026-10-18 à 20 h 53** :
+  765 228 tuiles, chacune a son `.webp` (vérifié, aucune manquante), démo
+  de l'accueil comprise ; `room.js` (et son préchargement), `game.js`,
+  `survival.js` et `index.html` demandent du WebP sur la bêta. **Les JPEG
+  restent** : le vrai site (2.3) les lit jusqu'à la 3.0.0, et `make_tiles`
+  écrit toujours les deux.
 - **Piège payé** : la carte en tuiles grandit sous la souris (CSS) sans que
   Leaflet le sache, il ne chargeait que les tuiles de l'ancienne taille
   (moitié noire). `mapTiles()` le lui dit (`ResizeObserver` →
