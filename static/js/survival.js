@@ -21,8 +21,14 @@ var POTIONS = {
     darkness: ['Darkness', 'You see the picture for 10 seconds, then it goes dark.']
 };
 var BOTTLES = ['swiftness', 'mining_fatigue', 'wither', 'regeneration', 'nausea', 'darkness', 'blindness'];
-var THROW_MS = 1050;    // the length of static/potion-throw.gif (a temporary one: Yasuro draws the real one)
-var SPLASH_MS = 560;    // when the bottle breaks in it
+// static/potion-throw.gif, Yasuro's (97 frames): someone runs in and throws
+// the bottle, which bursts over the screen. The sounds on its frames
+var THROW_MS = 3070;    // its length
+var THROWN_MS = 1690;   // the bottle leaves the hand (frame 51): the throw
+var SPLASH_MS = 1950;   // it bursts (frame 60): the glass
+var THROW_GIF = document.body.dataset.throw;   // its address, versioned (asset())
+var throwGif = null;    // loaded once; a new address for it each time plays it from its first frame
+fetch(THROW_GIF).then(function (r) { return r.blob(); }).then(function (b) { throwGif = b; }).catch(function () {});
 var DARK_AFTER = 10;    // Darkness: seconds of picture before the dark
 var darkTimer = null, witherShown = null;
 
@@ -317,14 +323,24 @@ function throwPotion() {
     if (s.phase != 'result') {
         return;
     }
-    Sfx.play('throw');
-    $('#potion-gif').attr('src', 'static/potion-throw.gif?' + Date.now());   // from its first frame
-    $('#potion-throw').prop('hidden', false);
-    setTimeout(function () { Sfx.play('splash'); }, SPLASH_MS);
-    setTimeout(function () {
+    var url = throwGif ? URL.createObjectURL(throwGif) : THROW_GIF + '&' + Date.now();
+    // the sounds count from when the picture is there, not from when it is asked for
+    $('#potion-gif').one('load', function () {
+        setTimeout(function () { Sfx.play('throw'); }, THROWN_MS);
+        setTimeout(function () { Sfx.play('splash'); }, SPLASH_MS);
+        setTimeout(function () {
+            $('#potion-throw').prop('hidden', true);
+            if (throwGif) {
+                URL.revokeObjectURL(url);
+            }
+            showPotion();
+        }, THROW_MS);
+    }).one('error', function () {
+        // no picture: the potion at once, never a game stuck without its button
         $('#potion-throw').prop('hidden', true);
         showPotion();
-    }, THROW_MS);
+    }).attr('src', url);
+    $('#potion-throw').prop('hidden', false);
 }
 
 function showPotion() {

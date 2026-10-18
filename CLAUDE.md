@@ -355,10 +355,19 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   guess** (`potion()`, gardée dans `survival_runs.next_effect`) et appliquée
   à la manche suivante. Au résultat, le bouton attend : son de lancer
   (`random/bow`), GIF `static/potion-throw.gif`, verre brisé
-  (`random/glass1-3`), puis la carte de la potion et le bouton. **Le GIF est
-  provisoire** (dessiné par `tools/potions.py`) : Yasuro dessinera le vrai,
-  à mettre sous le même nom, en réglant `THROW_MS` (sa durée) et
-  `SPLASH_MS` (le moment où la bouteille casse) dans `survival.js`. Les
+  (`random/glass1-3`), puis la carte de la potion et le bouton. **Le GIF
+  est celui de Yasuro** (97 images, 3,07 s : quelqu'un arrive en courant,
+  lance la bouteille qui éclate en rouge sur l'écran), versionné par
+  `asset()` (`data-throw`), chargé une fois puis rejoué par une adresse
+  `blob:` neuve (sinon 1,6 Mo par potion). Sons calés image par image et
+  comptés depuis l'affichage réel (`load`) : lancer à 1 690 ms (image 51),
+  verre à 1 950 ms (image 60), carte à 3 070 ms ; vérifié à ±3 ms. Pour un
+  nouveau GIF : refaire la planche des images et régler `THROW_MS`,
+  `THROWN_MS`, `SPLASH_MS` dans `survival.js`. **Piège** : `tools/potions.py`
+  dessinait le GIF provisoire, il ne le fait plus (il aurait écrasé le
+  sien). Sans image, la carte s'affiche tout de suite (jamais de partie
+  bloquée sans bouton). Pour envoyer un fichier animé : `scp` sur le
+  serveur, pas le chat (il l'aplatit en une image transparente). Les
   flacons (`static/potions.png`, couleurs des effets de Minecraft) sont à
   nous. Un rechargement montre la carte sans le lancer. Le lancer prend tout
   l'écran (demande de Yasuro), par-dessus le résultat.
