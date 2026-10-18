@@ -384,10 +384,25 @@ par défaut. Survival n'existe qu'en solo. Règles validées par Yasuro :
   migration efface les anciens scores Survival une fois, et `api/score`
   refuse désormais tout score Survival envoyé par le navigateur (on
   pouvait poster « 500 »).
-- **Limite connue** : le solo Classic envoie encore toutes les coordonnées
-  et adresses des lieux (`api/locations`) ; un script pourrait reconnaître
-  une image du Survival en comparant ses tuiles. Rendre le Classic solo
-  « serveur » fermerait ce trou (proposé à Yasuro).
+- **Anti-triche étendue au Classic** (2026-10-18, accord de Yasuro : « fix
+  classic for solo and multi so no cheater ») :
+  - le **Classic solo se joue sur le serveur** (section « Solo » d'`app.py`,
+    tables `solo_games` / `solo_guesses`, `api/solo/...`), même principe que
+    le Survival ; règles et écrans inchangés pour le joueur (le dernier
+    tour a son écran de score, puis « See Results »). Recharger reprend la
+    manche ; une partie finie va au classement de ses réglages (provinces
+    écrites `str(liste)` dans l'ordre de `PROVINCES`, comme le filtre) ou,
+    sans compte, attend une connexion (`session['pending']`) ;
+  - **`api/locations` (tous les lieux avec coordonnées et dossiers) et
+    `api/score` (un score dicté par le navigateur) n'existent plus** ;
+  - **aucune page ne voit plus un vrai dossier de tuiles** : salons et solo
+    passent par `play/tile/<jeton>/` (table `tiles`, un jeton par manche de
+    salon, gardé pour les rejeux, un par manche de solo, effacé au guess).
+    Seuls `/review` (réservé) et l'accueil (`static/demo`) montrent des
+    adresses réelles ;
+  - limite qui reste : un script qui reconnaîtrait les images elles-mêmes
+    (comparaison de tuiles) ; le chrono démarre côté serveur, chargement de
+    l'image compris (avant, le Classic attendait le chargement).
 - Page `survival` (`survival.html`, `survival.js`) : menu solo → Survival →
   difficulté (les autres réglages se cachent), `/game?mode=survival`
   redirige. Recharger reprend la même manche et son chrono ; une partie en
@@ -700,7 +715,8 @@ fan, sans rien voler).
   manches et un salon à deux invités `zz_` (`room.py <url> <préfixe>
   classic|duel|royale [largeur hauteur]`) et photographient chaque écran.
   `xpsolo.py` (un compte `zz_` vise juste en solo, puis photographie la barre
-  d'XP qui se remplit) et `xproom.py` (deux comptes `zz_`, deux salons gagnés
+  d'XP qui se remplit ; la page ne connaît plus la réponse : 6e argument =
+  chemin de la base, pour viser) et `xproom.py` (deux comptes `zz_`, deux salons gagnés
   d'affilée : bonus de victoire et série ; 3e argument = chemin de la base,
   pour lire les réponses).
 - **Méthode qui a marché** : développer sur une copie isolée dans le

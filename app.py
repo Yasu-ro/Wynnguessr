@@ -72,62 +72,14 @@ def next_page():
     page = request.args.get('next', '')
     return page if re.fullmatch(r'[a-z]+(\?(code|play)=[A-Za-z0-9_-]+)?', page) else './'
 
-@app.route("/api/locations", methods = ['GET'])
-def get_locations():
-    #if there are no provinces in session, return apology
-    if 'provinces' not in session:
-        return jsonify({"success": False})
-    provinces = session['provinces']
-    placeholders = ', '.join('?' for _ in provinces)
-    query = f"SELECT * FROM locations WHERE province IN ({placeholders}) AND review IN {PLAYABLE}"
-    with connect() as c:
-        locations = c.execute(query, provinces).fetchall()
-    locations_list = [{"id": location[0], "X" : location[1], "Z" : location[2], "url" : location[3]} for location in locations]
-    return jsonify(locations_list)
-
-
-def solo_game(form):
-    # a finished solo game sent by game.js, checked: the values of its scores
-    # row, or None if it does not hold up
-    score, mode = form.get('score', ''), form.get('mode', 'classic')
-    try:
-        total_time = float(form.get('totalTime', 0))
-    except ValueError:
-        return None
-    if not score.isnumeric():
-        return None
-    if mode == 'survival':
-        # Survival is played on the server (api/survival): a score sent from
-        # the browser could be anything
-        return None
-    else:
-        mode = 'classic'
-        rounds = form.get('rounds')
-        if rounds not in ['3', '5', '10', '25'] or int(score) > int(rounds) * 5000:
-            return None
-        if int(rounds) * 5000 == int(score) and total_time < .5:
-            return None
-    return {'score': int(score), 'nolook': 'Yes' if form.get('look') == 'True' else 'No',
-            'provinces': form.get('provinces', ''), 'rounds': rounds, 'time': total_time, 'mode': mode}
+# The solo Classic game is played on the server (section "Solo" below): the
+# browser never had to know where the locations are. The old routes that
+# gave it every location with its coordinates (api/locations) and took its
+# score as it said (api/score) are gone.
 
 def save_solo(c, uid, g):
     c.execute("INSERT INTO scores (user_id, score, date, nolook, provinces, rounds, time, mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
               (uid, g['score'], date.today(), g['nolook'], g['provinces'], g['rounds'], g['time'], g['mode']))
-
-@app.route("/api/score", methods=['POST'])
-def post_score():
-    game = solo_game(request.form)
-    if not game:
-        return jsonify({"success": False})
-    if not session.get('loggedin'):
-        # kept until the player logs in or makes an account (see adopt)
-        session['pending'] = game
-        return jsonify({"success": False, "pending": True})
-    with connect() as c:
-        save_solo(c, session['user_id'], game)
-        # for the end screen: the XP of this game, and the total it reaches
-        xp = progress(c, session['user_id'])['xp']
-    return jsonify({"success": True, "xp": xp, "gained": solo_xp(game['score'], game['mode'])})
 
 def adopt(c, uid):
     # on logging in or making an account, what was just played becomes the
@@ -136,6 +88,9 @@ def adopt(c, uid):
     game = session.pop('pending', None)
     if game:
         save_solo(c, uid, game)
+    gid = session.get('solo')
+    if gid:
+        c.execute("UPDATE solo_games SET user_id = ? WHERE id = ? AND user_id IS NULL AND phase != 'over'", (uid, gid))
     rid = session.get('survival')
     if rid and c.execute("UPDATE survival_runs SET user_id = ? WHERE id = ? AND user_id IS NULL", (uid, rid)).rowcount:
         survival_record(c, c.execute("SELECT * FROM survival_runs WHERE id = ?", (rid,)).fetchone())
@@ -230,7 +185,6 @@ def game():
     if form.get('mode') == 'survival':
         # Survival has its own page (and no settings but the difficulty)
         return redirect('survival?' + urlencode({'difficulty': form.get('difficulty', 'normal')}))
-    session['provinces'] = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
     if 'rounds' in form:
         if form.get('mode') in ('duel', 'royale'):
             return render_template('apology.html', message = "This mode is played with friends: create a room")
@@ -259,9 +213,6 @@ def game():
         #if look is not selected, set look to False
         look = form.get('look') == 'on'
         rounds = form.get('rounds')
-        #store provinces in session
-        session['provinces'] = provinces
-        print(provinces, time_limit, look, rounds)
 
         return render_template('game.html', provinces = provinces, time_limit = time_limit, look = look, rounds = rounds, mode = mode)
     return render_template('game.html', provinces = "['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']", time_limit = -1, look = False, rounds = 5, mode = 'classic')
@@ -1083,7 +1034,7 @@ def room_state(code):
         if n == 0 or (live and r['state'] == 'waiting'):
             return jsonify(out)
         loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (json.loads(r['locations'])[n - 1],)).fetchone()
-        out['url'] = loc['image_url']
+        out['url'] = tile_url(c, loc['location_id'], 'room:%s:%d' % (r['code'], n))
         out['answered'] = bool(c.execute("SELECT 1 FROM room_guesses WHERE code = ? AND user_id = ? AND round = ?",
                                          (r['code'], me['user_id'], n)).fetchone())
         # false for whoever only watches: knocked out, or arrived after the start of a duel or royale
@@ -1105,7 +1056,7 @@ def room_state(code):
                 # load the next picture during the reveal: everyone has it when the round starts
                 ids = json.loads(r['locations'])
                 if n < len(ids):
-                    out['next_url'] = c.execute("SELECT image_url FROM locations WHERE location_id = ?", (ids[n],)).fetchone()[0]
+                    out['next_url'] = tile_url(c, ids[n], 'room:%s:%d' % (r['code'], n + 1))
         return jsonify(out)
 
 @app.route("/api/room/<code>/chat", methods=['POST'])
@@ -1491,6 +1442,217 @@ def review_one(lid):
         else:
             return jsonify({"success": False})
     return jsonify({"success": True})
+
+# ---------- Pictures behind tokens ----------
+# The real address of a location's tiles (its folder) never reaches a page:
+# what played it would otherwise learn, over its games, which folder is
+# where. A page gets play/tile/<token>/, a random token for one use: a
+# round of a room (kept: a finished room can be replayed, and its token
+# leads nowhere else) or of a solo game (dropped once guessed).
+# Survival has its own (survival/tile/), tied to its runs.
+
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS tiles (token TEXT PRIMARY KEY, location_id INTEGER, scope TEXT UNIQUE)")
+
+def tile_url(c, lid, scope):
+    # the address of a location's pictures for one use: scope names it
+    # ('room:ABC234:3', 'solo:12:2'), the same scope gets the same token
+    row = c.execute("SELECT token FROM tiles WHERE scope = ?", (scope,)).fetchone()
+    token = row[0] if row else secrets.token_hex(16)
+    if not row:
+        c.execute("INSERT INTO tiles (token, location_id, scope) VALUES (?, ?, ?)", (token, lid, scope))
+    return 'play/tile/' + token + '/'
+
+@app.route("/play/tile/<token>/<path:name>")
+def play_tile(token, name):
+    with connect() as c:
+        row = c.execute("SELECT l.image_url FROM tiles t JOIN locations l ON l.location_id = t.location_id WHERE t.token = ?",
+                        (token,)).fetchone()
+    if not row or not row[0].startswith('static/tiles/'):
+        return '', 404
+    response = send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 3600)
+    response.cache_control.private = True   # the browser keeps it, Cloudflare does not (see Survival)
+    return response
+
+# ---------- Solo ----------
+# The Classic game alone, played on the server like Survival (same reasons,
+# see its header): the page gets a picture and a clock, sends a guess, and is
+# told the answer and the points. The rules are those of the original game:
+# N rounds, points by distance (guess_score), an optional time limit; a
+# finished game goes to the leaderboard of its settings. A reload brings back
+# the same round; Play Again starts another game.
+
+SOLO_ROUNDS = (3, 5, 10, 25)
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS solo_games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, provinces TEXT, rounds INTEGER,
+            time_limit INTEGER, look INTEGER, round INTEGER DEFAULT 0, phase TEXT, location_id INTEGER,
+            round_start REAL, deadline REAL, used TEXT DEFAULT '[]', score INTEGER DEFAULT 0,
+            time REAL DEFAULT 0, started REAL, ended REAL);
+        CREATE TABLE IF NOT EXISTS solo_guesses (
+            game_id INTEGER, round INTEGER, location_id INTEGER, x REAL, z REAL, distance REAL,
+            score INTEGER, time REAL, at REAL, PRIMARY KEY (game_id, round));
+    ''')
+
+def my_solo(c):
+    # the game this page plays: the session's, unless it is another account's
+    gid = session.get('solo')
+    game = gid and c.execute("SELECT * FROM solo_games WHERE id = ?", (gid,)).fetchone()
+    me = session.get('user_id') if session.get('loggedin') else None
+    if not game or (game['user_id'] is not None and game['user_id'] != me):
+        return None
+    return game
+
+def solo_settings(form):
+    # the settings of the mode page, checked: provinces in the order of
+    # PROVINCES (the leaderboard compares them as text), rounds, time, view
+    chosen = form.getlist('province')
+    provinces = [p for p in PROVINCES if p in chosen]
+    try:
+        rounds, limit = int(form.get('rounds', '')), int(form.get('time_limit', -1))
+    except ValueError:
+        return None
+    if not provinces or rounds not in SOLO_ROUNDS or not (limit == -1 or 1 <= limit <= 1800):
+        return None
+    return {'provinces': provinces, 'rounds': rounds, 'time_limit': limit, 'look': form.get('look') == 'true'}
+
+def solo_next(c, game):
+    provinces = json.loads(game['provinces'])
+    used = json.loads(game['used'])
+    marks = ', '.join('?' for _ in provinces)
+    left = [l[0] for l in c.execute(f"SELECT location_id FROM locations WHERE review IN {PLAYABLE} AND province IN ({marks})",
+                                    provinces) if l[0] not in used]
+    lid = secrets.choice(left)
+    now = time.time()
+    c.execute("""UPDATE solo_games SET round = round + 1, phase = 'guess', location_id = ?, round_start = ?, deadline = ?,
+            used = ? WHERE id = ?""", (lid, now, now + game['time_limit'] if game['time_limit'] > 0 else None,
+            json.dumps(used + [lid]), game['id']))
+
+def solo_settle(c, game, x = None, z = None):
+    # the round's guess (x and z, or None: no pin when the time ran out)
+    now = time.time()
+    loc = c.execute("SELECT * FROM locations WHERE location_id = ?", (game['location_id'],)).fetchone()
+    spent = max(0, min(now, game['deadline'] or now) - game['round_start'])
+    d = None if x is None else math.hypot(loc['x_position'] - x, loc['z_position'] - z)
+    points = 0 if x is None else guess_score(x, z, loc)
+    over = game['round'] >= game['rounds']
+    c.execute("""INSERT INTO solo_guesses (game_id, round, location_id, x, z, distance, score, time, at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", (game['id'], game['round'], loc['location_id'], x, z, d, points, spent, now))
+    c.execute("UPDATE solo_games SET score = score + ?, time = time + ?, phase = ?, ended = ? WHERE id = ?",
+              (points, spent, 'over' if over else 'result', now if over else None, game['id']))
+    c.execute("DELETE FROM tiles WHERE scope = ?", ('solo:%d:%d' % (game['id'], game['round']),))
+    game = c.execute("SELECT * FROM solo_games WHERE id = ?", (game['id'],)).fetchone()
+    if over:
+        # the finished game, on the leaderboard of its settings; without an
+        # account, kept in the session for the one the player logs in to (adopt)
+        g = {'score': game['score'], 'nolook': 'Yes' if game['look'] else 'No', 'provinces': str(json.loads(game['provinces'])),
+             'rounds': game['rounds'], 'time': round(game['time'], 2), 'mode': 'classic'}
+        if game['user_id']:
+            save_solo(c, game['user_id'], g)
+        else:
+            session['pending'] = g
+    return game
+
+def solo_tick(c, game):
+    if game['phase'] == 'guess' and game['deadline'] and time.time() > game['deadline'] + LATE:
+        game = solo_settle(c, game)
+    return game
+
+def solo_state(c, game):
+    out = {"success": True, "round": game['round'], "rounds": game['rounds'], "score": game['score'], "phase": game['phase'],
+           "time_limit": game['time_limit'], "look": bool(game['look']), "provinces": json.loads(game['provinces'])}
+    if game['phase'] == 'guess':
+        out['url'] = tile_url(c, game['location_id'], 'solo:%d:%d' % (game['id'], game['round']))
+        if game['deadline']:
+            out['time_left'] = max(0, game['deadline'] - time.time())
+        return out
+    guesses = [dict(g) for g in c.execute("""SELECT g.round, g.x, g.z, g.distance, g.score, l.x_position AS X, l.z_position AS Z
+            FROM solo_guesses g JOIN locations l ON l.location_id = g.location_id WHERE g.game_id = ? ORDER BY g.round""", (game['id'],))]
+    out['result'] = guesses[-1] if guesses else None
+    if game['phase'] == 'over':
+        out['history'] = guesses
+        out['time'] = game['time']
+        if game['user_id']:
+            out.update({"xp": progress(c, game['user_id'])['xp'], "gained": solo_xp(game['score'], 'classic')})
+        else:
+            out['pending'] = True
+    return out
+
+@app.route("/api/solo/start", methods=['POST'])
+def solo_start():
+    settings = solo_settings(request.form)
+    if not settings:
+        return jsonify({"success": False})
+    uid = session.get('user_id') if session.get('loggedin') else None
+    c = run_tx()
+    try:
+        marks = ', '.join('?' for _ in settings['provinces'])
+        pool = c.execute(f"SELECT COUNT(*) FROM locations WHERE review IN {PLAYABLE} AND province IN ({marks})",
+                         settings['provinces']).fetchone()[0]
+        if pool < settings['rounds']:
+            c.execute("ROLLBACK")
+            return jsonify({"success": False, "error": "Not enough locations in these provinces"})
+        gid = c.execute("""INSERT INTO solo_games (user_id, provinces, rounds, time_limit, look, phase, started)
+                VALUES (?, ?, ?, ?, ?, 'new', ?)""", (uid, json.dumps(settings['provinces']), settings['rounds'],
+                settings['time_limit'], int(settings['look']), time.time())).lastrowid
+        solo_next(c, c.execute("SELECT * FROM solo_games WHERE id = ?", (gid,)).fetchone())
+        session['solo'] = gid
+        out = solo_state(c, c.execute("SELECT * FROM solo_games WHERE id = ?", (gid,)).fetchone())
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/solo")
+def solo_get():
+    c = run_tx()
+    try:
+        game = my_solo(c)
+        out = solo_state(c, solo_tick(c, game)) if game else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/solo/guess", methods=['POST'])
+def solo_guess():
+    c = run_tx()
+    try:
+        game = my_solo(c)
+        ok = game and game['phase'] == 'guess' and request.form.get('round') == str(game['round'])
+        if ok:
+            x = z = None
+            late = game['deadline'] and time.time() > game['deadline'] + LATE
+            if not late and request.form.get('x'):
+                try:
+                    x, z = float(request.form['x']), float(request.form['z'])
+                except ValueError:
+                    x = z = None
+                if x is not None and not (math.isfinite(x) and math.isfinite(z)):
+                    x = z = None
+            game = solo_settle(c, game, x, z)
+        out = solo_state(c, game) if ok else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
+
+@app.route("/api/solo/next", methods=['POST'])
+def solo_go():
+    c = run_tx()
+    try:
+        game = my_solo(c)
+        ok = game and game['phase'] == 'result' and request.form.get('round') == str(game['round'])
+        if ok:
+            solo_next(c, game)
+            game = c.execute("SELECT * FROM solo_games WHERE id = ?", (game['id'],)).fetchone()
+        out = solo_state(c, game) if ok else {"success": False}
+        c.execute("COMMIT")
+    finally:
+        c.close()
+    return jsonify(out)
 
 # ---------- Survival ----------
 # Solo only. Hearts as in Minecraft (counted in half-hearts), a zone that
