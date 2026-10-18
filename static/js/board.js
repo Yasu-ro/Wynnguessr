@@ -13,8 +13,9 @@ $(function () {
         wins: ['Wins', 'Best streak', 'Games']
     };
 
+    // quotes too: a name may end up inside an attribute (data-name='...')
     function esc(text) {
-        return $('<div>').text(text).html();
+        return $('<div>').text(text).html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function number(n) {
@@ -44,7 +45,7 @@ $(function () {
         }
         return name + "<a class='board-verified' href='https://wynncraft.com/stats/player/" + encodeURIComponent(row.mc) +
             "' target='_blank' rel='noopener' title='Wynncraft profile: " + esc(row.mc) + "'>" +
-            "<i class='material-icons wynn-check'>verified</i><i class='material-icons'>open_in_new</i></a>";
+            "<i class='material-icons wynn-check'>verified</i></a>";   // the badge alone (Yasuro: the open icon was clutter)
     }
 
     function cells(row, mode) {
@@ -69,7 +70,6 @@ $(function () {
         }
         var mode = form.find('[name=mode]:checked').val();
         var ladder = mode == 'levels' || mode == 'wins';
-        var provinces = form.find('[name=province]:checked').map(function () { return this.value; }).get();
         form.find('.filters').prop('hidden', ladder);
         // Survival has no settings but its difficulty and the milk: one board for each
         form.find('.board-group').prop('hidden', mode == 'survival');
@@ -78,7 +78,6 @@ $(function () {
         asking = ladder ? {mode: mode}
             : mode == 'survival' ? {mode: mode, difficulty: form.find('[name=difficulty]:checked').val(), milk: form.find('[name=milk]:checked').val()} : {
             mode: mode,
-            provinces: "['" + provinces.join("', '") + "']",
             rounds: form.find('[name=rounds]:checked').val(),
             nolook: form.find('[name=nolook]:checked').val()
         };
@@ -99,12 +98,14 @@ $(function () {
     // a row of the board: its place (a cup for the first three), the player, the numbers
     function line(row, rank, me, mode, cls) {
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
-        // who is on a winning streak with friends right now, in every tab
-        var fire = row.streak >= 1 ? " <span class='board-fire' title='Wins in a row'>" +
+        // who is on a winning streak with friends right now, in every tab: in a
+        // column of its own, without a title (Yasuro: after the name, it cluttered)
+        var fire = row.streak >= 1 ? "<span class='board-fire' title='Wins in a row'>" +
             "<i class='material-icons xp-fire'>local_fire_department</i>" + row.streak + "</span>" : '';
         return "<tr class='leaderboard-row" + (row.id == me ? ' you' : '') + (cls || '') + "'><td>" + place + "</td>" +
-            "<td><span class='board-who'>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
-            player(row) + fire + "</span></td>" + cells(row, mode).map(function (c, i) {
+            "<td><span class='board-who'><span class='board-id'>" + (mode != 'levels' && row.level ? "<b class='lvl name-lvl' title='Level'>" + row.level + "</b>" : '') +
+            player(row) + '</span>' + (row.tag ? " <span class='name-tag " + esc(row.tag.color) + "'>" + esc(row.tag.label) + '</span>' : '') +
+            "</span></td><td class='board-streak'>" + fire + '</td>' + cells(row, mode).map(function (c, i) {
                 return '<td' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</td>';
             }).join('') + "</tr>";
     }
@@ -115,12 +116,12 @@ $(function () {
         if (r.start) {
             $('#table-body').append(html);
         } else {
-            $('#board-head').html('<th>#</th><th>Player</th>' + columns[mode].map(function (c, i) {
+            $('#board-head').html("<th>#</th><th>Player</th><th class='board-streak'></th>" + columns[mode].map(function (c, i) {
                 return '<th' + (i == 2 ? " class='board-more'" : '') + '>' + c + '</th>';
             }).join(''));
             $('#table-body').html(html);
             $('#board-mine').html(r.mine ? line(r.mine, r.mine.rank, r.me, mode, ' board-mine-row')
-                : r.ranked && r.total ? "<tr class='board-mine-row'><td colspan='5' class='board-mine-none'>You are not on this board yet.</td></tr>" : '');
+                : r.ranked && r.total ? "<tr class='board-mine-row'><td colspan='6' class='board-mine-none'>You are not on this board yet.</td></tr>" : '');
         }
         shown = r.start + r.rows.length;
         $('.board-table').prop('hidden', r.total == 0);

@@ -1,10 +1,11 @@
 {% extends "layout.html" %}
+{% import 'cards.html' as cards with context %}
 
-{% block title %}: Room {{ code }}{% endblock %}
+{% block title %}: {% if world %}{{ world.title }} · {{ world.line }}{% else %}Room {{ code }}{% endif %}{% endblock %}
 
 {% block head %}
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" integrity="sha256-p/HXuG8QaPIo2S8bCu+VvUHR4uEnhVFlc62/VS7ieT0=" crossorigin="">
 {% endblock %}
 
 {% block page_class %} wide{% endblock %}
@@ -13,9 +14,10 @@
 <div id="room" data-code="{{ code }}">
 
     <section id="lobby" class="room-page" hidden>
-        <h1 class="sign">Room {{ code }}</h1>
+        <h1 class="sign">{% if world %}{{ world.title }} · {{ world.line }}{% else %}Room {{ code }}{% endif %}</h1>
         <div class="room-columns">
             <div class="room-column">
+                {% if not world %}
                 <div class="panel">
                     <h2>Invite Your Friends</h2>
                     <div class="room-invite">
@@ -23,6 +25,7 @@
                         <button type="button" class="btn wood" data-copy>Copy Link</button>
                     </div>
                 </div>
+                {% endif %}
                 <div class="panel">
                     <h2>Players</h2>
                     <div class="room-players" id="lobby-players"></div>
@@ -41,6 +44,14 @@
                     </div>
                 </div>
             </div>
+            {% if world %}
+            {# a world: its card and its rules, no settings (they are the card's) #}
+            <div class="room-column panel world-panel">
+                <div class="card-table world-table">{{ cards.card(world.rank, world.suit, world.milk, tilt = world.look[0], wear = world.look[1]) }}</div>
+                <p class="world-rules">{{ world.rules }}</p>
+                {% if guest %}<p class="hint">Without an account, your scores don't go on the leaderboard.</p>{% endif %}
+            </div>
+            {% else %}
             <form id="room-settings" class="room-column panel settings" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
 {% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('survival', 'Survival')], friends = True %}{% include "modes.html" %}{% endwith %}
@@ -49,7 +60,9 @@
                 </fieldset>
                 <p id="settings-error" class="room-error"></p>
             </form>
+            {% endif %}
         </div>
+        <p class="world-status" id="world-status" hidden></p>
         <button type="button" id="start-button" class="btn big wide room-start" disabled>Start the Game</button>
     </section>
 
@@ -131,20 +144,20 @@
         <div id="xp-slot" class="xp-slot"></div>
         <div class="room-actions">
             <button type="button" id="again-button" class="btn room-action" hidden>Play Again</button>
-            <a href="mode" class="btn wood room-action">Back to Menu</a>
+            <a href="{{ 'multiplayer' if world else 'mode' }}" class="btn wood room-action">{{ 'Leave' if world else 'Back to Menu' }}</a>
         </div>
         <p id="results-hint" class="hint"></p>
         <div class="room-chat-slot room-chat-results" id="chat-slot-results"></div>
     </section>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js" integrity="sha256-oosvezOf0KYCxnad8dymrUOvc7yMalvmcglxUonBKpo=" crossorigin=""></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" integrity="sha256-wS9gmOZBqsqWxgIVgA8Y9WcQOa7PgSIX+rPA0VL2rbQ=" crossorigin=""></script>
 <script src="{{ asset('js/sound.js') }}"></script>
 <script src="{{ asset('js/motion.js') }}"></script>
 <script src="{{ asset('js/xp.js') }}"></script>
 <script src="{{ asset('js/block.js') }}"></script>
-<div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.gif') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
+<div class="potion-throw" id="potion-throw" data-throw="{{ asset('potion-throw.webp') }}" hidden><img id="potion-gif" alt="" width="128" height="128"></div>
 <script src="{{ asset('js/potions.js') }}"></script>
 <script src="{{ asset('js/room.js') }}"></script>
 {% endblock %}

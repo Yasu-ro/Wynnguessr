@@ -9,3 +9,7 @@ coverage.json
 static/tiles
 avatars/
 static/sounds/
+cloudflare_token
+.starting.lock
+database.db-wal
+database.db-shm

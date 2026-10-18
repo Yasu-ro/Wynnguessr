@@ -1,6 +1,4 @@
 from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, send_file, jsonify
-from flask_session import Session
-from flask_cors import CORS
 import os
 import re
 import sqlite3
@@ -14,6 +12,7 @@ import io
 import time
 import base64
 import hashlib
+import fcntl
 from datetime import date
 import urllib.request
 from urllib.parse import quote, urlencode
@@ -21,7 +20,6 @@ from flask_bcrypt import Bcrypt
 from config import Config
 
 app = Flask(__name__)
-CORS(app)
 bcrypt = Bcrypt(app)
 app.config.from_object(Config)
 # other sites share this domain behind Tailscale Funnel
@@ -30,6 +28,8 @@ app.config['SESSION_COOKIE_NAME'] = 'wynnguessr_session'
 # elsewhere), and only over https
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = True
+# nothing bigger comes in (the mod's captures are ~13 MB)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
 # only these locations are played; 'new' ones wait for the review
 PLAYABLE = "('old', 'kept')"
@@ -39,6 +39,15 @@ def connect():
     c = sqlite3.connect('database.db', timeout=10)
     c.row_factory = sqlite3.Row
     return c
+
+# The site runs several processes (gunicorn -w): each one runs the
+# migrations below as it starts. One at a time, or two could add the same
+# column and one would fail to start (the lock is let go at the end of this
+# file). The database in WAL mode: reading no longer holds up a writer.
+STARTING = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.starting.lock'), 'w')
+fcntl.flock(STARTING, fcntl.LOCK_EX)
+with connect() as c:
+    c.execute("PRAGMA journal_mode=WAL")
 
 @app.context_processor
 def assets():
@@ -60,17 +69,35 @@ def only_one_site_in_search(response):
     return response
 
 @app.after_request
+def kept_long(response):
+    # a file whose address changes with it (asset(): ?v=, the map's tiles in
+    # a folder named after the map, Mojang's sounds that never change) is
+    # kept a year, by the browser and by Cloudflare, without asking again:
+    # before, Cloudflare checked them every 4 hours and the 8.7 MB map came
+    # back from here
+    if request.endpoint == 'static' and response.status_code == 200 and (
+            'v' in request.args or request.path.startswith(('/static/map-2026/', '/static/sounds/'))):
+        response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+    return response
+
+@app.after_request
 def no_tricks(response):
     # no page of this site inside another site's frame (fake buttons over
     # real ones), and a file is only ever read as the type it is served as
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    # nor carry a <base>, run a plugin, or send its forms anywhere else; and
+    # always https (the browser remembers it a year). The scripts themselves
+    # are left free: the pages have inline ones, and the CDNs they come from
+    # host any npm package, so a list would stop nothing
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'"
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
 def next_page():
     # where to go after logging in: only a page of this site, e.g. "room?code=ABC234"
     page = request.args.get('next', '')
-    return page if re.fullmatch(r'[a-z]+(\?(code|play)=[A-Za-z0-9_-]+)?', page) else './'
+    return page if re.fullmatch(r'[a-z]+(\?(code|play|join)=[A-Za-z0-9_-]+)?', page) else './'
 
 # The solo Classic game is played on the server (section "Solo" below): the
 # browser never had to know where the locations are. The old routes that
@@ -121,8 +148,9 @@ def board(c, form, user_id = None):
         FROM scores s JOIN users u ON u.id = s.user_id WHERE COALESCE(s.mode, 'classic') = ?'''
     params = [mode]
     if mode == 'classic':
+        # the whole map only: choosing provinces is for custom games
         query += " AND s.provinces = ? AND s.nolook = ? AND s.rounds = ?"
-        params += [form.get('provinces', ''), form.get('nolook', 'No'), form.get('rounds', '')]
+        params += [str(PROVINCES), form.get('nolook', 'No'), form.get('rounds', '')]
         order = " ORDER BY s.score DESC, s.time ASC"
     else:
         query += " AND s.difficulty = ? AND COALESCE(s.milk, 0) = ?"
@@ -170,6 +198,9 @@ def update_rank():
         uid = session.get('user_id')
         mine = next(({**row, 'rank': i + 1} for i, row in enumerate(rows) if row['id'] == uid), None)
         total, rows = len(rows), rows[start:start + BOARD_PAGE]
+        tags = tag_of(c, [r['id'] for r in rows] + ([mine['id']] if mine else []))
+        for row in rows + ([mine] if mine else []):
+            row['tag'] = tags.get(row['id'])
         # each player's picture; a Minecraft head is drawn sharp
         for row in rows + ([mine] if mine else []):
             row['pic'], row['head'] = avatar_url(row), not row.get('avatar')
@@ -237,6 +268,30 @@ def discord_counts():
             pass   # the page goes without them
     return DISCORD_COUNTS
 
+# the visitors as Cloudflare counts them (each one once, since the site went
+# behind it), read with a token that may only read wynndle.com's analytics
+# (file cloudflare_token next to this one, not in git); else our own count
+CLOUDFLARE_TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cloudflare_token')
+CLOUDFLARE_ZONE = '6123d2ca7e48c20b76cb0da69584f9a5'   # wynndle.com
+LAUNCH = '2026-10-15'      # its first day behind Cloudflare
+VISITS = {'at': 0, 'count': None}
+
+def cloudflare_visitors():
+    if time.time() - VISITS['at'] > 600:
+        VISITS['at'] = time.time()
+        try:
+            with open(CLOUDFLARE_TOKEN_FILE) as f:
+                token = f.read().strip()
+            query = ('{viewer{zones(filter:{zoneTag:"%s"}){httpRequests1dGroups(limit:1, filter:{date_geq:"%s"}){uniq{uniques}}}}}'
+                     % (CLOUDFLARE_ZONE, LAUNCH))
+            req = urllib.request.Request('https://api.cloudflare.com/client/v4/graphql', data = json.dumps({'query': query}).encode(),
+                                         headers = {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'})
+            with urllib.request.urlopen(req, timeout = 5) as r:
+                VISITS['count'] = json.loads(r.read())['data']['viewer']['zones'][0]['httpRequests1dGroups'][0]['uniq']['uniques']
+        except Exception:
+            pass   # no token, Cloudflare silent: our own count instead
+    return VISITS['count']
+
 @app.route("/about")
 def about():
     now = time.time()
@@ -244,7 +299,7 @@ def about():
         one = lambda q, *a: c.execute(q, a).fetchone()[0]
         stats = {
             'online': one("SELECT COUNT(*) FROM visitors WHERE last > ?", now - ONLINE),
-            'visitors': one("SELECT COUNT(*) FROM visitors"),
+            'visitors': cloudflare_visitors() or one("SELECT COUNT(*) FROM visitors"),
             'accounts': one("SELECT COUNT(*) FROM users WHERE COALESCE(guest, 0) = 0"),
             # rooms played to the end, Classic games alone, Survival runs
             'games': one("SELECT COUNT(*) FROM rooms WHERE state = 'finished'")
@@ -267,10 +322,8 @@ def game():
         if form.get('mode') in ('duel', 'royale'):
             return render_template('apology.html', message = "This mode is played with friends: create a room")
         mode = 'survival' if form.get('mode') == 'survival' else 'classic'
-        #if there are no provinces selected, return apology
-        if form.getlist('province') == []:
-            return render_template('apology.html', message = "Please select at least one province")
-        provinces = form.getlist('province')
+        # always the whole map: choosing provinces is for custom games
+        provinces = PROVINCES
         #if time limit is not selected, set time limit to -1
         if form.get('time-limit-checkbox') == None:
             time_limit = -1
@@ -299,25 +352,55 @@ def game():
 
 TRIES = 10       # wrong passwords (or recovery codes) for one account from one place...
 WINDOW = 900     # ...in this many seconds, then it has to wait
-FAILS = {}       # (place, name) and name -> times of the recent failures (one worker: memory is enough)
+
+# the recent failures, in the database: the site runs several processes,
+# which must all see them (in memory, each had its own count)
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS fails (place TEXT, name TEXT, at REAL)")
+    c.execute("CREATE INDEX IF NOT EXISTS fails_name ON fails (name, at)")
 
 def place():
     # behind Cloudflare or Funnel every request comes from 127.0.0.1: the
-    # real address is in their header
-    return request.headers.get('CF-Connecting-IP') or request.headers.get('X-Forwarded-For', '').split(',')[0].strip() or request.remote_addr
+    # real address is the last one in X-Forwarded-For, which both write after
+    # whatever the player sent. Not CF-Connecting-IP: through Funnel (the old
+    # address) a player could write that one himself, and so get around the
+    # limits and the bans
+    return request.headers.get('X-Forwarded-For', '').split(',')[-1].strip() or request.headers.get('CF-Connecting-IP') or request.remote_addr
+
+# what one address may make in WINDOW: no flood of guests, accounts, rooms, pictures
+ACTIONS = {'guest': 10, 'account': 5, 'room': 20, 'picture': 10}
+
+with connect() as c:
+    c.execute("CREATE TABLE IF NOT EXISTS actions (place TEXT, what TEXT, at REAL)")
+    c.execute("CREATE INDEX IF NOT EXISTS actions_place ON actions (place, what, at)")
+
+def too_often(what):
+    # (not for this machine itself: tests and tools; through Cloudflare or
+    # Funnel a request always has its player's address)
+    if place() in ('127.0.0.1', '::1'):
+        return False
+    since = time.time() - WINDOW
+    with connect() as c:
+        c.execute("DELETE FROM actions WHERE at < ?", (since,))
+        return c.execute("SELECT COUNT(*) FROM actions WHERE place = ? AND what = ? AND at > ?", (place(), what, since)).fetchone()[0] >= ACTIONS[what]
+
+def done(c, what):
+    # counted once made, so a name already taken costs nothing (on the
+    # request's own connection: a second one would wait for its transaction)
+    c.execute("INSERT INTO actions (place, what, at) VALUES (?, ?, ?)", (place(), what, time.time()))
 
 def too_many(name):
     # also a cap per account whatever the place, a little higher
-    now, name = time.time(), name.lower()
-    if len(FAILS) > 10000:
-        FAILS.clear()
-    for k in ((place(), name), name):
-        FAILS[k] = [t for t in FAILS.get(k, ()) if now - t < WINDOW]
-    return len(FAILS[(place(), name)]) >= TRIES or len(FAILS[name]) >= 3 * TRIES
+    since, name = time.time() - WINDOW, name.lower()
+    with connect() as c:
+        c.execute("DELETE FROM fails WHERE at < ?", (since,))
+        here = c.execute("SELECT COUNT(*) FROM fails WHERE name = ? AND place = ? AND at > ?", (name, place(), since)).fetchone()[0]
+        anywhere = c.execute("SELECT COUNT(*) FROM fails WHERE name = ? AND at > ?", (name, since)).fetchone()[0]
+    return here >= TRIES or anywhere >= 3 * TRIES
 
 def failed(name):
-    for k in ((place(), name.lower()), name.lower()):
-        FAILS.setdefault(k, []).append(time.time())
+    with connect() as c:
+        c.execute("INSERT INTO fails (place, name, at) VALUES (?, ?, ?)", (place(), name.lower(), time.time()))
 
 def stamp(hashed):
     # a trace of the password in the session: when it changes, every other
@@ -326,15 +409,37 @@ def stamp(hashed):
 
 @app.before_request
 def still_logged_in():
-    if request.endpoint == 'static' or not session.get('loggedin'):
+    # (not for the pictures: 95 % of the requests, and none needs it)
+    # a banned player, guest or not, is logged out of every browser, and
+    # their next page tells them why, once (a page: not a script's call, nor
+    # a picture, which would use the message up unseen)
+    if request.endpoint in ('static', 'play_tile', 'survival_tile'):
         return
-    with connect() as c:
-        me = c.execute("SELECT password FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (session.get('user_id'),)).fetchone()
-    if me and session.setdefault('stamp', stamp(me[0])) == stamp(me[0]):
-        return
-    session.clear()
+    if session.get('user_id'):
+        with connect() as c:
+            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+            note = me and (me['banned_until'] or 0) > time.time() and ban_note(c, session['user_id'])
+        if note:
+            session.clear()
+            session['banned'] = note
+        elif session.get('loggedin') and not (me and not me['guest'] and session.setdefault('stamp', stamp(me[0])) == stamp(me[0])):
+            session.clear()
+    if session.get('banned') and request.method == 'GET' and a_page():
+        return render_template('apology.html', message = session.pop('banned')), 403
+
+def a_page():
+    # a page the player opens, not a script's call nor a picture. Browsers say
+    # so (Sec-Fetch-Dest); else the Accept header (its "best" will not do:
+    # Chromium's signed-exchange type would rank above text/html)
+    dest = request.headers.get('Sec-Fetch-Dest')
+    return dest == 'document' if dest else request.accept_mimetypes.best_match(['application/json', 'image/webp', 'text/html']) == 'text/html'
 
 def log_in(c, uid, wynn = False):
+    # a banned player stays out: what to tell them comes back instead
+    note = ban_note(c, uid)
+    if note:
+        return note
+    seen(c, uid)
     adopt(c, uid)
     session.permanent = True
     session['guest'] = False
@@ -353,6 +458,8 @@ def name_problem(c, name, uid = None):
     # the Minecraft name Wynncraft proved for someone else
     if not 1 <= len(name) <= 20 or not name.isprintable():
         return "Pick a name of 1 to 20 characters"
+    if name_rule(name):
+        return name_rule(name)
     if c.execute("""SELECT 1 FROM users WHERE id IS NOT ? AND ((username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0)
             OR mc_name = ? COLLATE NOCASE)""", (uid, name, name)).fetchone():
         return "This name is taken"
@@ -383,8 +490,8 @@ def login():
         with connect() as c:
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
             if user and user[2] and bcrypt.check_password_hash(user[2], password):
-                log_in(c, user[0])
-                return redirect(next_page())
+                note = log_in(c, user[0])
+                return render_template('apology.html', message = note) if note else redirect(next_page())
         failed(username)
         return render_template('apology.html', message = "Invalid username or password")
     else:
@@ -397,10 +504,12 @@ def register():
         password = request.form['password']
         confirmation = request.form['confirmation']
         with connect() as c:
-            problem = name_problem(c, username) or password_problem(password, confirmation)
+            problem = (place_note(c) or (too_often('account') and "Too many new accounts from here: wait a few minutes")
+                       or name_problem(c, username) or password_problem(password, confirmation))
             if problem:
                 return render_template('apology.html', message = problem)
             uid = c.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed(password))).lastrowid
+            done(c, 'account')
             log_in(c, uid)
             return redirect(next_page())
     else:
@@ -422,8 +531,8 @@ def recover():
         user = c.execute("SELECT id, recovery FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
         if user and user['recovery'] and bcrypt.check_password_hash(user['recovery'], plain_code(request.form.get('code', ''))):
             c.execute("UPDATE users SET password = ?, recovery = NULL WHERE id = ?", (hashed(request.form['password']), user['id']))
-            log_in(c, user['id'])
-            return redirect('account?saved=recovered')
+            note = log_in(c, user['id'])
+            return render_template('apology.html', message = note) if note else redirect('account?saved=recovered')
     failed(username)
     return render_template('apology.html', message = "Wrong username or recovery code")
 
@@ -466,17 +575,23 @@ def guest():
     name = ' '.join(request.form.get('username', '').split())
     if not name or len(name) > 20:
         return render_template('apology.html', message = "Pick a nickname of 1 to 20 characters")
+    if name_rule(name):
+        return render_template('apology.html', message = name_rule(name))
+    if too_often('guest'):
+        return render_template('apology.html', message = "Too many new nicknames from here: wait a few minutes")
     with connect() as c:
+        if place_note(c):
+            return render_template('apology.html', message = place_note(c))
         if c.execute("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0", (name,)).fetchone():
             return render_template('apology.html', message = "This name belongs to a registered player: pick another one, or log in")
-        uid = c.execute("INSERT INTO users (username, password, guest) VALUES (?, '', 1)", (name,)).lastrowid
+        uid = c.execute("INSERT INTO users (username, password, guest, seen_from) VALUES (?, '', 1, ?)", (name, place())).lastrowid
+        done(c, 'guest')
     session.permanent = True
     session['loggedin'] = False
     session['guest'] = True
     session['user_id'] = uid
     return redirect(next_page())
 
-ADMINS = (1,)    # user ids that may take down someone's picture: Yasuro
 AVATAR_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'avatars')   # not in git
 PICTURE_MAX = 8 * 1024 * 1024
 STEVE = 'https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f8f68fa93a3386d04452ab27f43acdf1b60cb'
@@ -491,9 +606,10 @@ def show_profile(uid):
         if not user:
             return render_template('apology.html', message = "This player does not exist"), 404
         p = progress(c, uid)
-    return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'],
+        tags = tags_of(c, [uid])[uid]
+        return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
                            avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
-                           admin = session.get('loggedin') and session.get('user_id') in ADMINS,
+                           admin = may(c, 'pictures', uid), moderate = uid != session.get('user_id') and may(c, 'players'),
                            games = p['history'][:30], p = p)
 
 @app.route("/profile")
@@ -507,11 +623,12 @@ def player():
     # anyone's profile, opened from the leaderboard
     uid = request.args.get('id', type = int)
     if request.method == 'POST':
-        # an admin takes down a picture that should not be there
-        if not (session.get('loggedin') and session.get('user_id') in ADMINS):
-            return render_template('apology.html', message = "Not allowed"), 403
+        # the staff takes down a picture that should not be there
         with connect() as c:
+            if not may(c, 'pictures', uid):
+                return render_template('apology.html', message = "Not allowed"), 403
             drop_picture(c, uid)
+            logged(c, 'picture', uid, 'picture taken down')
         return redirect('player?id=' + str(uid))
     return show_profile(uid)
 
@@ -558,8 +675,14 @@ def head(uuid):
 @app.route("/avatar")
 def avatar():
     # a player's picture: the one they sent, else their Minecraft head
+    uid = request.args.get('id', type = int)
     with connect() as c:
-        user = c.execute("SELECT avatar, mc_uuid FROM users WHERE id = ?", (request.args.get('id', type = int),)).fetchone()
+        user = c.execute("SELECT avatar, avatar_pending, mc_uuid FROM users WHERE id = ?", (uid,)).fetchone()
+        if request.args.get('pending') and user and user['avatar_pending'] and (
+                uid == session.get('user_id') and session.get('loggedin') or may(c, 'pictures')):
+            response = send_from_directory(AVATAR_DIR, user['avatar_pending'] + '.webp', max_age = 600)
+            response.cache_control.public, response.cache_control.private = False, True
+            return response
     if user and user['avatar']:
         return send_from_directory(AVATAR_DIR, user['avatar'] + '.webp', max_age = 86400)
     path = head(user['mc_uuid'] if user else None)
@@ -584,14 +707,22 @@ def save_picture(c, uid, upload):
     name = secrets.token_hex(10)
     os.makedirs(AVATAR_DIR, exist_ok = True)
     img.save(os.path.join(AVATAR_DIR, name + '.webp'), 'WEBP', quality = 85)
-    drop_picture(c, uid)
-    c.execute("UPDATE users SET avatar = ? WHERE id = ?", (name, uid))
+    # it waits for the staff before anyone sees it (Yasuro), except the
+    # owner's: nobody is above to look at it
+    drop_picture(c, uid, 'avatar_pending')
+    c.execute("UPDATE users SET avatar_pending = ?, pending_at = ?, avatar_note = NULL WHERE id = ?", (name, time.time(), uid))
+    if rank_of(c, uid) == 4:
+        approve_picture(c, uid)
 
-def drop_picture(c, uid):
-    # back to the Minecraft head
-    old = c.execute("SELECT avatar FROM users WHERE id = ?", (uid,)).fetchone()
+def approve_picture(c, uid):
+    drop_picture(c, uid)
+    c.execute("UPDATE users SET avatar = avatar_pending, avatar_pending = NULL, pending_at = NULL WHERE id = ?", (uid,))
+
+def drop_picture(c, uid, which = 'avatar'):
+    # the shown picture (back to the Minecraft head), or the one waiting
+    old = c.execute(f"SELECT {which} FROM users WHERE id = ?", (uid,)).fetchone()
     if old and old[0]:
-        c.execute("UPDATE users SET avatar = NULL WHERE id = ?", (uid,))
+        c.execute(f"UPDATE users SET {which} = NULL WHERE id = ?", (uid,))
         try:
             os.remove(os.path.join(AVATAR_DIR, old[0] + '.webp'))
         except OSError:
@@ -612,9 +743,12 @@ def account():
     with connect() as c:
         me = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
         if what == 'picture':
-            problem = save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture"
+            problem = ("Too many pictures: wait a few minutes" if too_often('picture') else
+                       save_picture(c, uid, request.files['picture']) if 'picture' in request.files else "Pick a picture")
+            if not problem:
+                done(c, 'picture')
         elif what == 'head':
-            problem = drop_picture(c, uid)
+            problem = drop_picture(c, uid) or drop_picture(c, uid, 'avatar_pending')
         elif what in ('name', 'mc-name'):
             name = me['mc_name'] if what == 'mc-name' else clean_name(form.get('username', ''))
             problem = name_problem(c, name or '', uid)
@@ -648,6 +782,8 @@ def account():
 def account_page(section = None, error = None, code = None):
     with connect() as c:
         me = c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+        if me['avatar_note'] and request.method == 'GET':
+            c.execute("UPDATE users SET avatar_note = NULL WHERE id = ?", (me['id'],))   # said once
     return render_template('account.html', me = me, avatar = avatar_url(me), section = section, error = error,
                            code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
 
@@ -658,8 +794,14 @@ def history(c, uid):
     games = []
     for r in c.execute('''SELECT r.* FROM rooms r JOIN room_players p ON p.code = r.code
             WHERE p.user_id = ? AND r.state = 'finished' ''', (uid,)).fetchall():
-        totals = dict(c.execute("SELECT user_id, SUM(score) FROM room_guesses WHERE code = ? GROUP BY user_id", (r['code'],)).fetchall())
-        when = c.execute("SELECT MAX(at) FROM room_guesses WHERE code = ?", (r['code'],)).fetchone()[0]
+        # only who played it live: a finished classic room can be replayed
+        # alone later, and that score once moved the win to someone else after
+        # the fact (Yasuro: "we all seem to lose our streak randomly")
+        live = """SELECT g.user_id, SUM(g.score), MAX(g.at) FROM room_guesses g JOIN room_players p ON p.code = g.code AND p.user_id = g.user_id
+            WHERE g.code = ? AND p.live = 1 GROUP BY g.user_id"""
+        rows = c.execute(live, (r['code'],)).fetchall()
+        totals = {u: t for u, t, _ in rows}
+        when = max((at for _, _, at in rows if at), default = None)   # (the oldest guesses have no time)
         if r['mode'] == 'classic':
             st = {}
             players = list(totals)
@@ -813,7 +955,9 @@ def wynn_back():
             return wynn_fail("An account named " + name + " already exists: log in with its password, then link Wynncraft from your profile")
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
-        log_in(c, uid, wynn = True)
+        note = log_in(c, uid, wynn = True)
+    if note:
+        return wynn_fail(note)
     return redirect('../../' + session.pop('wynn_next', './'))
 
 @app.route("/apology")
@@ -941,17 +1085,19 @@ def pick_locations(c, s):
         (*s['provinces'], s['rounds']))]
     return json.dumps(ids) if len(ids) == s['rounds'] else None
 
-def new_room(c, host, s):
+def new_room(c, host, s, world = None):
+    # a world (see "Multiplayer: worlds") has no host, and nobody in it yet
     locations = pick_locations(c, s)
     if not locations:
         return None
     code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
     while find_room(c, code):
         code = ''.join(secrets.choice(CODE_CHARS) for _ in range(6))
-    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty, milk)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?, ?)''',
-        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], s['milk']))
-    c.execute("INSERT INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, 1, ?)", (code, host, time.time()))
+    c.execute('''INSERT INTO rooms (code, host_id, mode, provinces, rounds, time_limit, look, locations, state, round, round_start, difficulty, milk, world)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'waiting', 0, 0, ?, ?, ?)''',
+        (code, host, s['mode'], json.dumps(s['provinces']), s['rounds'], s['time_limit'], s['look'], locations, s['difficulty'], s['milk'], world))
+    if host:
+        c.execute("INSERT INTO room_players (code, user_id, live, last_seen, joined) VALUES (?, ?, 1, ?, ?)", (code, host, time.time(), time.time()))
     return code
 
 PERFECT = 2      # a guess this close (in blocks) is a perfect 5,000; game.js has the same
@@ -1043,6 +1189,8 @@ def next_round(c, r):
 def tick(c, r):
     # close the round once nobody is left to wait for, then move on after the reveal
     now = time.time()
+    if r['world'] and r['state'] != 'playing':
+        return world_tick(c, r)
     if r['state'] != 'playing':
         host = c.execute("SELECT last_seen FROM room_players WHERE code = ? AND user_id = ?", (r['code'], r['host_id'])).fetchone()
         if host and host[0] > now - HOST_AWAY:
@@ -1077,10 +1225,12 @@ def room_create():
     if not session.get('user_id'):
         return redirect('../guest?next=' + quote('mode?play=friends'))
     s, error = room_settings(request.form)
-    if error:
-        return render_template('apology.html', message = error)
+    if error or too_often('room'):
+        return render_template('apology.html', message = error or "Too many new rooms: wait a few minutes")
     with room_tx() as c:
         code = new_room(c, session['user_id'], s)
+        if code:
+            done(c, 'room')
     if not code:
         return render_template('apology.html', message = "Not enough locations in these provinces")
     return redirect('../room?code=' + code)
@@ -1094,8 +1244,15 @@ def room():
         r = find_room(c, code)
         if not r:
             return render_template('apology.html', message = "No room with the code " + code)
-        if c.execute("SELECT 1 FROM room_bans WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone():
+        ban = c.execute("SELECT why FROM room_bans WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone()
+        if ban:
+            # not ready when a world's game started: back to the worlds, with a word why
+            if ban['why'] == 'away':
+                return redirect('multiplayer?missed=1')
             return render_template('apology.html', message = "The host removed you from this room")
+        if r['world'] and not c.execute("SELECT 1 FROM room_players WHERE code = ? AND user_id = ?", (r['code'], session['user_id'])).fetchone() \
+                and (r['state'] != 'waiting' or world_here(c, r['code']) >= WORLD_MAX):
+            return redirect('multiplayer?join=' + r['world'])
         # names tell players apart on screen: two of the same in a room would mix up
         clash = c.execute('''SELECT 1 FROM room_players p JOIN users u ON u.id = p.user_id, users me
             WHERE p.code = ? AND me.id = ? AND p.user_id != me.id AND u.username = me.username COLLATE NOCASE''',
@@ -1104,9 +1261,11 @@ def room():
             return render_template('apology.html', message = "Someone in this room already has your name: pick another nickname")
         # joining before the end means playing live, even mid-game; a finished
         # classic room can still be played alone, the other modes only looked at
-        c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen) VALUES (?, ?, ?, ?)",
-                  (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time()))
-    return render_template('room.html', code = r['code'])
+        c.execute("INSERT OR IGNORE INTO room_players (code, user_id, live, last_seen, joined) VALUES (?, ?, ?, ?, ?)",
+                  (r['code'], session['user_id'], int(r['state'] != 'finished' or r['mode'] != 'classic'), time.time(), time.time()))
+        seen(c, session['user_id'])
+    return render_template('room.html', code = r['code'], world = r['world'] and world_info(r['world']),
+                           guest = not session.get('loggedin'))
 
 @app.route("/api/room/<code>")
 def room_state(code):
@@ -1129,7 +1288,7 @@ def room_state(code):
             if request.args.get('round', '').isnumeric():
                 n = max(1, min(n, int(request.args['round'])))
         players = c.execute('''SELECT p.user_id AS uid, u.username AS name, p.user_id = ? AS you, p.user_id = ? AS host,
-                p.seat, p.last_seen > ? AS here, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
+                p.seat, p.last_seen > ? AS here, p.lobby_ready, COALESCE(SUM(g.score), 0) AS total, COUNT(g.round) AS played,
                 COALESCE(MAX(g.round = ?), 0) AS guessed
             FROM room_players p JOIN users u ON u.id = p.user_id
             LEFT JOIN room_guesses g ON g.code = p.code AND g.user_id = p.user_id
@@ -1146,16 +1305,42 @@ def room_state(code):
                             "time_limit": r['time_limit'], "look": bool(r['look'])},
                # the colour of a player is their place in the join order
                "players": [dict(p, color = i, **st.get(p['uid'], {})) for i, p in enumerate(players)]}
-        # chat: the messages the page has not seen yet (it says which was its last)
+        if r['world']:
+            out['world'] = world_info(r['world'])
+            out['ready'] = bool(me['lobby_ready'])
+            if r['state'] == 'waiting' and r['starts_at']:
+                out['starts_in'] = max(0, r['starts_at'] - now)
+            if r['state'] == 'finished' and not r['next_code']:
+                out['next_in'] = max(0, (r['round_end'] or now) + REVEAL + WORLD_RESULTS - now)
+        # the tag next to each name (Moderation: staff rank, a tag, a "#1")
+        tags = tag_of(c, [p['uid'] for p in players])
+        for p in out['players']:
+            p['tag'] = tags.get(p['uid'])
+        # chat: the messages the page has not seen yet (it says which was its last),
+        # but none the staff hid, and none of the players this one ignores
         colors = {p['uid']: p['color'] for p in out['players']}
         since = request.args.get('chat', '')
+        ignored = {i[0] for i in c.execute("SELECT target FROM ignores WHERE user_id = ?", (me['user_id'],))}
         out['chat'] = [dict(m, color = colors.get(m['uid'], 0)) for m in reversed(c.execute(
             '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text FROM room_chat m JOIN users u ON u.id = m.user_id
-            WHERE m.code = ? AND m.id > ? ORDER BY m.id DESC LIMIT 50''',
-            (r['code'], int(since) if since.isnumeric() else 0)).fetchall())]
-        # players keep their id: the host's tools (make host, kick) name them by it
+            WHERE m.code = ? AND m.id > ? AND m.hidden_by IS NULL ORDER BY m.id DESC LIMIT 50''',
+            (r['code'], int(since) if since.isnumeric() else 0)).fetchall()) if m['uid'] not in ignored]
+        # players keep their id: the host's tools (make host, kick) name them by it;
+        # a message does not, but the staff learns which ones it may hide
+        rank = my_rank(c)
         for p in out['chat']:
+            p['tag'] = tags.get(p['uid']) or tag_of(c, [p['uid']]).get(p['uid'])
+            if rank >= MAY['hide'] and rank_of(c, p['uid']) < rank:
+                p['hide'] = True
             del p['uid']
+        # hidden after the page showed them: it takes them away
+        out['hidden'] = [m[0] for m in c.execute("SELECT id FROM room_chat WHERE code = ? AND hidden_by IS NOT NULL", (r['code'],))]
+        for p in out['players']:
+            if p['uid'] in ignored:
+                p['ignored'] = True
+        muted = (c.execute("SELECT muted_until FROM users WHERE id = ?", (me['user_id'],)).fetchone()[0] or 0) - now
+        if muted > 0:
+            out['muted'] = how_long(muted)
         if r['mode'] == 'duel':
             out['multiplier'] = multiplier(max(n, 1))
         if r['mode'] == 'survival':
@@ -1196,11 +1381,47 @@ def room_chat(code):
         r, me = member(c, code)
         if not r or not text:
             return jsonify({"success": False})
+        muted = (c.execute("SELECT muted_until FROM users WHERE id = ?", (me['user_id'],)).fetchone()[0] or 0) - time.time()
+        if muted > 0:
+            return jsonify({"success": False, "error": "You are muted for " + how_long(muted)})
         last = c.execute("SELECT MAX(at) FROM room_chat WHERE code = ? AND user_id = ?", (r['code'], me['user_id'])).fetchone()[0]
         if last and time.time() - last < 0.7:
             return jsonify({"success": False, "error": "Slow down a little"})
-        c.execute("INSERT INTO room_chat (code, user_id, at, text) VALUES (?, ?, ?, ?)", (r['code'], me['user_id'], time.time(), text))
+        shown = filtered(text)
+        c.execute("INSERT INTO room_chat (code, user_id, at, text, raw) VALUES (?, ?, ?, ?, ?)",
+                  (r['code'], me['user_id'], time.time(), shown, text if shown != text else None))
     return jsonify({"success": True})
+
+@app.route("/api/room/<code>/report", methods=['POST'])
+def room_report(code):
+    # a player reports a message of someone else: it waits in Moderation
+    mid = request.form.get('id', type = int)
+    with room_tx() as c:
+        r, me = member(c, code)
+        m = r and c.execute("SELECT user_id FROM room_chat WHERE id = ? AND code = ? AND hidden_by IS NULL", (mid, r['code'])).fetchone()
+        if not m or m['user_id'] == me['user_id']:
+            return jsonify({"success": False})
+        if c.execute("SELECT COUNT(*) FROM chat_reports WHERE by = ? AND at > ?", (me['user_id'], time.time() - 600)).fetchone()[0] >= REPORTS_MAX:
+            return jsonify({"success": False, "error": "That's a lot of reports! The staff is on it"})
+        c.execute("INSERT OR IGNORE INTO chat_reports (message, by, at) VALUES (?, ?, ?)", (mid, me['user_id'], time.time()))
+    return jsonify({"success": True})
+
+@app.route("/api/room/<code>/ignore", methods=['POST'])
+def room_ignore(code):
+    # stop seeing someone's messages, in every room (undo: see them again)
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r:
+            return jsonify({"success": False})
+        if request.form.get('undo'):
+            c.execute("DELETE FROM ignores WHERE user_id = ? AND target = ?", (me['user_id'], request.form.get('uid', type = int)))
+            return jsonify({"success": True})
+        m = c.execute("SELECT m.user_id, u.username FROM room_chat m JOIN users u ON u.id = m.user_id WHERE m.id = ? AND m.code = ?",
+                      (request.form.get('id', type = int), r['code'])).fetchone()
+        if not m or m['user_id'] == me['user_id']:
+            return jsonify({"success": False})
+        c.execute("INSERT OR IGNORE INTO ignores (user_id, target, at) VALUES (?, ?, ?)", (me['user_id'], m['user_id'], time.time()))
+    return jsonify({"success": True, "uid": m['user_id'], "name": m['username']})
 
 @app.route("/api/room/<code>/settings", methods=['POST'])
 def room_set(code):
@@ -1478,10 +1699,16 @@ def make_tiles(data, name):
             os.makedirs(os.path.join(tmp, str(level)), exist_ok=True)
             for i in range(size // TILE):
                 for j in range(size // TILE):
-                    img.crop((j * TILE, i * TILE, (j + 1) * TILE, (i + 1) * TILE)).save(
-                        os.path.join(tmp, str(level), f'{letter}{i}_{j}.jpg'), quality=90)
+                    # each tile twice: WebP 90, what the pages load (a third
+                    # lighter, Yasuro's choice), and JPEG, until no page asks
+                    # for it (tools/webp_tiles.py did the older locations)
+                    tile = img.crop((j * TILE, i * TILE, (j + 1) * TILE, (i + 1) * TILE))
+                    tile.save(os.path.join(tmp, str(level), f'{letter}{i}_{j}.jpg'), quality=90)
+                    tile.save(os.path.join(tmp, str(level), f'{letter}{i}_{j}.webp'), quality=90)
         os.makedirs(os.path.join(tmp, 'fallback'), exist_ok=True)
-        face.resize((1024, 1024), Image.Resampling.LANCZOS).save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
+        small = face.resize((1024, 1024), Image.Resampling.LANCZOS)
+        small.save(os.path.join(tmp, 'fallback', letter + '.jpg'), quality=90)
+        small.save(os.path.join(tmp, 'fallback', letter + '.webp'), quality=90)
     os.rename(tmp, os.path.join(TILES_DIR, name))
     return 'static/tiles/' + name + '/'
 
@@ -1647,12 +1874,16 @@ def tile_url(c, lid, scope, fog = False):
 @app.route("/play/tile/<token>/<path:name>")
 def play_tile(token, name):
     with connect() as c:
-        row = c.execute("""SELECT CASE WHEN t.fog = 1 AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END
+        row = c.execute("""SELECT CASE WHEN t.fog = 1 AND l.fog_url IS NOT NULL THEN l.fog_url ELSE l.image_url END, t.scope
                 FROM tiles t JOIN locations l ON l.location_id = t.location_id WHERE t.token = ?""", (token,)).fetchone()
     if not row or not row[0].startswith('static/tiles/'):
         return '', 404
+    if row[1].startswith('room:'):
+        # a room's token never dies and everyone in the room has it: Cloudflare
+        # keeps the tiles, and sends them to the others without asking here
+        return send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 86400)
     response = send_from_directory(os.path.join(TILES_DIR, row[0][len('static/tiles/'):].strip('/')), name, max_age = 3600)
-    response.cache_control.private = True   # the browser keeps it, Cloudflare does not (see Survival)
+    response.cache_control.public, response.cache_control.private = False, True   # alone: the browser keeps it, Cloudflare does not (see Survival)
     return response
 
 # ---------- Solo ----------
@@ -1687,17 +1918,15 @@ def my_solo(c):
     return game
 
 def solo_settings(form):
-    # the settings of the mode page, checked: provinces in the order of
-    # PROVINCES (the leaderboard compares them as text), rounds, time, view
-    chosen = form.getlist('province')
-    provinces = [p for p in PROVINCES if p in chosen]
+    # the settings of the mode page, checked: rounds, time, view. Always the
+    # whole map: choosing provinces is for custom games (Yasuro, 2026-10-18)
     try:
         rounds, limit = int(form.get('rounds', '')), int(form.get('time_limit', -1))
     except ValueError:
         return None
-    if not provinces or rounds not in SOLO_ROUNDS or not (limit == -1 or 1 <= limit <= 1800):
+    if rounds not in SOLO_ROUNDS or not (limit == -1 or 1 <= limit <= 1800):
         return None
-    return {'provinces': provinces, 'rounds': rounds, 'time_limit': limit, 'look': form.get('look') == 'true'}
+    return {'provinces': PROVINCES, 'rounds': rounds, 'time_limit': limit, 'look': form.get('look') == 'true'}
 
 def solo_next(c, game):
     provinces = json.loads(game['provinces'])
@@ -2277,7 +2506,7 @@ def survival_tile(token, name):
         return '', 404
     response = send_from_directory(os.path.join(TILES_DIR, run[0][len('static/tiles/'):].strip('/')), name, max_age = 600)
     # kept by the browser, never by Cloudflare: the address must die with the round
-    response.cache_control.private = True
+    response.cache_control.public, response.cache_control.private = False, True
     return response
 
 
@@ -2721,6 +2950,708 @@ def room_milk(code):
             return jsonify({"success": False})
         c.execute("INSERT OR IGNORE INTO room_milk (code, round, user_id, at) VALUES (?, ?, ?, ?)", (r['code'], n, uid, now))
     return jsonify({"success": True})
+
+# ---------- Multiplayer: worlds ----------
+# Public games, no code to share (Yasuro: "super duper easy for players to
+# quickly play with others"), named after Wynncraft's worlds. One kind of
+# world per card of the Multiplayer page, and always a lobby open for each:
+# full (WORLD_MAX) or under way, another opens at once (open_world). Nobody
+# hosts: the settings are the card's, every province (choosing them is for
+# custom games), and the game starts by itself WORLD_COUNTDOWN seconds after
+# half the players are ready (2 at least), WORLD_ALL_READY once all are; the
+# countdown never stops for someone changing their mind, only when fewer
+# than 2 are left. Whoever is not ready then is out of the world (Yasuro:
+# "anyone who didn't click ready and missed the game should be kicked"),
+# back on the Multiplayer page with a word why; except who came in the
+# last WORLD_GRACE seconds, who plays. After the results everyone goes on
+# together to the open lobby, where Ready is asked again: the check comes
+# back every game. A lobby counts a player for GONE seconds after their last
+# poll, not AWAY: a tab in the background stays silent most of a minute, and
+# someone ready reading Discord would have been thrown out (see GONE).
+# The cards are ordered for who is there now, then how much each was played
+# lately (a game counts half as much every WORLD_HALF_LIFE days), and a new
+# kind (since) is helped up for its first NEW_FOR days, so it is not buried
+# under the old ones.
+
+WORLDS = {   # key: (title, line under it, settings, (rank, suit) of its card, since)
+    'survival-normal': ('Survival', 'Normal', {'mode': 'survival', 'difficulty': 'normal', 'milk': 0}, (10, 'hearts'), None),
+    'survival-hard': ('Survival', 'Hard', {'mode': 'survival', 'difficulty': 'hard', 'milk': 0}, (5, 'hearts'), None),
+    'survival-hardcore': ('Survival', 'Hardcore', {'mode': 'survival', 'difficulty': 'hardcore', 'milk': 0}, (1, 'hardcore'), None),
+    'classic': ('Classic', '5 rounds', {'mode': 'classic', 'rounds': 5}, (5, 'pins'), None),
+    'survival-normal-milk': ('Survival', 'Normal · Milk', {'mode': 'survival', 'difficulty': 'normal', 'milk': 1}, (10, 'hearts'), None),
+    'survival-hard-milk': ('Survival', 'Hard · Milk', {'mode': 'survival', 'difficulty': 'hard', 'milk': 1}, (5, 'hearts'), None),
+    'survival-hardcore-milk': ('Survival', 'Hardcore · Milk', {'mode': 'survival', 'difficulty': 'hardcore', 'milk': 1}, (1, 'hardcore'), None),
+}
+# how each lies on the table (tilt, wear), the same wherever the order puts it
+WORLD_LOOKS = [(-1.5, 0), (1, 1), (2, 3), (-0.5, 2), (-2, 1), (1.5, 0), (-1, 2)]
+WORLD_MAX = 16          # players in a lobby, then another opens
+WORLD_COUNTDOWN = 15    # seconds from half ready to the start
+WORLD_ALL_READY = 3     # ...cut to this once everyone is
+WORLD_GRACE = 10        # who came in this late before the start plays, ready or not
+WORLD_RESULTS = 20      # seconds on the results, then on to the next lobby
+WORLD_HALF_LIFE = 3     # days: a game played that long ago counts half
+NEW_FOR = 14            # days a new kind of world is helped up the page
+RULES = {
+    'survival': "The same place for everyone. Guess close to keep your hearts, earn emeralds, throw potions at the others. The last one standing wins.",
+    'classic': "Five places, the same for everyone. The closer you guess, the more points. The most points wins.",
+}
+
+with connect() as c:
+    if 'world' not in [col[1] for col in c.execute("PRAGMA table_info(rooms)")]:
+        c.execute("ALTER TABLE rooms ADD COLUMN world TEXT")         # the kind of world, None: a custom game
+        c.execute("ALTER TABLE rooms ADD COLUMN starts_at REAL")     # a world's countdown
+    if 'lobby_ready' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
+        c.execute("ALTER TABLE room_players ADD COLUMN lobby_ready INTEGER DEFAULT 0")
+        c.execute("ALTER TABLE room_players ADD COLUMN joined REAL")
+    if 'why' not in [col[1] for col in c.execute("PRAGMA table_info(room_bans)")]:
+        c.execute("ALTER TABLE room_bans ADD COLUMN why TEXT")       # 'away': not ready when a world started
+    c.execute("CREATE INDEX IF NOT EXISTS rooms_world ON rooms (world, state)")
+
+def world_info(key):
+    title, line, settings, (rank, suit), since = WORLDS[key]
+    return {'key': key, 'title': title, 'line': line, 'rank': rank, 'suit': suit, 'milk': bool(settings.get('milk')),
+            'rules': RULES[settings['mode']], 'look': WORLD_LOOKS[list(WORLDS).index(key)]}
+
+def world_settings(key):
+    s = WORLDS[key][2]
+    if s['mode'] == 'survival':
+        return {'mode': 'survival', 'provinces': PROVINCES, 'rounds': SURVIVAL_ROUNDS, 'time_limit': -1, 'look': 0,
+                'difficulty': s['difficulty'], 'milk': s['milk']}
+    return {'mode': s['mode'], 'provinces': PROVINCES, 'rounds': s['rounds'], 'time_limit': -1, 'look': 0,
+            'difficulty': None, 'milk': 0}
+
+def world_here(c, code):
+    return c.execute("SELECT COUNT(*) FROM room_players WHERE code = ? AND last_seen > ?", (code, time.time() - GONE)).fetchone()[0]
+
+def open_world(c, key):
+    # the lobby of this kind to send a player to: the fullest with room left,
+    # so that people gather; else a new one
+    best = None
+    for (code,) in c.execute("SELECT code FROM rooms WHERE world = ? AND state = 'waiting' ORDER BY rowid DESC", (key,)).fetchall():
+        n = world_here(c, code)
+        if n < WORLD_MAX and (best is None or n > best[1]):
+            best = (code, n)
+    return best[0] if best else new_room(c, None, world_settings(key), world = key)
+
+def world_tick(c, r):
+    # a world's lobby: the countdown and the start; once finished: the next lobby
+    now, code = time.time(), r['code']
+    if r['state'] == 'waiting':
+        here = c.execute("SELECT user_id, lobby_ready, joined FROM room_players WHERE code = ? AND last_seen > ?",
+                         (code, now - GONE)).fetchall()
+        ready = sum(p['lobby_ready'] for p in here)
+        start = r['starts_at']
+        if len(here) < 2:
+            start = None
+        elif start is None and ready >= max(2, math.ceil(len(here) / 2)):
+            start = now + WORLD_COUNTDOWN
+        if start is not None and ready == len(here):
+            start = min(start, now + WORLD_ALL_READY)
+        if start != r['starts_at']:
+            c.execute("UPDATE rooms SET starts_at = ? WHERE code = ?", (start, code))
+        if start is not None and now >= start:
+            playing = {p['user_id'] for p in here if p['lobby_ready'] or (p['joined'] or 0) > now - WORLD_GRACE}
+            if len(playing) < 2:
+                c.execute("UPDATE rooms SET starts_at = NULL WHERE code = ?", (code,))
+            else:
+                # the game starts without whoever was not ready: out of the world
+                for (uid,) in c.execute("SELECT user_id FROM room_players WHERE code = ?", (code,)).fetchall():
+                    if uid not in playing:
+                        c.execute("DELETE FROM room_players WHERE code = ? AND user_id = ?", (code, uid))
+                        c.execute("INSERT OR REPLACE INTO room_bans (code, user_id, why) VALUES (?, ?, 'away')", (code, uid))
+                c.execute("UPDATE room_players SET seat = 1 WHERE code = ?", (code,))
+                c.execute("UPDATE rooms SET state = 'playing', round = 1, round_start = ?, round_end = NULL WHERE code = ?",
+                          (now + (PREP if r['mode'] == 'survival' else 0), code))
+        return find_room(c, code)
+    if r['state'] == 'finished' and not r['next_code'] and now >= (r['round_end'] or now) + REVEAL + WORLD_RESULTS:
+        c.execute("UPDATE rooms SET next_code = ? WHERE code = ?", (open_world(c, r['world']), code))
+        return find_room(c, code)
+    return r
+
+@app.route("/api/room/<code>/lobby", methods=['POST'])
+def room_lobby(code):
+    # Ready, or not any more, in a world's lobby
+    with room_tx() as c:
+        r, me = member(c, code)
+        if not r or not r['world'] or r['state'] != 'waiting':
+            return jsonify({"success": False})
+        c.execute("UPDATE room_players SET lobby_ready = ? WHERE code = ? AND user_id = ?",
+                  (int(request.form.get('ready') == '1'), r['code'], me['user_id']))
+        world_tick(c, find_room(c, r['code']))
+    return jsonify({"success": True})
+
+def world_list(c, ordered = True):
+    # every kind of world: who waits (and their heads), how many play, how much
+    # it was played lately; best first, the most played marked
+    now, rows = time.time(), []
+    for key in WORLDS:
+        waiting = c.execute('''SELECT u.id, u.avatar, u.mc_uuid FROM room_players p JOIN rooms r ON r.code = p.code JOIN users u ON u.id = p.user_id
+            WHERE r.world = ? AND r.state = 'waiting' AND p.last_seen > ? ORDER BY p.rowid''', (key, now - GONE)).fetchall()
+        playing = c.execute('''SELECT COUNT(*) FROM room_players p JOIN rooms r ON r.code = p.code
+            WHERE r.world = ? AND r.state = 'playing' AND p.last_seen > ?''', (key, now - GONE)).fetchone()[0]
+        lately = sum(n * .5 ** ((now - t) / 86400 / WORLD_HALF_LIFE) for t, n in c.execute(
+            '''SELECT r.round_start, COUNT(*) FROM rooms r JOIN room_players p ON p.code = r.code
+            WHERE r.world = ? AND r.state != 'waiting' AND r.round_start > ? GROUP BY r.code''', (key, now - 30 * 86400)))
+        since = WORLDS[key][4]
+        fresh = since and max(0, 1 - (date.today() - date.fromisoformat(since)).days / NEW_FOR)
+        rows.append(dict(world_info(key), waiting = len(waiting), playing = playing, lately = lately, new = bool(fresh),
+                         heads = [avatar_url(u) for u in waiting[:5]],
+                         score = 100 * len(waiting) + 40 * playing + lately + 60 * (fresh or 0)))
+    most = max(rows, key = lambda w: w['lately'])
+    if most['lately'] >= 1:
+        most['most'] = True
+    return sorted(rows, key = lambda w: -w['score']) if ordered else rows
+
+@app.route("/multiplayer")
+def multiplayer():
+    # the worlds as cards; ?join=<kind>: straight into its open lobby
+    key = request.args.get('join')
+    if key:
+        if key not in WORLDS:
+            return redirect('multiplayer')
+        if not session.get('user_id'):
+            return redirect('guest?next=' + quote('multiplayer?join=' + key))
+        with room_tx() as c:
+            code = open_world(c, key)
+        return redirect('room?code=' + code)
+    with connect() as c:
+        worlds = world_list(c)
+    return render_template('multiplayer.html', worlds = worlds, missed = request.args.get('missed'))
+
+@app.route("/api/multiplayer")
+def multiplayer_counts():
+    # the page's numbers, every few seconds (its order stays: cards do not jump)
+    with connect() as c:
+        return jsonify({"success": True, "worlds": {w['key']: {k: w[k] for k in ('waiting', 'playing', 'heads')}
+                                                    for w in world_list(c, ordered = False)}})
+
+# ---------- Moderation ----------
+# Staff ranks, as Wynncraft's chat tags ([Admin], [Mod]...), each with its
+# powers, under one rule (Yasuro: "all have different powers over each other
+# so no one can just delete everything because we have the highest role"):
+# one acts only on someone of a lower rank, gives only ranks lower than one's
+# own, and nothing is ever destroyed: a hidden message can be shown again, a
+# ban lifted, an old name stays in the log, and the log itself cannot be
+# erased from the site. The owner is set here: nobody can take it away.
+
+OWNER = 1                 # Yasuro's account
+RANKS = {4: 'Owner', 3: 'Admin', 2: 'Moderator', 1: 'Helper'}
+MAY = {                   # the lowest rank with each power
+    'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
+    'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
+    'staff': 3,           # give and take ranks (below one's own)
+    'tags': 2,            # give and take tags
+    'make_tags': 3,       # make a tag, or put one away
+}
+HELPER_MUTE = 3600        # a Helper mutes for an hour at most
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS staff (user_id INTEGER PRIMARY KEY, rank INTEGER, by INTEGER, at REAL);
+        CREATE TABLE IF NOT EXISTS mod_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at REAL, by INTEGER,
+            action TEXT, target INTEGER, details TEXT, reason TEXT);
+    ''')
+
+def rank_of(c, uid):
+    if uid == OWNER:
+        return 4
+    row = c.execute("SELECT rank FROM staff WHERE user_id = ?", (uid,)).fetchone()
+    return row[0] if row else 0
+
+def my_rank(c):
+    return rank_of(c, session['user_id']) if session.get('loggedin') else 0
+
+def may(c, power, target = None):
+    # may this session's player use this power (on that player)?
+    r = my_rank(c)
+    return r >= MAY[power] and (target is None or rank_of(c, target) < r)
+
+def logged(c, action, target, details = '', reason = ''):
+    c.execute("INSERT INTO mod_log (at, by, action, target, details, reason) VALUES (?, ?, ?, ?, ?, ?)",
+              (time.time(), session['user_id'], action, target, details, reason))
+
+# Tags: a small word next to a name, Wynncraft style, and only one (Yasuro:
+# "don't make them too obnoxious"): the staff rank first, else a tag the
+# staff gave (newest first), else a "#1" earned by leading a board, which
+# moves by itself to whoever leads it next. The profile shows them all.
+TAG_COLORS = ('gold', 'red', 'orange', 'green', 'teal', 'purple', 'stone')
+TOPS = {'at': 0, 'tags': {}}
+TOPS_EVERY = 120          # seconds a computed "#1" list is kept (the levels are long to work out)
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS tags (id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT, color TEXT,
+            by INTEGER, at REAL, retired INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS user_tags (user_id INTEGER, tag_id INTEGER, by INTEGER, at REAL,
+            PRIMARY KEY (user_id, tag_id));
+    ''')
+
+def top_tags(c):
+    # who leads each board: {user id: ["#1 Survival Hard", ...]}
+    if time.time() - TOPS['at'] > TOPS_EVERY:
+        tops = {}
+        boards = [('#1 Survival ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
+        boards.append(('#1 Classic', board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'})))
+        boards += [('#1 Level', ladder(c, 'levels')), ('#1 Wins', ladder(c, 'wins'))]
+        for label, rows in boards:
+            if rows:
+                tops.setdefault(rows[0]['id'], []).append(label)
+        TOPS.update(at = time.time(), tags = tops)
+    return TOPS['tags']
+
+def tags_of(c, uids):
+    # every tag of these players, in the order they are shown: {id: [{label, color}]}
+    uids = list({u for u in uids if u})
+    out = {u: [] for u in uids}
+    if not uids:
+        return out
+    marks = ','.join('?' * len(uids))
+    for u, rank in [(OWNER, 4)] + c.execute(f"SELECT user_id, rank FROM staff WHERE user_id IN ({marks})", uids).fetchall():
+        if u in out:
+            out[u].append({"label": RANKS[rank], "color": 'rank-%d' % rank})
+    for t in c.execute(f'''SELECT ut.user_id, t.label, t.color FROM user_tags ut JOIN tags t ON t.id = ut.tag_id
+            WHERE ut.user_id IN ({marks}) AND t.retired = 0 ORDER BY ut.at DESC''', uids):
+        out[t[0]].append({"label": t[1], "color": 'tag-' + t[2]})
+    for u, labels in top_tags(c).items():
+        if u in out:
+            out[u] += [{"label": l, "color": 'tag-top'} for l in labels]
+    return out
+
+def tag_of(c, uids):
+    # the one tag shown next to each name
+    return {u: (t[0] if t else None) for u, t in tags_of(c, uids).items()}
+
+@app.context_processor
+def staff_menu():
+    # the Moderation button of the menu, for the staff only
+    def rank():
+        if not session.get('loggedin'):
+            return 0
+        with connect() as c:
+            return my_rank(c)
+    def waiting():
+        with connect() as c:
+            return len(pictures_waiting(c)) + len(reports_waiting(c))
+    return {'my_rank': rank, 'RANKS': RANKS, 'mod_waiting': waiting}
+
+@app.route("/moderation")
+def moderation():
+    with connect() as c:
+        r = my_rank(c)
+        first = 'photos' if r and not reports_waiting(c) and pictures_waiting(c) else 'reports'
+    if not r:
+        return render_template('apology.html', message = "This page is for the moderation team"), 403
+    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()}, first = first)
+
+@app.route("/api/mod/staff")
+def mod_staff():
+    # the team: every rank, who gave it, and what this player may give
+    with connect() as c:
+        r = my_rank(c)
+        if not r:
+            return jsonify({"success": False}), 403
+        rows = [{"id": OWNER, "rank": 4, "by": None, "at": None}] + [dict(x) for x in c.execute(
+            "SELECT user_id AS id, rank, by, at FROM staff WHERE user_id != ? ORDER BY rank DESC, at", (OWNER,))]
+        names = {u['id']: u['username'] for u in c.execute(
+            f"SELECT id, username FROM users WHERE id IN ({','.join('?' * len(rows))}) OR id IN (SELECT by FROM staff)",
+            [x['id'] for x in rows])}
+        for x in rows:
+            x.update(name = names.get(x['id'], '?'), by = names.get(x['by']) if x['by'] else None, tag = RANKS[x['rank']],
+                     mine = x['rank'] < r and r >= MAY['staff'])
+    return jsonify({"success": True, "rank": r, "staff": rows,
+                    "give": {k: v for k, v in RANKS.items() if k < r} if r >= MAY['staff'] else {}})
+
+@app.route("/api/mod/rank", methods=['POST'])
+def mod_rank():
+    # give, change or take a rank (0 takes it): only below one's own, only to
+    # someone below one's own, never the owner, never a guest
+    name, reason = ' '.join(request.form.get('name', '').split()), request.form.get('reason', '').strip()[:200]
+    new = request.form.get('rank', type = int)
+    with room_tx() as c:
+        r = my_rank(c)
+        user = c.execute("SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE username = ? COLLATE NOCASE", (name,)).fetchone()
+        if r < MAY['staff']:
+            return jsonify({"success": False, "error": "Only an Admin can change the team"}), 403
+        if not user:
+            return jsonify({"success": False, "error": "No player with this name"})
+        if user['guest']:
+            return jsonify({"success": False, "error": user['username'] + " is a guest name, not an account: ranks are for accounts only"})
+        old = rank_of(c, user['id'])
+        if new not in [0] + list(RANKS) or new >= r or old >= r:
+            return jsonify({"success": False, "error": "You can only give ranks below yours, to players below you"})
+        if new == old:
+            return jsonify({"success": False, "error": "Nothing to change"})
+        if new:
+            c.execute("INSERT INTO staff (user_id, rank, by, at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET rank = excluded.rank, by = excluded.by, at = excluded.at",
+                      (user['id'], new, session['user_id'], time.time()))
+        else:
+            c.execute("DELETE FROM staff WHERE user_id = ?", (user['id'],))
+        logged(c, 'rank', user['id'], '%s → %s' % (RANKS.get(old, 'Player'), RANKS.get(new, 'Player')), reason)
+    return jsonify({"success": True})
+
+with connect() as c:
+    # a picture sent waits for the staff: which, since when, and why one was refused
+    if 'avatar_pending' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN avatar_pending TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN pending_at REAL")
+        c.execute("ALTER TABLE users ADD COLUMN avatar_note TEXT")
+
+def pictures_waiting(c):
+    # the pictures this session's staff member may look at, oldest first
+    r = my_rank(c)
+    if r < MAY['pictures']:
+        return []
+    return [dict(u) for u in c.execute("SELECT id, username AS name, avatar_pending, pending_at FROM users WHERE avatar_pending IS NOT NULL ORDER BY pending_at")
+            if rank_of(c, u['id']) < r]
+
+@app.route("/api/mod/pictures")
+def mod_pictures():
+    with connect() as c:
+        if not may(c, 'pictures'):
+            return jsonify({"success": False}), 403
+        rows = pictures_waiting(c)
+    return jsonify({"success": True, "pictures": [{"id": u['id'], "name": u['name'], "at": u['pending_at'],
+                    "url": 'avatar?id=%d&pending=1&v=%s' % (u['id'], u['avatar_pending'])} for u in rows]})
+
+@app.route("/api/mod/picture", methods=['POST'])
+def mod_picture():
+    # yes: it becomes the player's picture; no: it goes, and they are told why
+    uid, what = request.form.get('id', type = int), request.form.get('do')
+    reason = request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        if not may(c, 'pictures', uid) or what not in ('approve', 'reject'):
+            return jsonify({"success": False}), 403
+        if not c.execute("SELECT avatar_pending FROM users WHERE id = ?", (uid,)).fetchone()[0]:
+            return jsonify({"success": False, "error": "Already looked at"})
+        if what == 'approve':
+            approve_picture(c, uid)
+            logged(c, 'picture', uid, 'picture approved', reason)
+        else:
+            drop_picture(c, uid, 'avatar_pending')
+            c.execute("UPDATE users SET avatar_note = ? WHERE id = ?", (reason or 'not accepted', uid))
+            logged(c, 'picture', uid, 'picture refused', reason)
+    return jsonify({"success": True})
+
+@app.route("/api/mod/tags")
+def mod_tags():
+    # every tag the staff made, with who holds it
+    with connect() as c:
+        if not may(c, 'tags'):
+            return jsonify({"success": False}), 403
+        tags = [dict(t) for t in c.execute("SELECT id, label, color, retired FROM tags ORDER BY retired, at DESC")]
+        for t in tags:
+            t['holders'] = [dict(h) for h in c.execute('''SELECT u.id, u.username AS name FROM user_tags ut JOIN users u ON u.id = ut.user_id
+                WHERE ut.tag_id = ? ORDER BY ut.at''', (t['id'],))]
+        r = my_rank(c)
+    return jsonify({"success": True, "tags": tags, "colors": TAG_COLORS, "make": r >= MAY['make_tags']})
+
+@app.route("/api/mod/tag", methods=['POST'])
+def mod_tag():
+    # make a tag, put it away (or back), give it or take it
+    form, what = request.form, request.form.get('do')
+    with room_tx() as c:
+        if what in ('make', 'retire'):
+            if not may(c, 'make_tags'):
+                return jsonify({"success": False, "error": "Only an Admin can make tags"}), 403
+            if what == 'make':
+                label = ' '.join(form.get('label', '').split())[:20]
+                if not label or form.get('color') not in TAG_COLORS:
+                    return jsonify({"success": False, "error": "A tag needs a word and a colour"})
+                tid = c.execute("INSERT INTO tags (label, color, by, at) VALUES (?, ?, ?, ?)",
+                                (label, form['color'], session['user_id'], time.time())).lastrowid
+                logged(c, 'tag', None, 'made the tag ' + label, form.get('reason', '')[:200])
+            else:
+                t = c.execute("SELECT * FROM tags WHERE id = ?", (form.get('tag', type = int),)).fetchone()
+                if not t:
+                    return jsonify({"success": False})
+                c.execute("UPDATE tags SET retired = ? WHERE id = ?", (int(not t['retired']), t['id']))
+                logged(c, 'tag', None, ('put back the tag ' if t['retired'] else 'put away the tag ') + t['label'])
+            return jsonify({"success": True})
+        t = c.execute("SELECT * FROM tags WHERE id = ? AND retired = 0", (form.get('tag', type = int),)).fetchone()
+        user = c.execute("SELECT id FROM users WHERE username = ? COLLATE NOCASE AND COALESCE(guest, 0) = 0",
+                         (' '.join(form.get('name', '').split()),)).fetchone()
+        if not t or not user:
+            return jsonify({"success": False, "error": "No such tag or player account"})
+        if not may(c, 'tags', user['id']):
+            return jsonify({"success": False, "error": "You can only tag players below you"}), 403
+        if what == 'give':
+            c.execute("INSERT OR IGNORE INTO user_tags (user_id, tag_id, by, at) VALUES (?, ?, ?, ?)",
+                      (user['id'], t['id'], session['user_id'], time.time()))
+            logged(c, 'tag', user['id'], 'given the tag ' + t['label'], form.get('reason', '')[:200])
+        elif what == 'take':
+            c.execute("DELETE FROM user_tags WHERE user_id = ? AND tag_id = ?", (user['id'], t['id']))
+            logged(c, 'tag', user['id'], 'lost the tag ' + t['label'], form.get('reason', '')[:200])
+        else:
+            return jsonify({"success": False})
+    return jsonify({"success": True})
+
+@app.route("/api/mod/log")
+def mod_log_list():
+    # the log, newest first, 50 at a time (before: the oldest id already shown)
+    with connect() as c:
+        if not may(c, 'log'):
+            return jsonify({"success": False}), 403
+        before = request.args.get('before', type = int) or 2 ** 62
+        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, a.username AS by, m.target AS tid, t.username AS target
+            FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
+            WHERE m.id < ? ORDER BY m.id DESC LIMIT 50''', (before,))]
+    return jsonify({"success": True, "log": rows})
+
+# ---------- Moderation: the chat ----------
+# Minecraft's way (chat reports, 1.19.1): a player reports a message, and the
+# staff reads it among the messages around it. Each player may also ignore
+# someone (Wynncraft's /ignore): their messages stop, for that player only,
+# in every room, until undone from the player list. A word filter masks
+# insults and slurs with stars, as Minecraft servers do; what was typed stays
+# for the staff, who may hide a message for everyone (kept, and in the log).
+
+REPORTS_MAX = 10          # reports a player may send in 10 minutes
+LEET = {'a': 'a4@', 'b': 'b8', 'e': 'e3', 'g': 'g9', 'i': 'i1!|', 'l': 'l1|', 'o': 'o0', 's': 's5$', 't': 't7', 'u': 'uv'}
+
+with connect() as c:
+    if 'raw' not in [col[1] for col in c.execute("PRAGMA table_info(room_chat)")]:
+        c.execute("ALTER TABLE room_chat ADD COLUMN raw TEXT")     # what was typed, when the filter changed it
+        c.execute("ALTER TABLE room_chat ADD COLUMN hidden_by INTEGER")
+        c.execute("ALTER TABLE room_chat ADD COLUMN hidden_at REAL")
+    c.executescript('''
+        CREATE INDEX IF NOT EXISTS room_chat_code ON room_chat (code, id);
+        CREATE TABLE IF NOT EXISTS chat_reports (message INTEGER, by INTEGER, at REAL, done INTEGER DEFAULT 0,
+            PRIMARY KEY (message, by));
+        CREATE TABLE IF NOT EXISTS ignores (user_id INTEGER, target INTEGER, at REAL, PRIMARY KEY (user_id, target));
+    ''')
+
+def word_filter():
+    # bad_words.txt, one regex: each letter repeated, in digits or signs, split by . - _
+    words = []
+    with open('bad_words.txt', encoding = 'utf-8') as f:
+        for line in f:
+            w = line.split('#')[0].strip().lower()
+            if w:
+                body = '[._-]*'.join(r'\s+' if ch == ' ' else '[%s]+' % re.escape(LEET.get(ch, ch)) for ch in w.strip('*'))
+                words.append(('(?:[a-z][._-]?)*' if w.startswith('*') else r'(?<![a-z0-9@$])') + body +
+                             ('(?:[._-]?[a-z])*' if w.endswith('*') else r'(?![a-z0-9])'))
+    return re.compile('|'.join(words), re.IGNORECASE)
+
+BAD_WORDS = word_filter()
+
+def filtered(text):
+    return BAD_WORDS.sub(lambda m: '*' * len(m.group()), text)
+
+# Names: the same words, also inside a name written in one piece (BigWord:
+# "Big Word"), and none that would pass for the site or its staff
+RESERVED = ('admin', 'moderator', 'wynnguessr', 'wynndle')         # nowhere in a name
+RESERVED_ALONE = ('mod', 'owner', 'staff', 'helper', 'system', 'server')
+
+def name_rule(name):
+    split = re.sub(r'([a-z])([A-Z])', r'\1 \2', name).replace('_', ' ')
+    plain = re.sub(r'[^a-z]', '', name.lower())
+    if filtered(name) != name or filtered(split) != split or any(w in plain for w in RESERVED) or plain in RESERVED_ALONE:
+        return "This name is not allowed: pick another one"
+
+def reports_waiting(c):
+    # the reported messages this staff member may act on (written below them), oldest first
+    r = my_rank(c)
+    if r < MAY['reports']:
+        return []
+    return [dict(x) for x in c.execute('''SELECT m.id, m.code, m.user_id AS uid, m.at, COALESCE(m.raw, m.text) AS text, MIN(cr.at) AS first
+        FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE cr.done = 0 AND m.hidden_by IS NULL
+        GROUP BY m.id ORDER BY first''') if rank_of(c, x['uid']) < r]
+
+@app.route("/api/mod/reports")
+def mod_reports():
+    with connect() as c:
+        if not may(c, 'reports'):
+            return jsonify({"success": False}), 403
+        out = []
+        for x in reports_waiting(c):
+            # the messages around it, as Minecraft sends them with a report
+            around = c.execute("SELECT id, user_id, COALESCE(raw, text) AS text, hidden_by FROM room_chat WHERE code = ? AND id < ? ORDER BY id DESC LIMIT 3",
+                               (x['code'], x['id'])).fetchall()[::-1] + c.execute(
+                "SELECT id, user_id, COALESCE(raw, text) AS text, hidden_by FROM room_chat WHERE code = ? AND id >= ? ORDER BY id LIMIT 4",
+                (x['code'], x['id'])).fetchall()
+            users = {u['id']: u for u in c.execute(f"SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE id IN ({','.join('?' * len(around))})",
+                                                   [m['user_id'] for m in around])}
+            by = [b[0] for b in c.execute("SELECT u.username FROM chat_reports cr JOIN users u ON u.id = cr.by WHERE cr.message = ? AND cr.done = 0 ORDER BY cr.at", (x['id'],))]
+            author = users.get(x['uid'])
+            out.append({"id": x['id'], "room": x['code'], "at": x['at'], "by": by,
+                        "author": {"id": x['uid'], "name": author['username'] if author else '?', "guest": bool(author and author['guest'])},
+                        "around": [{"id": m['id'], "name": users[m['user_id']]['username'] if m['user_id'] in users else '?',
+                                    "text": m['text'], "hidden": m['hidden_by'] is not None} for m in around]})
+    return jsonify({"success": True, "reports": out})
+
+@app.route("/api/mod/hide", methods=['POST'])
+def mod_hide():
+    # hide a message for everyone (from the chat, or a report): kept, and in the log
+    mid, reason = request.form.get('id', type = int), request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        m = c.execute("SELECT * FROM room_chat WHERE id = ?", (mid,)).fetchone()
+        if not m or not may(c, 'hide', m['user_id']):
+            return jsonify({"success": False}), 403
+        if m['hidden_by'] is None:
+            c.execute("UPDATE room_chat SET hidden_by = ?, hidden_at = ? WHERE id = ?", (session['user_id'], time.time(), mid))
+            c.execute("UPDATE chat_reports SET done = 1 WHERE message = ?", (mid,))
+            logged(c, 'hide', m['user_id'], 'message hidden: "%s"' % (m['raw'] or m['text']), reason)
+    return jsonify({"success": True})
+
+@app.route("/api/mod/report", methods=['POST'])
+def mod_report():
+    # nothing wrong with it: the report is closed, the message stays
+    mid, reason = request.form.get('id', type = int), request.form.get('reason', '').strip()[:200]
+    with room_tx() as c:
+        m = c.execute("SELECT * FROM room_chat WHERE id = ?", (mid,)).fetchone()
+        if not m or not may(c, 'reports', m['user_id']) or request.form.get('do') != 'dismiss':
+            return jsonify({"success": False}), 403
+        if c.execute("UPDATE chat_reports SET done = 1 WHERE message = ? AND done = 0", (mid,)).rowcount:
+            logged(c, 'report', m['user_id'], 'report dismissed: "%s"' % (m['raw'] or m['text']), reason)
+    return jsonify({"success": True})
+
+# ---------- Moderation: sanctions ----------
+# Mute (no chat) and ban (no playing), as on Discord and Minecraft servers:
+# each has a length and a reason, and goes to the log; a Helper mutes for an
+# hour at most. A ban logs the player out of every browser. A guest is only a
+# name and could come back as a new one: so while a ban lasts (28 days at
+# most there: addresses change hands), the player's last address makes no new
+# guest or account. The staff never sees an address. Rename: the old name
+# stays in the log.
+
+MUTES = (600, 3600, 86400, 7 * 86400, 28 * 86400)
+BANS = (86400, 7 * 86400, 28 * 86400, 0)          # 0: forever
+FOREVER = 10 ** 11                                 # a date that never comes
+PLACE_BAN = 28 * 86400
+
+with connect() as c:
+    if 'muted_until' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN muted_until REAL")
+        c.execute("ALTER TABLE users ADD COLUMN banned_until REAL")
+        c.execute("ALTER TABLE users ADD COLUMN ban_reason TEXT")
+        c.execute("ALTER TABLE users ADD COLUMN seen_from TEXT")    # the last address, for a ban only
+    c.execute("CREATE TABLE IF NOT EXISTS place_bans (place TEXT, until REAL, user_id INTEGER)")
+
+def how_long(seconds):
+    # "6 more days": the same for everyone, whatever their time zone (a
+    # minute of slack: an hour's mute read a moment later is still an hour)
+    for unit, size in (('day', 86400), ('hour', 3600), ('minute', 60)):
+        if seconds + 60 >= size or unit == 'minute':
+            n = max(1, round(seconds / size))
+            return '%d more %s%s' % (n, unit, '' if n == 1 else 's')
+
+def seen(c, uid):
+    c.execute("UPDATE users SET seen_from = ? WHERE id = ?", (place(), uid))
+
+def ban_note(c, uid):
+    # why this player may not come in, or None
+    u = c.execute("SELECT banned_until, ban_reason FROM users WHERE id = ?", (uid,)).fetchone()
+    left = (u and u['banned_until'] or 0) - time.time()
+    if left > 0:
+        return ('This account is banned' + ('' if u['banned_until'] >= FOREVER else ' for ' + how_long(left)) +
+                ('. Why: ' + u['ban_reason'] if u['ban_reason'] else ''))
+
+def place_note(c):
+    # a banned player's address makes no new name while the ban lasts
+    if c.execute("SELECT 1 FROM place_bans WHERE place = ? AND until > ?", (place(), time.time())).fetchone():
+        return "This connection is banned for now"
+
+PLAYERS_PAGE = 50
+KINDS = {   # the filters of the Players tab
+    'all': '1',
+    'accounts': 'COALESCE(u.guest, 0) = 0',
+    'guests': 'u.guest = 1',
+    'staff': '(u.id = %d OR u.id IN (SELECT user_id FROM staff))' % OWNER,
+    'muted': 'u.muted_until > :now',
+    'banned': 'u.banned_until > :now',
+    'reported': 'u.id IN (SELECT m.user_id FROM chat_reports cr JOIN room_chat m ON m.id = cr.message)',
+}
+
+@app.route("/api/mod/players")
+def mod_players():
+    # every player, newest first, 50 at a time; filtered by a kind and by
+    # anything in the name (an exact name first)
+    q, kind = ' '.join(request.args.get('q', '').split()), request.args.get('kind', 'all')
+    start = request.args.get('start', 0, type = int)
+    with connect() as c:
+        if not may(c, 'players') or kind not in KINDS:
+            return jsonify({"success": False}), 403
+        now = time.time()
+        rows = c.execute(f'''SELECT u.id, u.username AS name, COALESCE(u.guest, 0) AS guest, u.avatar, u.mc_uuid,
+                u.muted_until > :now AS muted, u.banned_until > :now AS banned,
+                (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) AS reported
+            FROM users u WHERE {KINDS[kind]} AND u.username LIKE :q ESCAPE '\\'
+            ORDER BY u.username = :exact COLLATE NOCASE DESC, u.id DESC LIMIT :n OFFSET :start''',
+            {'now': now, 'q': '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%', 'exact': q, 'n': PLAYERS_PAGE + 1, 'start': start}).fetchall()
+        tags = tag_of(c, [u['id'] for u in rows])
+        out = [{'id': u['id'], 'name': u['name'], 'guest': bool(u['guest']), 'muted': bool(u['muted']), 'banned': bool(u['banned']),
+                'reported': u['reported'], 'tag': tags.get(u['id']), 'picture': avatar_url(u)} for u in rows[:PLAYERS_PAGE]]
+    return jsonify({"success": True, "players": out, "more": len(rows) > PLAYERS_PAGE})
+
+@app.route("/api/mod/player")
+def mod_player():
+    # one player: how things stand, what this staff member may do, what happened
+    uid = request.args.get('id', type = int)
+    with connect() as c:
+        if not may(c, 'players'):
+            return jsonify({"success": False}), 403
+        u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if not u:
+            return jsonify({"success": False})
+        now = time.time()
+        log = [dict(x) for x in c.execute('''SELECT m.at, m.details, m.reason, a.username AS by FROM mod_log m LEFT JOIN users a ON a.id = m.by
+            WHERE m.target = ? ORDER BY m.id DESC LIMIT 30''', (uid,))]
+        said = [dict(x) for x in c.execute('''SELECT code AS room, at, COALESCE(raw, text) AS text, hidden_by IS NOT NULL AS hidden
+            FROM room_chat WHERE user_id = ? ORDER BY id DESC LIMIT 10''', (uid,))]
+        reported = c.execute("SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = ?", (uid,)).fetchone()[0]
+        out = {"success": True, "id": uid, "name": u['username'], "guest": bool(u['guest']), "tag": tag_of(c, [uid]).get(uid),
+               "picture": None if u['guest'] else avatar_url(u), "reported": reported, "log": log, "said": said,
+               "muted": how_long(u['muted_until'] - now) if (u['muted_until'] or 0) > now else None,
+               "banned": ('forever' if u['banned_until'] >= FOREVER else 'for ' + how_long(u['banned_until'] - now)) if (u['banned_until'] or 0) > now else None,
+               "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename')}}
+        out['mutes'] = [m for m in MUTES if out['may']['long_mute'] or m <= HELPER_MUTE]
+        r = my_rank(c)
+        if r >= MAY['staff'] and not u['guest'] and rank_of(c, uid) < r:
+            out['ranks'] = {k: v for k, v in RANKS.items() if k < r}
+        out['rank'] = rank_of(c, uid)
+        out['bans'] = list(BANS)
+    return jsonify(out)
+
+@app.route("/api/mod/sanction", methods=['POST'])
+def mod_sanction():
+    f = request.form
+    uid, what, reason = f.get('id', type = int), f.get('do'), f.get('reason', '').strip()[:200]
+    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename'}.get(what)
+    with room_tx() as c:
+        u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if not u or not need or not may(c, need, uid):
+            return jsonify({"success": False, "error": "You can only do this to players below you"}), 403
+        now, length = time.time(), f.get('length', type = int)
+        if what == 'mute':
+            if length not in MUTES or (length > HELPER_MUTE and not may(c, 'long_mute', uid)):
+                return jsonify({"success": False, "error": "A Helper mutes for an hour at most"})
+            c.execute("UPDATE users SET muted_until = ? WHERE id = ?", (now + length, uid))
+            logged(c, 'mute', uid, 'muted for ' + how_long(length).replace(' more', ''), reason)
+        elif what == 'unmute':
+            c.execute("UPDATE users SET muted_until = NULL WHERE id = ?", (uid,))
+            logged(c, 'mute', uid, 'unmuted', reason)
+        elif what == 'ban':
+            if length not in BANS:
+                return jsonify({"success": False})
+            until = now + length if length else FOREVER
+            c.execute("UPDATE users SET banned_until = ?, ban_reason = ? WHERE id = ?", (until, reason or None, uid))
+            if u['seen_from']:
+                c.execute("INSERT INTO place_bans (place, until, user_id) VALUES (?, ?, ?)", (u['seen_from'], min(until, now + PLACE_BAN), uid))
+            logged(c, 'ban', uid, 'banned ' + ('for ' + how_long(length).replace(' more', '') if length else 'forever'), reason)
+        elif what == 'unban':
+            c.execute("UPDATE users SET banned_until = NULL, ban_reason = NULL WHERE id = ?", (uid,))
+            c.execute("UPDATE place_bans SET until = ? WHERE user_id = ? AND until > ?", (now, uid, now))
+            logged(c, 'ban', uid, 'unbanned', reason)
+        else:
+            name = clean_name(f.get('name', ''))
+            problem = name_problem(c, name, uid)
+            if problem:
+                return jsonify({"success": False, "error": problem})
+            c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
+            logged(c, 'rename', uid, 'renamed from ' + u['username'], reason)
+    return jsonify({"success": True})
+
+fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)
 
 
 if __name__ == "__main__":

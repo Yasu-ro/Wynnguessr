@@ -1,4 +1,5 @@
 {% extends "layout.html" %}
+{% import 'cards.html' as cards with context %}
 
 {% block title %}: Play{% endblock %}
 
@@ -9,13 +10,13 @@
     <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     <form action="game" class="panel settings" method="get">
 {% with modes = [('survival', 'Survival'), ('classic', 'Classic')] %}{% include "modes.html" %}{% endwith %}
-{% include "settings.html" %}
+{% with solo = True %}{% include "settings.html" %}{% endwith %}
 {% include "difficulty.html" %}
         <button type="submit" class="btn big wide" id="mode-submit-button">Play</button>
     </form>
     <script>showRules();</script>
 {% elif play == 'friends' %}
-    <h1 class="sign">Play With Friends</h1>
+    <h1 class="sign">Custom Game</h1>
     <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     {% if session['user_id'] %}
     <div class="duo">
@@ -46,18 +47,17 @@
     </div>
     {% endif %}
 {% else %}
-    <h1 class="sign">How Do You Want to Play?</h1>
-    <div class="duo">
-        <a class="pick" href="mode?play=solo">
-            <i class="material-icons">person</i>
-            <b>Solo</b>
-            <span>Play alone.</span>
-        </a>
-        <a class="pick" href="mode?play=friends">
-            <i class="material-icons">groups</i>
-            <b>With Friends</b>
-            <span>Play together.</span>
-        </a>
+    {# what to play, as three cards: the Ace of pins (one player), the Joker
+       (anyone), the King (the host makes the rules) #}
+    <h1 class="sign">Play</h1>
+    <div class="card-table play-table">
+        <a class="pcard-slot" href="mode?play=solo">{{ cards.card(1, 'pins', tilt = -3, wear = 0) }}
+            <span class="pcard-slip" style="--slip: 1deg"><b>Solo</b><small>Survival or Classic, on your own</small><span class="btn">Play</span></span></a>
+        <a class="pcard-slot" href="multiplayer">{{ cards.card('JOKER', None, tilt = 1.5, wear = 2) }}
+            <span class="pcard-slip" style="--slip: -1deg"><b>Multiplayer</b><small>Play with anyone online</small><span class="btn">Play</span></span></a>
+        <a class="pcard-slot" href="mode?play=friends">{{ cards.card('K', 'pins', tilt = 3, wear = 1) }}
+            <span class="pcard-slip" style="--slip: 0.5deg"><b>Custom Game</b><small>Your rules, a code for your friends</small><span class="btn">Play</span></span></a>
     </div>
+    <script src="{{ asset('js/cards.js') }}"></script>
 {% endif %}
 {% endblock %}

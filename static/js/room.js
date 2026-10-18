@@ -93,7 +93,7 @@ function preload(url) {
     for (var level = 1; level <= 3; level++) {
         var n = 1 << (level - 1);
         'fbudlr'.split('').forEach(function (face) {
-            for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) load(url + level + '/' + face + i + '_' + j + '.jpg');
+            for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) load(url + level + '/' + face + i + '_' + j + '.webp');
         });
     }
 }
@@ -113,7 +113,8 @@ function render(data) {
     }
     s = data;
     if (s.next_url) preload(s.next_url);
-    chat(s.chat);
+    chat(s.chat, s.hidden);
+    $('#chat-input').prop('disabled', !!s.muted).attr('placeholder', s.muted ? 'You are muted for ' + s.muted : 'Say something...');
     arrivals();
     if (s.next && s.live && s.state == 'finished') {
         leaving = true;
@@ -189,8 +190,9 @@ function show(id) {
     setNav();
 }
 
+// quotes too: a name may end up inside an attribute (data-name='...')
 function esc(text) {
-    return $('<div>').text(text).html();
+    return $('<div>').text(text).html().replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function me() {
@@ -203,6 +205,11 @@ function player(name) {
 
 function color(p) {
     return COLORS[p.color % COLORS.length];
+}
+
+// the tag next to a name (staff rank, a tag, a "#1"), small: one at most
+function tagHtml(t) {
+    return t ? " <span class='name-tag " + esc(t.color) + "'>" + esc(t.label) + '</span>' : '';
 }
 
 function dot(p) {
@@ -234,7 +241,7 @@ function pin(fill, star) {
 
 function makeMap(id, zoom) {
     var m = L.map(id, {crs: L.CRS.Simple, minZoom: -3, maxZoom: 5});
-    L.imageOverlay('static/map-2026.webp', bounds, {attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'}).addTo(m);
+    mapTiles(m);
     crisp(m);
     m.setView([3072, -256], zoom);
     return m;
@@ -298,19 +305,31 @@ function chatPlace() {
 var bubbleAt = 0;         // the last chat sound: one every 2 seconds at most
 var chatSeen = false;     // the messages already there when the page opened make no sound
 
-function chat(messages) {
+function chat(messages, hidden) {
     var log = $('#chat-log'), theirs = false;
     (messages || []).forEach(function (m) {
         if (m.id <= chatId) {
             return;
         }
         chatId = m.id;
-        log.append("<p>" + dot(m) + "<b>" + esc(m.name) + "</b><span>" + esc(m.text) + "</span></p>");
-        theirs = theirs || m.name != me().name;
-        if ($('#room-chat').hasClass('folded') && m.name != me().name) {
-            unread++;
+        // the name is kept with .data, never written into an attribute: a guest picks it
+        var line = $("<p>" + dot(m) + "<b>" + esc(m.name) + tagHtml(m.tag) + "</b><span>" + esc(m.text) + "</span></p>")
+            .data({id: m.id, name: m.name, hide: !!m.hide}).appendTo(log);
+        if (m.name != me().name) {
+            line.addClass('theirs');
+            theirs = true;
+            if ($('#room-chat').hasClass('folded')) {
+                unread++;
+            }
         }
     });
+    // hidden by the staff after this page showed them
+    if (hidden && hidden.length) {
+        log.children('p').filter(function () { return hidden.indexOf($(this).data('id')) >= 0; }).each(function () {
+            $(this).next('.chat-tools').remove();
+            $(this).remove();
+        });
+    }
     log.children().slice(0, -100).remove();
     // follow the conversation, unless the player scrolled up to read
     chatPlace();
@@ -336,6 +355,55 @@ $('#chat-form').on('submit', function (e) {
         }
     }).fail(function () { input.val(text); });
 });
+
+// a message of someone else, clicked: report it, ignore who wrote it (for
+// this player only, in every room), or, for the staff above them, hide it
+$('#chat-log').on('click', 'p.theirs', function () {
+    var line = $(this), open = line.next('.chat-tools').length;
+    $('#chat-log .chat-tools').remove();
+    if (!open) {
+        line.after("<div class='chat-tools'><button type='button' class='room-tool' data-chat='report'>Report</button>" +
+            "<button type='button' class='room-tool' data-chat='ignore'>Ignore</button>" +
+            (line.data('hide') ? "<button type='button' class='room-tool armed' data-chat='hide'>Hide</button>" : '') + '</div>');
+        if (!line.next().next().length) {
+            chatStick = true;
+            chatPlace();
+        }
+    }
+}).on('click', '[data-chat]', function () {
+    var tools = $(this).parent(), line = tools.prev(), what = $(this).data('chat');
+    tools.find('button').prop('disabled', true);
+    if (what == 'report') {
+        send('report', {id: line.data('id')}).done(function (r) {
+            tools.html('<span>' + esc(r.success ? 'Reported. Thank you!' : r.error || 'This message is gone') + '</span>');
+            setTimeout(function () { tools.remove(); }, 2500);
+        });
+    } else if (what == 'ignore') {
+        send('ignore', {id: line.data('id')}).done(function (r) {
+            if (r.success) {
+                tools.remove();
+                $('#chat-log p.theirs').filter(function () { return $(this).data('name') == r.name; }).remove();
+                $("<p class='chat-note'>You ignore " + esc(r.name) + ". <button type='button'>Undo</button></p>")
+                    .data('uid', r.uid).appendTo('#chat-log');
+                chatPlace();
+            }
+        });
+    } else {
+        $.post('api/mod/hide', {id: line.data('id')}).done(function () {
+            tools.remove();
+            line.remove();
+        });
+    }
+}).on('click', '.chat-note button', function () {
+    var note = $(this).parent();
+    hearAgain(note.data('uid'));
+    note.remove();
+});
+
+// their next messages show again (the ones missed meanwhile stay missed)
+function hearAgain(uid) {
+    send('ignore', {undo: 1, uid: uid});
+}
 
 // in game the chat can be folded away; its title then counts what was missed
 $('.room-chat-head').on('click', function (e) {
@@ -405,16 +473,23 @@ function lobby() {
         show('lobby');
     }
     $('#lobby-players').html(s.players.map(function (p) {
+        // someone this player ignores: one click to see their messages again;
         // the host can hand the room over, or kick (a second click confirms)
-        var tools = s.host && !p.you ? "<span class='room-tools'>" +
+        var tools = (p.ignored ? "<button type='button' class='room-tool' data-unignore='" + p.uid + "' title='Ignored: click to see their messages again'><i class='material-icons'>speaker_notes_off</i></button>" : '') +
+            (s.host && !p.you ?
             (p.here ? "<button type='button' class='room-tool' data-host='" + p.uid + "' title='Make host'><i class='material-icons'>star_border</i></button>" : '') +
             (kickArmed == p.uid && Date.now() - kickAt < KICK_ARMED
                 ? "<button type='button' class='room-tool armed' data-kick='" + p.uid + "'>Kick?</button>"
-                : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") +
-            "</span>" : '';
-        return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) +
-            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') + tools + "</div>";
+                : "<button type='button' class='room-tool' data-kick='" + p.uid + "' title='Kick'><i class='material-icons'>person_remove</i></button>") : '');
+        tools = tools ? "<span class='room-tools'>" + tools + '</span>' : '';
+        return "<div class='room-player" + (p.here ? '' : ' away') + "'>" + dot(p) + esc(p.name) + tagHtml(p.tag) +
+            (p.host ? "<i class='material-icons' title='Host'>star</i>" : '') +
+            (s.world && p.lobby_ready ? "<i class='material-icons room-ready' title='Ready'>check</i>" : '') + tools + "</div>";
     }).join(''));
+    if (s.world) {
+        worldLobby();
+        return;
+    }
     if (!pending && JSON.stringify(s.settings) != settingsKey) {
         settingsKey = JSON.stringify(s.settings);
         showSettings(s.settings);
@@ -432,7 +507,9 @@ function lobby() {
 var KICK_ARMED = 3000;     // ms the "Kick?" button waits for the second click
 var kickArmed = null, kickAt = 0;
 
-$('#lobby-players').on('click', '[data-host]', function () {
+$('#lobby-players').on('click', '[data-unignore]', function () {
+    hearAgain($(this).data('unignore'));
+}).on('click', '[data-host]', function () {
     send('host', {uid: $(this).data('host')});
 }).on('click', '[data-kick]', function () {
     var uid = $(this).data('kick');
@@ -515,12 +592,54 @@ $('#room-settings').on('change', function () {
 
 $('#start-button').on('click', function () {
     $(this).prop('disabled', true);
+    if (s && s.world) {
+        send('lobby', {ready: s.ready ? 0 : 1});
+        return;
+    }
     send('start').done(function (r) {
         if (!r.success && r.error) {
             $('#settings-error').text(r.error);
         }
     });
 });
+
+// ---------- a world's lobby ----------
+// No host: everyone says Ready. Half of them ready (2 at least) starts a
+// countdown, everyone ready cuts it short; whoever is not ready when it ends
+// is left out of the game (app.py, "Multiplayer: worlds").
+
+var worldStart = null;     // when the game starts, local clock
+var worldNext = null;      // after the results: when everyone moves on to the next lobby
+
+function worldLobby() {
+    worldStart = s.starts_in != null ? Date.now() + s.starts_in * 1000 : null;
+    $('#start-button').prop('disabled', false).toggleClass('wood', !!s.ready)
+        .text(s.ready ? 'Ready! Click if you need more time' : "I'm Ready");
+    worldStatus();
+}
+
+function worldStatus() {
+    var here = s.players.filter(function (p) { return p.here; }).length;
+    var ready = s.players.filter(function (p) { return p.lobby_ready; }).length;
+    var text, hurry = false;
+    if (worldStart) {
+        var left = Math.max(0, Math.ceil((worldStart - Date.now()) / 1000));
+        text = left ? 'Starting in ' + left + ' s' : 'Starting!';
+        if (!s.ready && left) {
+            text += ': not ready, you will be left out';
+            hurry = true;
+        }
+        if (left && left <= 3 && left != lastSecond) {
+            Sfx.play('tick', [1.5, 1.26, 1.06][left - 1]);
+        }
+        lastSecond = left;
+    } else if (here < 2) {
+        text = 'Waiting for one more player...';
+    } else {
+        text = 'Starts when half the players are ready (' + ready + '/' + here + ')';
+    }
+    $('#world-status').prop('hidden', false).text(text).toggleClass('urgent', hurry);
+}
 
 // ---------- a round ----------
 
@@ -668,6 +787,13 @@ $('#guess-button').on('click', function () { submit(false); });
 function clocks() {
     if (!s) {
         return;
+    }
+    if (s.world && view == 'lobby') {
+        worldStatus();
+    }
+    if (s.world && view == 'results' && worldNext) {
+        var wait = Math.max(0, Math.ceil((worldNext - Date.now()) / 1000));
+        $('#results-hint').text(wait ? 'Next game in ' + wait + ' s' : 'Off to the next game...');
     }
     if (s.mode == 'survival') {
         return clocksSurvival();
@@ -963,7 +1089,7 @@ function results() {
         var place = rank <= 3 ? "<i class='material-icons' style='color:" + medals[rank - 1] + "'>emoji_events</i>" : rank;
         var v = value(p);
         return "<tr class='leaderboard-row" + (p.you ? ' you' : '') + (i < hidden ? ' podium-wait' : '') + (i == plankNow ? ' plank-in' : '') + "'>" +
-            "<td>" + place + "</td><td class='room-name'>" + dot(p) + esc(p.name) + v[0] + "</td><td>" + v[1] + "</td></tr>";
+            "<td>" + place + "</td><td class='room-name'>" + dot(p) + esc(p.name) + tagHtml(p.tag) + v[0] + "</td><td>" + v[1] + "</td></tr>";
     }).join('');
     var plain = html.replace(" plank-in'", "'");
     if (plankNow >= 0 || plain != resultRows) {
@@ -998,6 +1124,11 @@ function results() {
     }
     $('#results-score').text({classic: 'Score', duel: 'HP', royale: 'Lives', survival: 'Hearts'}[s.mode]);
     $('#again-button').prop('hidden', !(s.live && s.host));
+    if (s.world) {
+        // a world goes on by itself: everyone moves on to its next lobby
+        worldNext = s.next_in != null ? Date.now() + s.next_in * 1000 : null;
+        return;
+    }
     var host = s.players.filter(function (p) { return p.host; })[0];
     $('#results-hint').text(s.live && !s.host && host ? host.name + ' can start a new game.' : '');
 }
@@ -1077,7 +1208,7 @@ function crisp(m) {
 function panoramaConfig(url, options) {
     var config = url.slice(-1) == '/'
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
-            extension: 'jpg', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
+            extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
     for (var k in options) config[k] = options[k];
     return config;

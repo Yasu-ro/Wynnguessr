@@ -75,9 +75,10 @@ function explode() {
     setTimeout(function () { flash.remove(); }, 900);
 }
 
-// The throw: static/potion-throw.gif, Yasuro's (97 frames): someone runs in
-// and throws the bottle, which bursts over the screen; its sounds on its
-// frames. Loaded once; a new address for it each time plays it from its first frame
+// The throw: Yasuro's animation (static/potion-throw.gif, 97 frames), served
+// as static/potion-throw.webp: the same pixels and timings, 930 kB instead of
+// 1.6 MB: someone runs in and throws the bottle, which bursts over the
+// screen; its sounds on its frames. Loaded once; a new address for it each time plays it from its first frame
 var THROW_MS = 3070;    // its length
 var THROWN_MS = 1690;   // the bottle leaves the hand (frame 51): the throw
 var SPLASH_MS = 1950;   // it bursts (frame 60): the glass

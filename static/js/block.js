@@ -3,6 +3,22 @@
 // clicked, shown by its centre. Zoomed in, a frame shows the block under the
 // pointer, so that the exact block (5,000 points) can be aimed at.
 
+// the map itself, one pixel per block, cut in tiles (tools/map_tiles.py): a
+// page loads only what it shows, not the whole 8.7 MB image
+var MAP_BOUNDS = [[0, -2560], [6144, 2048]];
+function mapTiles(m) {
+    // the map grows under the mouse (style.css): told so, it loads the tiles of
+    // its new size (the whole image used to be there anyway). pan: false keeps
+    // it anchored at the top left, as it always grew
+    if (window.ResizeObserver) {
+        new ResizeObserver(function () { m.invalidateSize({pan: false}); }).observe(m.getContainer());
+    }
+    return L.tileLayer('static/map-2026/{z}/{x}_{y}.webp', {
+        tileSize: 256, minZoom: -3, maxZoom: 5, minNativeZoom: -3, maxNativeZoom: 0, bounds: MAP_BOUNDS, noWrap: true,
+        attribution: '<a href="https://wynntils.com/">Wynntils Map</a>'
+    }).addTo(m);
+}
+
 // the block under a point of the map
 function blockAt(latlng) {
     return {x: Math.floor(latlng.lng), z: Math.floor(-latlng.lat)};
