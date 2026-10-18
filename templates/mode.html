@@ -8,8 +8,8 @@
     <h1 class="sign">Play Solo</h1>
     <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     <form action="game" class="panel settings" method="get">
-{% with modes = [('classic', 'Classic'), ('survival', 'Survival')] %}{% include "modes.html" %}{% endwith %}
-            <fieldset class="setting" id="difficulty" hidden>
+{% with modes = [('survival', 'Survival'), ('classic', 'Classic')] %}{% include "modes.html" %}{% endwith %}
+            <fieldset class="setting" id="difficulty">
                 <h3 class="setting-name">Difficulty</h3>
                 <div class="chips">
                     <input type="radio" name="difficulty" id="difficulty-normal" value="normal" checked>
@@ -19,7 +19,9 @@
                     <input type="radio" name="difficulty" id="difficulty-hardcore" value="hardcore">
                     <label class="chip" for="difficulty-hardcore">Hardcore</label>
                 </div>
-                <p class="setting-note">Normal: 10 hearts · Hard: 5 hearts, less time · Hardcore: 1 heart</p>
+                <p class="setting-note difficulty-rules" data-difficulty="normal">10 hearts, 60 seconds a round.</p>
+                <p class="setting-note difficulty-rules" data-difficulty="hard" hidden>5 hearts, 40 seconds a round, more potions.</p>
+                <p class="setting-note difficulty-rules" data-difficulty="hardcore" hidden>1 heart, 30 seconds a round, even more potions.</p>
             </fieldset>
 {% include "settings.html" %}
             <script>
@@ -29,6 +31,13 @@
                     ['provinces', 'timer', 'look', 'rounds'].forEach(function (id) { document.getElementById(id).hidden = survival; });
                     document.getElementById('difficulty').hidden = !survival;
                 });
+                // only the chosen difficulty says what it does
+                function showDifficulty() {
+                    var difficulty = document.querySelector('[name=difficulty]:checked').value;
+                    document.querySelectorAll('.difficulty-rules').forEach(function (p) { p.hidden = p.dataset.difficulty != difficulty; });
+                }
+                document.querySelectorAll('[name=difficulty]').forEach(function (r) { r.addEventListener('change', showDifficulty); });
+                showDifficulty();
             </script>
         <button type="submit" class="btn big wide" id="mode-submit-button">Play</button>
     </form>

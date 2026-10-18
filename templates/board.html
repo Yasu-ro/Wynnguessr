@@ -1,16 +1,16 @@
     <form class="board-filters" id="filter-options">
         <div class="tabs">
-            <input type="radio" name="mode" id="board-classic" value="classic" checked>
-            <label for="board-classic" class="tab">Classic</label>
-            <input type="radio" name="mode" id="board-survival" value="survival">
+            <input type="radio" name="mode" id="board-survival" value="survival" checked>
             <label for="board-survival" class="tab">Survival</label>
+            <input type="radio" name="mode" id="board-classic" value="classic">
+            <label for="board-classic" class="tab">Classic</label>
             <input type="radio" name="mode" id="board-levels" value="levels">
             <label for="board-levels" class="tab">Levels</label>
             <input type="radio" name="mode" id="board-wins" value="wins">
             <label for="board-wins" class="tab">Wins</label>
         </div>
         <div class="filters">
-            <div class="board-group chips">
+            <div class="board-group chips" hidden>
                 <span class="board-label">Provinces</span>
                 <input type="checkbox" name="province" id="board-wynn" value="wynn" checked>
                 <label for="board-wynn" class="chip small">Wynn</label>
@@ -25,7 +25,7 @@
                 <input type="checkbox" name="province" id="board-fruma" value="fruma" checked>
                 <label for="board-fruma" class="chip small">Fruma</label>
             </div>
-            <div class="board-group chips" id="board-difficulty" hidden>
+            <div class="board-group chips" id="board-difficulty">
                 <span class="board-label">Difficulty</span>
                 <input type="radio" name="difficulty" id="board-normal" value="normal" checked>
                 <label for="board-normal" class="chip small">Normal</label>
@@ -34,7 +34,7 @@
                 <input type="radio" name="difficulty" id="board-hardcore" value="hardcore">
                 <label for="board-hardcore" class="chip small">Hardcore</label>
             </div>
-            <div class="board-group chips" id="board-rounds">
+            <div class="board-group chips" id="board-rounds" hidden>
                 <span class="board-label">Rounds</span>
                 <input type="radio" name="rounds" id="board-3" value="3">
                 <label for="board-3" class="chip small">3</label>
@@ -45,7 +45,7 @@
                 <input type="radio" name="rounds" id="board-25" value="25">
                 <label for="board-25" class="chip small">25</label>
             </div>
-            <div class="board-group chips">
+            <div class="board-group chips" hidden>
                 <span class="board-label">View</span>
                 <input type="radio" name="nolook" id="board-free" value="No" checked>
                 <label for="board-free" class="chip small">Free</label>

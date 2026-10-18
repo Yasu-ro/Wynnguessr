@@ -790,7 +790,11 @@ fan, sans rien voler).
   bandes à bord coloré hors DA) façon
   Valorant (`history()` ; une partie de salon est dans `scores` avec `room`,
   pour ne pas la compter deux fois). Volontairement différent du classement.
-- `leaderboard` : onglets Classic/Survival (filtres, meilleure partie par
+- **Survival est le mode principal** (décision de Yasuro, 2026-10-18) : premier
+  et coché par défaut dans « Play Solo » comme dans le classement ; Classic
+  reste choisissable. Sous Difficulty, seule la difficulté cochée dit ce
+  qu'elle fait (`.difficulty-rules`), pas les trois à la fois.
+- `leaderboard` : onglets Survival/Classic (filtres, meilleure partie par
   joueur) et Levels/Wins (voir « Niveaux ») ; un pseudo lié Wynncraft = lien souligné vert + coche + icône.
 - `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet
   (`DISCORD` dans `app.py`). Le texte reprend les mots de Yasuro (« garder ma
