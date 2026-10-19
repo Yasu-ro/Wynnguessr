@@ -326,7 +326,10 @@ function chat(messages, hidden) {
         }
         chatId = m.id;
         // the name is kept with .data, never written into an attribute: a guest picks it
-        var line = $("<p>" + dot(m) + "<b>" + esc(m.name) + tagHtml(m.tag) + "</b><span>" + esc(m.text) + "</span></p>")
+        // their picture in a ring of their colour, and their wins in a row
+        var line = $("<p><img class='chat-pic" + (m.head ? ' head' : '') + "' src='" + esc(m.pic) + "' alt='' width='18' height='18' style='border-color:" + color(m) + "'>" +
+                     "<b>" + esc(m.name) + tagHtml(m.tag) + (m.streak ? "<span class='board-fire' title='Wins in a row'><i class='material-icons xp-fire'>local_fire_department</i>" +
+                     m.streak + '</span>' : '') + "</b><span>" + esc(m.text) + "</span></p>")
             .data({id: m.id, name: m.name, hide: !!m.hide}).appendTo(log);
         if (m.name != me().name) {
             line.addClass('theirs');

@@ -12,6 +12,7 @@
         <a class="nav-btn" href="moderation"{% if request.path == '/moderation' %} aria-current="page"{% endif %}{% if waiting %} title="{{ waiting }} to look at"{% endif %}><i class="material-icons">gavel</i><span>Moderation</span>{% if waiting %}<b class="nav-count">{{ waiting }}</b>{% endif %}</a>
         {% endif %}
         <a class="pill" href="profile" title="Level {{ me.level }}"{% if request.path == '/profile' %} aria-current="page"{% endif %}><b class="pill-level">{{ me.level }}</b><span>Profile</span><i class="pill-xp" style="width: {{ (100 * me.into / me.need) | round(1) }}%"></i></a>
+        {% if me.streak %}<span class="nav-streak" title="Wins in a row"><i class="material-icons xp-fire">local_fire_department</i>{{ me.streak }}</span>{% endif %}
         <a class="nav-btn" href="logout"><i class="material-icons">logout</i><span>Logout</span></a>
         {% else %}
         {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}

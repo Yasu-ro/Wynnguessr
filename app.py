@@ -885,6 +885,22 @@ def progress(c, uid):
             'games': len(games), 'played': sum(g['multi'] for g in games), 'wins': wins,
             'best': best, 'streak': run, 'history': games}
 
+# the wins in a row of the players of a room, for the chat: kept a minute per
+# process, and worked out before the room's write lock (history() reads every
+# room a player was in), like the "#1" tags
+STREAKS = {}              # user id: (when worked out, wins in a row)
+STREAKS_EVERY = 60
+
+def room_streaks(c, code):
+    now = time.time()
+    for (uid,) in c.execute('''SELECT p.user_id FROM room_players p JOIN users u ON u.id = p.user_id
+            WHERE p.code = ? AND COALESCE(u.guest, 0) = 0''', (code.upper(),)).fetchall():
+        if now - STREAKS.get(uid, (0, 0))[0] > STREAKS_EVERY:
+            run = 0
+            for g in sorted((g for g in history(c, uid) if g['multi']), key = lambda g: g['when']):
+                run = run + 1 if g['win'] else 0
+            STREAKS[uid] = (now, run)
+
 @app.context_processor
 def menu_level():
     # the level shown in the menu, worked out only by the pages that show it
@@ -1300,6 +1316,7 @@ def room_state(code):
     # the "#1" tags, when due, before the room's write lock: never while holding it
     if time.time() - TOPS['at'] > TOPS_EVERY:
         top_tags(connect())
+    room_streaks(connect(), code)
     with room_tx() as c:
         r, me = member(c, code)
         if not r:
@@ -1353,7 +1370,7 @@ def room_state(code):
         since = request.args.get('chat', '')
         ignored = {i[0] for i in c.execute("SELECT target FROM ignores WHERE user_id = ?", (me['user_id'],))}
         out['chat'] = [dict(m, color = colors.get(m['uid'], 0)) for m in reversed(c.execute(
-            '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text FROM room_chat m JOIN users u ON u.id = m.user_id
+            '''SELECT m.id, m.user_id AS uid, u.username AS name, m.text, u.avatar, u.mc_uuid FROM room_chat m JOIN users u ON u.id = m.user_id
             WHERE m.code = ? AND m.id > ? AND m.hidden_by IS NULL ORDER BY m.id DESC LIMIT 50''',
             (r['code'], int(since) if since.isnumeric() else 0)).fetchall()) if m['uid'] not in ignored]
         # players keep their id: the host's tools (make host, kick) name them by it;
@@ -1364,6 +1381,9 @@ def room_state(code):
         ranks = ranks_of(c, writers) if rank >= MAY['hide'] else {}
         for p in out['chat']:
             p['tag'] = tags.get(p['uid'])
+            p['head'] = not p['avatar']   # a Minecraft head: drawn pixel by pixel
+            p['pic'] = avatar_url({'id': p['uid'], 'avatar': p.pop('avatar'), 'mc_uuid': p.pop('mc_uuid')})
+            p['streak'] = STREAKS.get(p['uid'], (0, 0))[1]
             if rank >= MAY['hide'] and ranks[p['uid']] < rank:
                 p['hide'] = True
             del p['uid']

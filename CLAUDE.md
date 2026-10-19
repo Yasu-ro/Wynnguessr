@@ -895,6 +895,14 @@ max), journal d'audit avec la raison. D'où :
     Un visiteur sans compte ni pseudo d'invité ne signale pas.
     Tests : `t_chatmod.py` (54), `t_report_page.py` (navigateur, 13 × 2),
     `t_chat_page.py` et `t_players_page.py` mis à jour.
+  - **Photo et série dans le chat, série dans le menu** (2026-10-19,
+    demande de Yasuro) : la pastille de couleur d'une ligne de chat devient
+    la photo du joueur (`chat-pic`), entourée de sa couleur ; après son nom
+    et son étiquette, sa série de victoires en cours (flamme, dès 1, comme
+    au classement). Les séries viennent de `room_streaks()` : gardées une
+    minute par processus, calculées **avant le verrou du salon**
+    (`history()` relit tous les salons du joueur). Le menu montre la sienne
+    à côté de Profile, cachée sous 480 px (le menu n'a plus de place).
   - **Ignore** (le mot de Wynncraft ; « Mute » reste pour la sanction de
     l'équipe, étape 4) : pour ce joueur seulement, **dans tous les salons**
     (table `ignores`), ses messages disparaissent ; une note « You ignore X.

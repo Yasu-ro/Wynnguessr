@@ -3009,6 +3009,39 @@ body.room-playing {
     margin-right: 6px;
     white-space: nowrap;
 }
+.room-chat-log .chat-pic {
+    flex: none;
+    align-self: flex-start;
+    width: 20px;
+    height: 20px;
+    margin-right: 6px;
+    border: 2px solid;
+    border-radius: 50%;
+}
+.room-chat-log .chat-pic.head {
+    image-rendering: pixelated;
+}
+.room-chat-log .board-fire {
+    margin-left: 4px;
+}
+.room-chat-log .xp-fire {
+    margin-right: 1px;
+    font-size: 16px;
+    vertical-align: -3px;
+}
+/* the menu: wins in a row, next to Profile */
+.nav-streak {
+    flex: none;
+    margin-right: 6px;
+    font: 700 16px/1 var(--sans);
+    color: var(--ink);
+    white-space: nowrap;
+}
+@media (max-width: 480px) {
+    .nav-streak {
+        display: none;   /* no room left in the menu: the profile shows it */
+    }
+}
 /* someone else's message opens a row: Report, Ignore, (staff) Hide */
 .room-chat-log p.theirs {
     margin-inline: -4px;
