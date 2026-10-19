@@ -33,7 +33,10 @@
                 section.classList.add('flash');
             };
             var y = scrollY;
-            section.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+            // in the middle of the screen when it fits (as near as the page allows), else its top under the menu
+            var fits = section.offsetHeight < innerHeight - document.querySelector('.navbar').offsetHeight - 40;
+            section.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                                    block: fits ? 'center' : 'start'});
             history.replaceState(null, '', link.getAttribute('href'));
             addEventListener('scrollend', flash);
             setTimeout(function () { if (scrollY == y) flash(); }, 100);   // already there: no scroll to end

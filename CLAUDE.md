@@ -845,7 +845,8 @@ max), journal d'audit avec la raison. D'où :
   page, une ligne par section (ancres `#picture`…). Affiché seulement à
   partir de **1 560 px** de large, là où il tient à côté de la page ; en
   dessous, rien (question posée à Yasuro).
-  Un clic fait **glisser** jusqu'à la section (pas de saut), puis l'assombrit
+  Un clic fait **glisser** jusqu'à la section (pas de saut), **centrée à
+  l'écran** si elle y tient et si la page le permet, puis l'assombrit
   d'une **bande sur toute la largeur de la page** (`.flash`, dessin de
   Yasuro ; un cadre vert avait été refusé), qui apparaît en ~0,2 s et
   s'efface en ~1 s (demande : « fade in faster »), lancée à `scrollend`
