@@ -762,9 +762,10 @@ def account():
             what = 'name'
         elif what == 'tag':
             label = form.get('tag', '')
-            problem = None if label in [t['label'] for t in tags_of(c, [uid])[uid]] else "No such tag"
-            if not problem:
-                c.execute("UPDATE users SET shown_tag = ? WHERE id = ?", (label, uid))
+            if label not in [t['label'] for t in tags_of(c, [uid])[uid]]:
+                return "No such tag", 400
+            c.execute("UPDATE users SET shown_tag = ? WHERE id = ?", (label, uid))
+            return '', 204   # sent from the page, which stays where it is
         elif what == 'password':
             # the old password, unless there is none or Wynncraft vouched for this login
             if me['password'] and not session.get('wynn'):
@@ -794,8 +795,9 @@ def account_page(section = None, error = None, code = None):
         me = c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
         if me['avatar_note'] and request.method == 'GET':
             c.execute("UPDATE users SET avatar_note = NULL WHERE id = ?", (me['id'],))   # said once
-        tags = tags_of(c, [me['id']])[me['id']]
-    return render_template('account.html', me = me, avatar = avatar_url(me), tags = tags, section = section, error = error,
+        tags = tags_of(c, [me['id']], picked = False)[me['id']]
+        shown = tag_of(c, [me['id']])[me['id']]
+    return render_template('account.html', me = me, avatar = avatar_url(me), tags = tags, shown = shown, section = section, error = error,
                            code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
 
 def history(c, uid):
@@ -3267,7 +3269,7 @@ def top_tags(c):
         TOPS.update(at = time.time(), tags = tops)
     return TOPS['tags']
 
-def tags_of(c, uids):
+def tags_of(c, uids, picked = True):
     # every tag of these players, in the order they are shown: {id: [{label, color}]}
     uids = list({u for u in uids if u})
     out = {u: [] for u in uids}
@@ -3283,9 +3285,11 @@ def tags_of(c, uids):
     for u, labels in top_tags(c).items():
         if u in out:
             out[u] += [{"label": l, "color": 'tag-top'} for l in labels]
-    # the one picked goes first, while the player still has it
-    for u, label in c.execute(f"SELECT id, shown_tag FROM users WHERE id IN ({marks}) AND shown_tag IS NOT NULL", uids):
-        out[u].sort(key = lambda t: t['label'] != label)
+    # the one picked goes first, while the player still has it (Edit Profile
+    # keeps the order fixed: picked = False)
+    if picked:
+        for u, label in c.execute(f"SELECT id, shown_tag FROM users WHERE id IN ({marks}) AND shown_tag IS NOT NULL", uids):
+            out[u].sort(key = lambda t: t['label'] != label)
     return out
 
 def tag_of(c, uids):

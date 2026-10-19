@@ -833,7 +833,11 @@ max), journal d'audit avec la raison. D'où :
   celle qui passe devant, dans `users.shown_tag` (son **libellé**, comparé à
   celles qu'il a encore : un « #1 » perdu ou une étiquette rangée, et
   l'ordre par défaut revient seul). Un membre de l'équipe peut donc cacher
-  son rang derrière une autre étiquette. Tests ajoutés à `t_tags.py` (8).
+  son rang derrière une autre étiquette. Les étiquettes sont elles-mêmes
+  les boutons, ordre fixe (`tags_of(..., picked = False)`), aperçu « pseudo +
+  étiquette » au-dessus ; le choix part en `fetch` (204) : un rechargement
+  ramenait la page tout en haut (retour de Yasuro). Tests ajoutés à
+  `t_tags.py` (8).
 - **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
   Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
   dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne

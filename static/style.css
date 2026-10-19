@@ -330,6 +330,46 @@ button, input {
     margin: 0;
     font-size: 13px;
 }
+/* Edit Profile: the tags are the buttons; the one picked stands out */
+.tag-preview {
+    margin: 4px 0 18px;
+    font: 700 20px/1.2 var(--sans);
+    text-align: center;
+}
+.tag-preview .name-tag {
+    margin-left: 8px;
+    font-size: 14px;
+}
+.tag-pick {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+.tag-pick > input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.tag-pick .name-tag {
+    margin: 0;
+    padding: 4px 10px 5px;
+    font-size: 15px;
+    opacity: .6;
+    cursor: pointer;
+    transition: opacity .15s;
+}
+.tag-pick .name-tag:hover {
+    opacity: .8;
+}
+.tag-pick :checked + .name-tag {
+    opacity: 1;
+    outline: 3px solid var(--green);
+    outline-offset: 2px;
+}
+.tag-pick :focus-visible + .name-tag {
+    opacity: 1;
+}
 
 /* Moderation: the staff's tags, as Wynncraft's chat tags ([Mod] in orange) */
 .rank-tag {
@@ -671,7 +711,7 @@ button, input {
 #tag-colors .chip {
     padding: 4px 8px;
 }
-#tag-colors .name-tag, .account .chip .name-tag {
+#tag-colors .name-tag {
     margin: 0;
 }
 .mod-why {

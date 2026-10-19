@@ -52,15 +52,26 @@
         {% if tags|length > 1 %}
         <section class="panel">
             <h2>Tag</h2>
-            <form class="chips" action="account?do=tag" method="post">
+            <p class="tag-preview">{{ me.username }}<span class="name-tag {{ shown.color }}" id="tag-shown">{{ shown.label }}</span></p>
+            <form class="tag-pick" id="tag-pick">
                 {% for t in tags %}
-                <input type="radio" name="tag" id="tag-{{ loop.index }}" value="{{ t.label }}"{{ ' checked' if loop.first }} onchange="this.form.submit()">
-                <label class="chip" for="tag-{{ loop.index }}"><span class="name-tag {{ t.color }}">{{ t.label }}</span></label>
+                <input type="radio" name="tag" id="tag-{{ loop.index }}" value="{{ t.label }}" data-color="{{ t.color }}"{{ ' checked' if t.label == shown.label }}>
+                <label class="name-tag {{ t.color }}" for="tag-{{ loop.index }}">{{ t.label }}</label>
                 {% endfor %}
             </form>
-            <p class="hint">The one shown next to your name.</p>
-            {{ note('tag') }}
+            <p class="note bad" id="tag-error" hidden>Could not save: try again</p>
         </section>
+        <script>
+            // saved on the spot: a reload took the page back to the top
+            document.getElementById('tag-pick').addEventListener('change', function (e) {
+                var shown = document.getElementById('tag-shown'), error = document.getElementById('tag-error');
+                shown.textContent = e.target.value;
+                shown.className = 'name-tag ' + e.target.dataset.color;
+                fetch('account?do=tag', {method: 'POST', body: new FormData(this)}).then(function (r) {
+                    error.hidden = r.ok;
+                }, function () { error.hidden = false; });
+            });
+        </script>
         {% endif %}
 
         <section class="panel">
