@@ -774,19 +774,18 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   - Tests : `t_worlds.py` (33, horloge à la main), `t_worlds_page.py`
     (navigateur : Play → Multiplayer → Join, invité, Ready, partie
     complète, lobby suivant, AFK sorti). Tout le reste rejoué vert.
-  - À faire avant la 3.0.0 : test de charge (50 joueurs).
+  - Test de charge fait le 2026-10-19 (voir « Ultrareview et retours de
+    Yasuro ») : 50 joueurs passent large.
 - **Sortie : tout d'un coup, en version 3.0.0** (Yasuro, 2026-10-18 : « I
   would rather push everything at once as a big 3.0.0 version ») : **plus
   aucune mise en prod partielle** ; le vrai site reste en 2.3 jusque-là.
-- **État au 2026-10-18 au soir** : phase 1 faite sur la bêta, sauf la
-  bascule des pages en WebP (attendre la fin du service `wynnguessr-webp`,
-  ~4 h à partir de 17 h 11 : `journalctl --user -u wynnguessr-webp`, puis
-  `extension: 'webp'` dans `room.js`, `survival.js`, `game.js`, le
-  préchargement de `room.js` (`.jpg` en dur) et la démo de `index.html`,
-  et vérifier que chaque lieu s'ouvre). À la mise en prod : passer le
-  vrai site à 4 workers (unité systemd hors git), **lui faire son venv
-  neuf depuis `requirements.txt`** (Flask 3 ; puis `restart`, pas `HUP`)
-  et `VERSION = '3.0'`.
+- **À la mise en prod de la 3.0.0**, dans l'ordre : sauvegarder la vraie
+  base ; rejouer les migrations sur une copie d'elle d'abord ; **lui faire
+  son venv neuf depuis `requirements.txt`** (Flask 3 ; puis `restart`, pas
+  `HUP`) ; passer le vrai site à 4 workers (unité systemd hors git) ;
+  `VERSION = '3.0'` ; les sons, hors git (`tools/sounds.py`). (La bascule
+  des pages en WebP, attendue ici le 2026-10-18 au soir, est faite :
+  3b4e33d.)
 - **Modération** : une **page à part** pour les modérateurs, à côté du bouton
   Profile, avec tout ce qu'il faut pour ajouter des modérateurs et modérer.
   **Des rangs** (admin, mod…) aux pouvoirs différents **les uns sur les
@@ -1143,9 +1142,36 @@ dans `app.py`, tous corrigés :
   `t_review_page.py` (navigateur, 20 dans Chromium et Firefox). Mis à jour
   pour le 59dd06e (onglet Players refait, message de rang) : `t_ranks`, et
   la fin de `t_xss_page` (pseudos piégés dans Players : rien ne s'exécute).
-- **Pas fait, en attente de Yasuro** : le pied de page (sombre, comme le
-  décor de wynncraft.com) ne ressemble pas à la barre du haut ; proposé de
-  le passer en sable comme le menu, pas de réponse encore.
+- **Test de charge** (le dernier « à faire » avant la 3.0.0) : 50 puis 150
+  faux joueurs `zz_` sur une copie de la bêta à 4 workers, qui font comme
+  la page : poll du salon chaque seconde, Ready, une réponse par manche, un
+  message toutes les 15 à 45 s, lobby suivant ; le premier qui voit une
+  manche charge ses tuiles (Cloudflare sert les autres) ; plus 5 pages
+  Multiplayer. **50 joueurs** (58 requêtes/s) : poll médian 10 ms, 99 %
+  sous 64 ms, pire 139 ms, aucune erreur, la moitié d'un cœur de processeur.
+  **150 joueurs** (161/s) : médian 9 ms mais 1 % au-delà de 0,6 s, pire
+  2,8 s, aucune erreur. La limite est le **verrou d'écriture** que chaque
+  poll prend (`room_tx`, `BEGIN IMMEDIATE`) alors qu'il n'écrit presque
+  rien (`last_seen` toutes les 2 s, `tick()` aux changements) : si le site
+  dépasse la centaine de joueurs en salon à la fois, le gain suivant est
+  de lire sans verrou et de ne le prendre que pour écrire. Pas fait : pas
+  nécessaire (le vrai site, le 2026-10-19 : ~6 joueurs en salon au plus
+  fort, plus le solo).
+- **Les tests de cette session** (les `t_*.py` cités dans ce fichier, le
+  test de charge `load/`, `run_browser.sh`, `calib/clean_zz.py`,
+  `wg/dev_app.py`) sont gardés dans
+  `/data/claude-scratch/wynnguessr-tests-3.0.tgz` (73 Ko) pour la mise en
+  prod ; à effacer, avec le dossier, une fois la 3.0.0 en ligne. Copies,
+  venvs et navigateurs Playwright effacés (`playwright install chromium
+  firefox` les remet).
+- **En attente de Yasuro** : (1) le pied de page (sombre, comme le décor
+  de wynncraft.com) ne ressemble pas à la barre du haut : proposé de le
+  passer en sable comme le menu ; (2) la boussole toujours affichée, ou un
+  interrupteur ; (3) le crédit « Wynntils Map » sous la carte, ou sur la
+  page About ; (4) la PR n°1 de revue (`review` → `review-base`, sur le
+  fork) et la copie `~/Wynnguessr-review` : les fermer et effacer, ou les
+  mettre à jour pour une autre ultrareview. Rien n'y est touché sans son
+  accord.
 
 ## Niveaux, XP et séries de victoires
 
