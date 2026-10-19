@@ -1948,18 +1948,33 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
 .account .panel {
     scroll-margin-top: calc(var(--nav-h) + 20px);
 }
-/* the section a board link led to: a green ring that fades */
-.account .panel.flash {
-    animation: panel-flash 1.6s ease-out;
+/* the section a board link led to: a dark band across the whole page (the
+   page is 960 px wide wherever the board shows), quick in, slow out */
+.account .panel {
+    position: relative;
+}
+.account .panel::after {
+    content: "";
+    position: absolute;
+    inset: -15px calc(50% - 480px);
+    background: rgba(0, 0, 0, .3);
+    opacity: 0;
+    pointer-events: none;
+}
+.account .panel.flash::after {
+    animation: panel-flash 1.8s;
 }
 @keyframes panel-flash {
-    0%, 25% {
-        outline: 4px solid var(--green);
-        outline-offset: 4px;
+    0% {
+        opacity: 0;
+        animation-timing-function: ease-out;
+    }
+    12%, 45% {
+        opacity: 1;
+        animation-timing-function: ease-in-out;
     }
     100% {
-        outline: 4px solid transparent;
-        outline-offset: 4px;
+        opacity: 0;
     }
 }
 .account-picture {
