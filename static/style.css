@@ -671,7 +671,7 @@ button, input {
 #tag-colors .chip {
     padding: 4px 8px;
 }
-#tag-colors .name-tag {
+#tag-colors .name-tag, .account .chip .name-tag {
     margin: 0;
 }
 .mod-why {

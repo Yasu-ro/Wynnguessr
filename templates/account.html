@@ -49,6 +49,20 @@
             {{ note('name') }}
         </section>
 
+        {% if tags|length > 1 %}
+        <section class="panel">
+            <h2>Tag</h2>
+            <form class="chips" action="account?do=tag" method="post">
+                {% for t in tags %}
+                <input type="radio" name="tag" id="tag-{{ loop.index }}" value="{{ t.label }}"{{ ' checked' if loop.first }} onchange="this.form.submit()">
+                <label class="chip" for="tag-{{ loop.index }}"><span class="name-tag {{ t.color }}">{{ t.label }}</span></label>
+                {% endfor %}
+            </form>
+            <p class="hint">The one shown next to your name.</p>
+            {{ note('tag') }}
+        </section>
+        {% endif %}
+
         <section class="panel">
             <h2>{{ 'Password' if me.password else 'Set a Password' }}</h2>
             <form class="stack" action="account?do=password" method="post">

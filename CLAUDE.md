@@ -828,6 +828,12 @@ max), journal d'audit avec la raison. D'où :
   aperçu en direct) ou la range (cachée partout, pas effacée) ; un
   Moderator la donne ou la reprend (règle d'en dessous) ; tout au journal.
   Tables `tags`, `user_tags`. Tests : `t_tags.py` (15), `t_tags_page.py`.
+- **Choix de l'étiquette** (2026-10-19, demande de Yasuro) : qui en a
+  plusieurs choisit sur `account` (section Tag, seulement à partir de 2)
+  celle qui passe devant, dans `users.shown_tag` (son **libellé**, comparé à
+  celles qu'il a encore : un « #1 » perdu ou une étiquette rangée, et
+  l'ordre par défaut revient seul). Un membre de l'équipe peut donc cacher
+  son rang derrière une autre étiquette. Tests ajoutés à `t_tags.py` (8).
 - **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
   Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
   dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne

@@ -735,7 +735,7 @@ def drop_picture(c, uid, which = 'avatar'):
 
 @app.route("/account", methods=['GET', 'POST'])
 def account():
-    # one's own picture, name, password and recovery code
+    # one's own picture, name, tag, password and recovery code
     if not session.get('loggedin'):
         return redirect('login?next=account')
     uid = session['user_id']
@@ -760,6 +760,11 @@ def account():
             if not problem:
                 c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
             what = 'name'
+        elif what == 'tag':
+            label = form.get('tag', '')
+            problem = None if label in [t['label'] for t in tags_of(c, [uid])[uid]] else "No such tag"
+            if not problem:
+                c.execute("UPDATE users SET shown_tag = ? WHERE id = ?", (label, uid))
         elif what == 'password':
             # the old password, unless there is none or Wynncraft vouched for this login
             if me['password'] and not session.get('wynn'):
@@ -789,7 +794,8 @@ def account_page(section = None, error = None, code = None):
         me = c.execute("SELECT * FROM users WHERE id = ?", (session['user_id'],)).fetchone()
         if me['avatar_note'] and request.method == 'GET':
             c.execute("UPDATE users SET avatar_note = NULL WHERE id = ?", (me['id'],))   # said once
-    return render_template('account.html', me = me, avatar = avatar_url(me), section = section, error = error,
+        tags = tags_of(c, [me['id']])[me['id']]
+    return render_template('account.html', me = me, avatar = avatar_url(me), tags = tags, section = section, error = error,
                            code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
 
 def history(c, uid):
@@ -3240,6 +3246,9 @@ with connect() as c:
         CREATE TABLE IF NOT EXISTS user_tags (user_id INTEGER, tag_id INTEGER, by INTEGER, at REAL,
             PRIMARY KEY (user_id, tag_id));
     ''')
+    # the tag a player picked to show, when they have several (see /account)
+    if 'shown_tag' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN shown_tag TEXT")
 
 def top_tags(c):
     # who leads each board: {user id: ["#1 Survival Hard", ...]}. Worked out
@@ -3274,6 +3283,9 @@ def tags_of(c, uids):
     for u, labels in top_tags(c).items():
         if u in out:
             out[u] += [{"label": l, "color": 'tag-top'} for l in labels]
+    # the one picked goes first, while the player still has it
+    for u, label in c.execute(f"SELECT id, shown_tag FROM users WHERE id IN ({marks}) AND shown_tag IS NOT NULL", uids):
+        out[u].sort(key = lambda t: t['label'] != label)
     return out
 
 def tag_of(c, uids):
