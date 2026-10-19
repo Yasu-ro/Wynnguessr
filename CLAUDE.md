@@ -1527,6 +1527,14 @@ de `style.css` et `static/js/motion.js` (inclus par `game.html` et
 « clunky and cheap », il la voulait « really like wynncraft's site » (site de
 fan, sans rien voler).
 
+- **Logo** (2026-10-19, dessiné par Yasuro : l'épingle dorée au W vert ; « change
+  all our logos with this one ») : `static/wynnlogo.png`, 320 px, tiré de son
+  dessin de 800 px, recadré au plus près. 35 points perdus de chaque côté,
+  presque transparents, ont été retirés. Il est réduit en alpha
+  prémultiplié, ce qui évite un liseré sombre. Il sert à tout : menu,
+  icône d'onglet, accueil, As de Solo, dos de carte et bannière. Toujours
+  appelé par `asset()` : le menu et l'icône d'onglet l'appelaient sans
+  `?v=`, et Cloudflare aurait gardé l'ancien 4 h.
 - **Palette** relevée dans le thème « journey » de wynncraft.com
   (`cdn.wynncraft.com/nextgen/themes/journey/theme.css`) : variables en tête de
   `style.css` — sable `--sand` (une page), papier `--paper` (un panneau), bois
@@ -1793,9 +1801,15 @@ incluse par `index`, `layout` et `game` (pas `review`). L'image
 `static/banner.jpg` (1200×630) est tirée du même lieu que la photo d'accueil
 (rue vers le château de Wynn, face est) avec le logo et le titre. Son adresse
 doit être complète : le nom du site est celui de la requête quand il finit par
-`wynndle.com` (la bêta montre donc sa propre image), sinon `wynndle.com`.
-Couleur de la barre Discord = le vert du logo. Discord met l'aperçu en cache :
-un lien déjà partagé peut garder l'ancien.
+`wynndle.com` (la bêta montre donc sa propre image), sinon `wynndle.com` ;
+versionnée par `asset()` depuis le 2026-10-19. **Refaite le 2026-10-19** pour
+le nouveau logo, à l'identique sinon (aucun script ne l'avait faite : relevé
+sur l'ancienne) : `hero.webp` réduite à 1200×675 puis coupée à partir de 35 px
+du haut ; logo de 150 px posé à (52, 442) ; titre en DejaVu Sans Bold 92,
+blanc, contour de 4 px (40, 26, 22), sa boîte à (228, 473). Couleur de la
+barre Discord = le vert du logo : `#a7eb64`, le vert clair du W (avant
+`#75fb4c`, l'ancienne épingle). Discord met l'aperçu en cache : un lien déjà
+partagé peut garder l'ancien.
 
 ### Fruma et moteurs de recherche
 
