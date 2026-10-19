@@ -20,6 +20,7 @@
         {% else %}
             {% if moderate %}<a class="btn wood" href="moderation?player={{ user.id }}">Moderate</a>{% endif %}
             {% if admin and user.avatar %}<form action="player?id={{ user.id }}" method="post"><button type="submit" class="btn red">Remove picture</button></form>{% endif %}
+            {% if can_report %}<button type="button" class="btn wood" id="report-player">Report</button>{% endif %}
         {% endif %}
     </div>
 
@@ -68,4 +69,18 @@
         <p class="hint">No games yet.</p>
     {% endif %}
 </div>
+{% if can_report %}
+<script src="{{ asset('js/report.js') }}"></script>
+<script>
+    document.getElementById('report-player').addEventListener('click', function () {
+        reportForm({{ ('Report ' + username) | tojson }}, function (why) {
+            var data = new FormData();
+            data.append('id', {{ user.id }});
+            data.append('why', why.why);
+            data.append('note', why.note);
+            return fetch('api/report', {method: 'POST', body: data}).then(function (r) { return r.json(); });
+        });
+    });
+</script>
+{% endif %}
 {% endblock %}

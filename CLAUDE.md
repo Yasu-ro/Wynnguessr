@@ -879,6 +879,22 @@ max), journal d'audit avec la raison. D'où :
     l'a signalé ; **Hide It** ou **Dismiss**, raison au journal. Règle
     d'en dessous : un signalement visant un Moderator n'apparaît qu'aux
     rangs au-dessus.
+  - **Raisons et joueur entier** (2026-10-19, demande de Yasuro) : tout
+    signalement passe par une fenêtre (`static/js/report.js`, `<dialog>`) :
+    une raison parmi 5 (`REPORT_WHY`, liste courte choisie par Yasuro :
+    Rude or hateful, Bad name or picture, Cheating, Spam, Something else),
+    quelques mots (200 caractères), ou les deux ; **au moins l'un des
+    deux**. On signale un message (clic dessus, comme avant) ou **un joueur
+    entier** : bouton Report de son profil, drapeau dans la liste des
+    joueurs du salon (choix de Yasuro : les deux ; un invité n'a pas de
+    profil). Table `player_reports`, chaque signalement gardé (un deuxième
+    peut dire autre chose), limite commune de 10 en 10 min. Onglet Reports :
+    les joueurs d'abord (Open → sa fiche, Dismiss), puis les messages ;
+    chaque carte liste qui et pourquoi. Un mute, un ban ou un rename ferme
+    les signalements du joueur. Comptés dans le badge et l'onglet Players.
+    Un visiteur sans compte ni pseudo d'invité ne signale pas.
+    Tests : `t_chatmod.py` (54), `t_report_page.py` (navigateur, 13 × 2),
+    `t_chat_page.py` et `t_players_page.py` mis à jour.
   - **Ignore** (le mot de Wynncraft ; « Mute » reste pour la sanction de
     l'équipe, étape 4) : pour ce joueur seulement, **dans tous les salons**
     (table `ignores`), ses messages disparaissent ; une note « You ignore X.

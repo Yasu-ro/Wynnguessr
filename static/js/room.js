@@ -385,13 +385,15 @@ $('#chat-log').on('click', 'p.theirs', function () {
     }
 }).on('click', '[data-chat]', function () {
     var tools = $(this).parent(), line = tools.prev(), what = $(this).data('chat');
-    tools.find('button').prop('disabled', true);
     if (what == 'report') {
-        send('report', {id: line.data('id')}).done(function (r) {
-            tools.html('<span>' + esc(r.success ? 'Reported. Thank you!' : r.error || 'This message is gone') + '</span>');
-            setTimeout(function () { tools.remove(); }, 2500);
+        tools.remove();
+        reportForm('Report this message from ' + line.data('name'), function (why) {
+            return send('report', $.extend({id: line.data('id')}, why));
         });
-    } else if (what == 'ignore') {
+        return;
+    }
+    tools.find('button').prop('disabled', true);
+    if (what == 'ignore') {
         send('ignore', {id: line.data('id')}).done(function (r) {
             if (r.success) {
                 tools.remove();
@@ -503,8 +505,10 @@ function lobby() {
     }
     $('#lobby-players').html(s.players.map(function (p) {
         // someone this player ignores: one click to see their messages again;
-        // the host can hand the room over, or kick (a second click confirms)
+        // anyone else can be reported; the host can hand the room over, or
+        // kick (a second click confirms)
         var tools = (p.ignored ? "<button type='button' class='room-tool' data-unignore='" + p.uid + "' title='Ignored: click to see their messages again'><i class='material-icons'>speaker_notes_off</i></button>" : '') +
+            (p.you ? '' : "<button type='button' class='room-tool' data-report='" + p.uid + "' title='Report'><i class='material-icons'>flag</i></button>") +
             (s.host && !p.you ?
             (p.here ? "<button type='button' class='room-tool' data-host='" + p.uid + "' title='Make host'><i class='material-icons'>star_border</i></button>" : '') +
             (kickArmed == p.uid && Date.now() - kickAt < KICK_ARMED
@@ -538,6 +542,11 @@ var kickArmed = null, kickAt = 0;
 
 $('#lobby-players').on('click', '[data-unignore]', function () {
     hearAgain($(this).data('unignore'));
+}).on('click', '[data-report]', function () {
+    var uid = $(this).data('report'), who = s.players.filter(function (p) { return p.uid == uid; })[0];
+    reportForm('Report ' + (who ? who.name : 'this player'), function (why) {
+        return $.post('api/report', $.extend({id: uid}, why), null, 'json');
+    });
 }).on('click', '[data-host]', function () {
     send('host', {uid: $(this).data('host')});
 }).on('click', '[data-kick]', function () {

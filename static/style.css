@@ -474,6 +474,51 @@ button, input {
     font-size: 15px;
 }
 /* a reported message among the ones around it, in a little chat of its own */
+/* the report form, over the page */
+.report-form {
+    width: min(440px, calc(100% - 32px));
+    padding: 0;
+    color: var(--ink);
+    background: none;
+    border: 0;
+}
+.report-form::backdrop {
+    background: rgba(0, 0, 0, .55);
+}
+.report-form form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 11px;
+    padding: 20px 22px 22px;
+    background: var(--paper);
+    box-shadow: var(--frame-thin);
+}
+.report-form h2 {
+    margin: 0;
+    font: 700 20px/1.2 var(--sans);
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.report-form .chips {
+    justify-content: center;
+}
+.report-form textarea.field {
+    resize: vertical;
+}
+.report-form .note {
+    margin: 0;
+}
+.report-buttons {
+    display: flex;
+    gap: 12px;
+}
+.report-buttons .btn {
+    flex: 1;
+}
+.report-form [hidden] {
+    display: none;
+}
 .mod-reports {
     display: grid;
     gap: 14px;
@@ -500,6 +545,14 @@ button, input {
 .mod-report small, .mod-report-by {
     margin: 0;
     color: var(--ink-soft);
+}
+.mod-report-by {
+    padding: 0;
+    list-style: none;
+    overflow-wrap: anywhere;
+}
+.mod-report-by b {
+    color: var(--ink);
 }
 .mod-chat {
     padding: 6px 10px;

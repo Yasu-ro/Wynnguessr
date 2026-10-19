@@ -120,11 +120,25 @@ $(function () {
 
     // ---------- reports ----------
     // a reported message among the ones around it (what was typed, before
-    // the filter): hide it for everyone, or close the report
+    // the filter): hide it for everyone, or close the report. A player
+    // reported as a whole: open their card, or close the report. Each says
+    // who reported, and why
+    function reasons(by) {
+        return "<ul class='mod-report-by'>" + by.map(function (b) {
+            return '<li><b>' + esc(b.name) + '</b>' + (b.why ? ' · ' + esc(b.why) : '') + (b.note ? ': “' + esc(b.note) + '”' : '') + '</li>';
+        }).join('') + '</ul>';
+    }
     function reports() {
         $.getJSON('api/mod/reports').done(function (r) {
-            $('#report-list').html(r.reports.map(function (x) {
-                var by = x.by.length > 3 ? x.by.slice(0, 3).join(', ') + ' and ' + (x.by.length - 3) + ' more' : x.by.join(', ');
+            $('#report-list').html(r.players.map(function (x) {
+                return "<div class='mod-report' data-player-report='" + x.id + "'><p class='mod-report-head'>" +
+                    "<span><a class='board-name' href='#' data-player='" + x.id + "'>" + esc(x.name) + '</a>' +
+                    (x.guest ? ' <small>(guest)</small>' : '') + '</span>' +
+                    '<small>Player · ' + when(x.at) + '</small></p>' + reasons(x.by) +
+                    "<input class='field small' placeholder='Why (kept in the log)' aria-label='Why' maxlength='200'>" +
+                    "<div><button type='button' class='btn' data-player='" + x.id + "'>Open</button>" +
+                    "<button type='button' class='btn wood' data-report='dismiss'>Dismiss</button></div></div>";
+            }).join('') + r.reports.map(function (x) {
                 return "<div class='mod-report' data-id='" + x.id + "'><p class='mod-report-head'>" +
                     "<span><a class='board-name' href='#' data-player='" + x.author.id + "'>" + esc(x.author.name) + '</a>' +
                     (x.author.guest ? ' <small>(guest)</small>' : '') + '</span>' +
@@ -132,18 +146,19 @@ $(function () {
                     "<div class='mod-chat'>" + x.around.map(function (m) {
                         return '<p' + (m.id == x.id ? " class='reported'" : m.hidden ? " class='gone'" : '') + '><b>' + esc(m.name) + '</b><span>' + esc(m.text) + '</span></p>';
                     }).join('') + '</div>' +
-                    "<p class='mod-report-by'>Reported by " + esc(by) + '</p>' +
+                    reasons(x.by) +
                     "<input class='field small' placeholder='Why (kept in the log)' aria-label='Why' maxlength='200'>" +
                     "<div><button type='button' class='btn red' data-report='hide'>Hide It</button>" +
                     "<button type='button' class='btn wood' data-report='dismiss'>Dismiss</button></div></div>";
             }).join(''));
-            $('#report-empty').prop('hidden', r.reports.length > 0);
+            $('#report-empty').prop('hidden', r.reports.length + r.players.length > 0);
         });
     }
     $('#report-list').on('click', '[data-report]', function () {
         var card = $(this).closest('.mod-report'), what = $(this).data('report');
         card.find('button').prop('disabled', true);
-        $.post(what == 'hide' ? 'api/mod/hide' : 'api/mod/report', {id: card.data('id'), 'do': what, reason: card.find('input').val()}).always(reports);
+        $.post(what == 'hide' ? 'api/mod/hide' : 'api/mod/report', {id: card.data('id'), player: card.data('player-report'), 'do': what,
+                                                                   reason: card.find('input').val()}).always(reports);
     });
 
     // ---------- players ----------

@@ -615,6 +615,7 @@ def show_profile(uid):
         return render_template('profile.html', user = user, username = user['username'], mc_name = user['mc_name'], tags = tags,
                            avatar = avatar_url(user), own = uid == session.get('user_id') and session.get('loggedin'),
                            admin = may(c, 'pictures', uid), moderate = uid != session.get('user_id') and may(c, 'players'),
+                           can_report = bool(session.get('user_id')) and uid != session.get('user_id'),
                            games = p['history'][:30], p = p)
 
 @app.route("/profile")
@@ -1434,9 +1435,33 @@ def room_report(code):
         m = r and c.execute("SELECT user_id FROM room_chat WHERE id = ? AND code = ? AND hidden_by IS NULL", (mid, r['code'])).fetchone()
         if not m or m['user_id'] == me['user_id']:
             return jsonify({"success": False})
-        if c.execute("SELECT COUNT(*) FROM chat_reports WHERE by = ? AND at > ?", (me['user_id'], time.time() - 600)).fetchone()[0] >= REPORTS_MAX:
+        reason = report_reason(request.form)
+        if not reason:
+            return jsonify({"success": False, "error": "Pick a reason or write one"})
+        if reports_sent(c, me['user_id']) >= REPORTS_MAX:
             return jsonify({"success": False, "error": "That's a lot of reports! The staff is on it"})
-        c.execute("INSERT OR IGNORE INTO chat_reports (message, by, at) VALUES (?, ?, ?)", (mid, me['user_id'], time.time()))
+        c.execute("INSERT OR IGNORE INTO chat_reports (message, by, at, why, note) VALUES (?, ?, ?, ?, ?)", (mid, me['user_id'], time.time()) + reason)
+    return jsonify({"success": True})
+
+@app.route("/api/report", methods=['POST'])
+def report_player():
+    # a player reports someone as a whole (from a profile, or a room's player
+    # list): guests too, on both sides. Each report is kept (a second one may
+    # say something new), within the limit of 10 in 10 minutes
+    target = request.form.get('id', type = int)
+    with connect() as c:
+        me = session.get('user_id')
+        u = c.execute("SELECT id FROM users WHERE id = ?", (target,)).fetchone()
+        if not me:
+            return jsonify({"success": False, "error": "Log in to report a player"}), 403
+        if not u or target == me:
+            return jsonify({"success": False})
+        reason = report_reason(request.form)
+        if not reason:
+            return jsonify({"success": False, "error": "Pick a reason or write one"})
+        if reports_sent(c, me) >= REPORTS_MAX:
+            return jsonify({"success": False, "error": "That's a lot of reports! The staff is on it"})
+        c.execute("INSERT INTO player_reports (target, by, at, why, note) VALUES (?, ?, ?, ?, ?)", (target, me, time.time()) + reason)
     return jsonify({"success": True})
 
 @app.route("/api/room/<code>/ignore", methods=['POST'])
@@ -3306,7 +3331,7 @@ def staff_menu():
             return my_rank(c)
     def waiting():
         with connect() as c:
-            return len(pictures_waiting(c)) + len(reports_waiting(c)) + (contact_waiting(c) if my_rank(c) >= MAY['contact'] else 0)
+            return len(pictures_waiting(c)) + len(reports_waiting(c)) + len(players_reported(c)) + (contact_waiting(c) if my_rank(c) >= MAY['contact'] else 0)
     return {'my_rank': rank, 'RANKS': RANKS, 'mod_waiting': waiting}
 
 @app.route("/moderation")
@@ -3314,7 +3339,7 @@ def moderation():
     with connect() as c:
         r = my_rank(c)
         # each tab says how many wait; the first one with something opens
-        waiting = {'reports': len(reports_waiting(c)), 'photos': len(pictures_waiting(c)),
+        waiting = {'reports': len(reports_waiting(c)) + len(players_reported(c)), 'photos': len(pictures_waiting(c)),
                    'messages': contact_waiting(c) if r >= MAY['contact'] else 0}
         first = next((k for k in waiting if waiting[k]), 'reports')
     if not r:
@@ -3488,7 +3513,10 @@ def mod_log_list():
 # insults and slurs with stars, as Minecraft servers do; what was typed stays
 # for the staff, who may hide a message for everyone (kept, and in the log).
 
-REPORTS_MAX = 10          # reports a player may send in 10 minutes
+REPORTS_MAX = 10          # reports a player may send in 10 minutes (messages and players)
+# why a player reports a message or someone: one of these, a few words, or both
+REPORT_WHY = {'rude': 'Rude or hateful', 'name': 'Bad name or picture', 'cheat': 'Cheating', 'spam': 'Spam', 'other': 'Something else'}
+REPORT_NOTE = 200
 LEET = {'a': 'a4@', 'b': 'b8', 'e': 'e3', 'g': 'g9', 'i': 'i1!|', 'l': 'l1|', 'o': 'o0', 's': 's5$', 't': 't7', 'u': 'uv'}
 
 with connect() as c:
@@ -3501,7 +3529,24 @@ with connect() as c:
         CREATE TABLE IF NOT EXISTS chat_reports (message INTEGER, by INTEGER, at REAL, done INTEGER DEFAULT 0,
             PRIMARY KEY (message, by));
         CREATE TABLE IF NOT EXISTS ignores (user_id INTEGER, target INTEGER, at REAL, PRIMARY KEY (user_id, target));
+        CREATE TABLE IF NOT EXISTS player_reports (id INTEGER PRIMARY KEY AUTOINCREMENT, target INTEGER, by INTEGER, at REAL,
+            why TEXT, note TEXT, done INTEGER DEFAULT 0);
     ''')
+    if 'why' not in [col[1] for col in c.execute("PRAGMA table_info(chat_reports)")]:
+        c.execute("ALTER TABLE chat_reports ADD COLUMN why TEXT")
+        c.execute("ALTER TABLE chat_reports ADD COLUMN note TEXT")
+
+def report_reason(form):
+    # (why, note), or None when neither was given
+    why = form.get('why') if form.get('why') in REPORT_WHY else None
+    note = ' '.join(form.get('note', '').split())[:REPORT_NOTE] or None
+    return (why, note) if why or note else None
+
+def reports_sent(c, uid):
+    # reports this player sent in the last 10 minutes, messages and players
+    since = time.time() - 600
+    return (c.execute("SELECT COUNT(*) FROM chat_reports WHERE by = ? AND at > ?", (uid, since)).fetchone()[0] +
+            c.execute("SELECT COUNT(*) FROM player_reports WHERE by = ? AND at > ?", (uid, since)).fetchone()[0])
 
 def word_filter():
     # bad_words.txt, one regex: each letter repeated, in digits or signs, split
@@ -3566,6 +3611,18 @@ def reports_waiting(c):
         FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE cr.done = 0 AND m.hidden_by IS NULL
         GROUP BY m.id ORDER BY first''') if rank_of(c, x['uid']) < r]
 
+def players_reported(c):
+    # the players reported as a whole this staff member may act on, oldest first
+    r = my_rank(c)
+    if r < MAY['reports']:
+        return []
+    return [dict(x) for x in c.execute('''SELECT target AS uid, MIN(at) AS first FROM player_reports WHERE done = 0
+        GROUP BY target ORDER BY first''') if rank_of(c, x['uid']) < r]
+
+def reported_by(rows):
+    # who reported, and why: [{name, why, note}]
+    return [{"name": b['username'], "why": REPORT_WHY.get(b['why']), "note": b['note']} for b in rows]
+
 @app.route("/api/mod/reports")
 def mod_reports():
     with connect() as c:
@@ -3580,13 +3637,20 @@ def mod_reports():
                 (x['code'], x['id'])).fetchall()
             users = {u['id']: u for u in c.execute(f"SELECT id, username, COALESCE(guest, 0) AS guest FROM users WHERE id IN ({','.join('?' * len(around))})",
                                                    [m['user_id'] for m in around])}
-            by = [b[0] for b in c.execute("SELECT u.username FROM chat_reports cr JOIN users u ON u.id = cr.by WHERE cr.message = ? AND cr.done = 0 ORDER BY cr.at", (x['id'],))]
+            by = reported_by(c.execute('''SELECT u.username, cr.why, cr.note FROM chat_reports cr JOIN users u ON u.id = cr.by
+                WHERE cr.message = ? AND cr.done = 0 ORDER BY cr.at''', (x['id'],)))
             author = users.get(x['uid'])
             out.append({"id": x['id'], "room": x['code'], "at": x['at'], "by": by,
                         "author": {"id": x['uid'], "name": author['username'] if author else '?', "guest": bool(author and author['guest'])},
                         "around": [{"id": m['id'], "name": users[m['user_id']]['username'] if m['user_id'] in users else '?',
                                     "text": m['text'], "hidden": m['hidden_by'] is not None} for m in around]})
-    return jsonify({"success": True, "reports": out})
+        people = []
+        for x in players_reported(c):
+            u = c.execute("SELECT username, COALESCE(guest, 0) AS guest FROM users WHERE id = ?", (x['uid'],)).fetchone()
+            by = reported_by(c.execute('''SELECT u.username, pr.why, pr.note FROM player_reports pr JOIN users u ON u.id = pr.by
+                WHERE pr.target = ? AND pr.done = 0 ORDER BY pr.at''', (x['uid'],)))
+            people.append({"id": x['uid'], "name": u['username'] if u else '?', "guest": bool(u and u['guest']), "at": x['first'], "by": by})
+    return jsonify({"success": True, "reports": out, "players": people})
 
 @app.route("/api/mod/hide", methods=['POST'])
 def mod_hide():
@@ -3607,6 +3671,14 @@ def mod_report():
     # nothing wrong with it: the report is closed, the message stays
     mid, reason = request.form.get('id', type = int), request.form.get('reason', '').strip()[:200]
     with room_tx() as c:
+        if request.form.get('player'):
+            # the reports about a player as a whole
+            uid = request.form.get('player', type = int)
+            if not may(c, 'reports', uid) or request.form.get('do') != 'dismiss':
+                return jsonify({"success": False}), 403
+            if c.execute("UPDATE player_reports SET done = 1 WHERE target = ? AND done = 0", (uid,)).rowcount:
+                logged(c, 'report', uid, 'player report dismissed', reason)
+            return jsonify({"success": True})
         m = c.execute("SELECT * FROM room_chat WHERE id = ?", (mid,)).fetchone()
         if not m or not may(c, 'reports', m['user_id']) or request.form.get('do') != 'dismiss':
             return jsonify({"success": False}), 403
@@ -3668,7 +3740,7 @@ KINDS = {   # the filters of the Players tab
     'staff': '(u.id = %d OR u.id IN (SELECT user_id FROM staff))' % OWNER,
     'muted': 'u.muted_until > :now',
     'banned': 'u.banned_until > :now',
-    'reported': 'u.id IN (SELECT m.user_id FROM chat_reports cr JOIN room_chat m ON m.id = cr.message)',
+    'reported': 'u.id IN (SELECT m.user_id FROM chat_reports cr JOIN room_chat m ON m.id = cr.message UNION SELECT target FROM player_reports)',
 }
 
 @app.route("/api/mod/players")
@@ -3683,7 +3755,8 @@ def mod_players():
         now = time.time()
         rows = c.execute(f'''SELECT u.id, u.username AS name, COALESCE(u.guest, 0) AS guest, u.avatar, u.mc_uuid,
                 u.muted_until > :now AS muted, u.banned_until > :now AS banned,
-                (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) AS reported
+                (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) +
+                (SELECT COUNT(*) FROM player_reports WHERE target = u.id) AS reported
             FROM users u WHERE {KINDS[kind]} AND u.username LIKE :q ESCAPE '\\'
             ORDER BY u.username = :exact COLLATE NOCASE DESC, u.id DESC LIMIT :n OFFSET :start''',
             {'now': now, 'q': '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%', 'exact': q, 'n': PLAYERS_PAGE + 1, 'start': start}).fetchall()
@@ -3707,7 +3780,8 @@ def mod_player():
             WHERE m.target = ? ORDER BY m.id DESC LIMIT 30''', (uid,))]
         said = [dict(x) for x in c.execute('''SELECT code AS room, at, COALESCE(raw, text) AS text, hidden_by IS NOT NULL AS hidden
             FROM room_chat WHERE user_id = ? ORDER BY id DESC LIMIT 10''', (uid,))]
-        reported = c.execute("SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = ?", (uid,)).fetchone()[0]
+        reported = (c.execute("SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = ?", (uid,)).fetchone()[0] +
+                    c.execute("SELECT COUNT(*) FROM player_reports WHERE target = ?", (uid,)).fetchone()[0])
         out = {"success": True, "id": uid, "name": u['username'], "guest": bool(u['guest']), "tag": tag_of(c, [uid]).get(uid),
                "picture": None if u['guest'] else avatar_url(u), "reported": reported, "log": log, "said": said,
                "muted": how_long(u['muted_until'] - now) if (u['muted_until'] or 0) > now else None,
@@ -3758,6 +3832,8 @@ def mod_sanction():
                 return jsonify({"success": False, "error": problem})
             c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
             logged(c, 'rename', uid, 'renamed from ' + u['username'], reason)
+        if what in ('mute', 'ban', 'rename'):
+            c.execute("UPDATE player_reports SET done = 1 WHERE target = ? AND done = 0", (uid,))   # dealt with
     return jsonify({"success": True})
 
 # ---------- Contact ----------
