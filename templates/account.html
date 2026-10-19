@@ -10,8 +10,15 @@
     <h1 class="sign">Edit Profile</h1>
     <a class="back" href="profile"><i class="material-icons">arrow_back</i>Back</a>
     {% if saved == 'recovered' %}<p class="note">New password saved. Your recovery code is used up: make a new one below.</p>{% endif %}
+    <nav class="sign side-board" aria-label="Sections">
+        <a href="#picture">Picture</a>
+        <a href="#name">Name</a>
+        {% if tags|length > 1 %}<a href="#tag">Tag</a>{% endif %}
+        <a href="#password">Password</a>
+        {% if me.password %}<a href="#code">Recovery Code</a>{% endif %}
+    </nav>
     <div class="account">
-        <section class="panel">
+        <section class="panel" id="picture">
             <h2>Picture</h2>
             <div class="account-picture">
                 <img class="avatar{{ ' head' if not me.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
@@ -37,7 +44,7 @@
             {% if not (saved == 'picture' and me.avatar_pending) %}{{ note('picture') }}{% endif %}{{ note('head') }}
         </section>
 
-        <section class="panel">
+        <section class="panel" id="name">
             <h2>Name</h2>
             <form class="stack" action="account?do=name" method="post">
                 <input class="field" name="username" value="{{ me.username }}" aria-label="Name" maxlength="20" autocomplete="off">
@@ -50,7 +57,7 @@
         </section>
 
         {% if tags|length > 1 %}
-        <section class="panel">
+        <section class="panel" id="tag">
             <h2>Tag</h2>
             <p class="tag-preview">{{ me.username }}<span class="name-tag {{ shown.color }}" id="tag-shown">{{ shown.label }}</span></p>
             <form class="tag-pick" id="tag-pick">
@@ -74,7 +81,7 @@
         </script>
         {% endif %}
 
-        <section class="panel">
+        <section class="panel" id="password">
             <h2>{{ 'Password' if me.password else 'Set a Password' }}</h2>
             <form class="stack" action="account?do=password" method="post">
                 {% if need_current %}
@@ -89,7 +96,7 @@
         </section>
 
         {% if me.password %}
-        <section class="panel">
+        <section class="panel" id="code">
             <h2>Recovery Code</h2>
             {% if code %}
             <p class="recovery-code">{{ code }}</p>

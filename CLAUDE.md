@@ -839,6 +839,12 @@ max), journal d'audit avec la raison. D'où :
   étiquette » au-dessus ; le choix part en `fetch` (204) : un rechargement
   ramenait la page tout en haut (retour de Yasuro). Tests ajoutés à
   `t_tags.py` (8).
+- **Panneau de navigation d'Edit Profile** (2026-10-19, demande de Yasuro,
+  modèle : le tableau de bord de wynncraft.com, mais en panneau suspendu
+  comme les titres) : `.side-board` reprend `.sign`, fixé à gauche de la
+  page, une ligne par section (ancres `#picture`…). Affiché seulement à
+  partir de **1 560 px** de large, là où il tient à côté de la page ; en
+  dessous, rien (question posée à Yasuro).
 - **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
   Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
   dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne

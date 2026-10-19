@@ -1911,6 +1911,43 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     max-width: 520px;
     margin: 0 auto;
 }
+/* Edit Profile: a tall board hanging on the left, one line per section
+   (Yasuro: like wynncraft.com's dashboard, as a sign); only where it fits
+   beside the page */
+.side-board {
+    position: fixed;
+    top: calc(var(--nav-h) + 48px);
+    left: max(16px, calc(50% - 480px - 275px));
+    z-index: 1;
+    display: none;
+    flex-direction: column;
+    width: 235px;
+    margin: 0;
+    padding: 26px 26px 30px;
+    font-size: 24px;
+    text-align: left;
+}
+.side-board a {
+    padding: 14px 0;
+    white-space: nowrap;
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 2px dashed rgba(63, 39, 36, .25);
+}
+.side-board a:last-child {
+    border-bottom: 0;
+}
+.side-board a:hover {
+    text-decoration: underline;
+}
+@media (min-width: 1560px) {
+    .side-board {
+        display: flex;
+    }
+}
+.account .panel {
+    scroll-margin-top: calc(var(--nav-h) + 20px);
+}
 .account-picture {
     display: flex;
     align-items: center;
