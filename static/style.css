@@ -4372,9 +4372,9 @@ body.room-playing {
         display: none;
     }
 }
+/* the screenshot under its button, the cross on its corner */
 .contact-preview {
     position: relative;
-    flex: none;
     width: fit-content;
     max-width: 100%;
     margin: 0;
