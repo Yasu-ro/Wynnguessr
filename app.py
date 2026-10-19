@@ -373,7 +373,7 @@ def place():
     return request.headers.get('X-Forwarded-For', '').split(',')[-1].strip() or request.headers.get('CF-Connecting-IP') or request.remote_addr
 
 # what one address may make in WINDOW: no flood of guests, accounts, rooms, pictures
-ACTIONS = {'guest': 10, 'account': 5, 'room': 20, 'picture': 10}
+ACTIONS = {'guest': 10, 'account': 5, 'room': 20, 'picture': 10, 'contact': 6}
 
 with connect() as c:
     c.execute("CREATE TABLE IF NOT EXISTS actions (place TEXT, what TEXT, at REAL)")
@@ -430,7 +430,7 @@ def still_logged_in():
         elif session.get('loggedin') and not (me and not me['guest'] and session.setdefault('stamp', stamp(me[0])) == stamp(me[0])):
             session.clear()
     if session.get('banned') and request.method == 'GET' and a_page():
-        return render_template('apology.html', message = session.pop('banned')), 403
+        return render_template('apology.html', message = session.pop('banned'), appeal = True), 403
 
 def a_page():
     # a page the player opens, not a script's call nor a picture. Browsers say
@@ -496,7 +496,7 @@ def login():
             user = c.execute("SELECT * FROM users WHERE username = ? AND COALESCE(guest, 0) = 0", (username,)).fetchone()
             if user and user[2] and bcrypt.check_password_hash(user[2], password):
                 note = log_in(c, user[0])
-                return render_template('apology.html', message = note) if note else redirect(next_page())
+                return render_template('apology.html', message = note, appeal = True) if note else redirect(next_page())
         failed(username)
         return render_template('apology.html', message = "Invalid username or password")
     else:
@@ -537,7 +537,7 @@ def recover():
         if user and user['recovery'] and bcrypt.check_password_hash(user['recovery'], plain_code(request.form.get('code', ''))):
             c.execute("UPDATE users SET password = ?, recovery = NULL WHERE id = ?", (hashed(request.form['password']), user['id']))
             note = log_in(c, user['id'])
-            return render_template('apology.html', message = note) if note else redirect('account?saved=recovered')
+            return render_template('apology.html', message = note, appeal = True) if note else redirect('account?saved=recovered')
     failed(username)
     return render_template('apology.html', message = "Wrong username or recovery code")
 
@@ -912,9 +912,9 @@ def wynn_api(url, data = None, token = None):
     with urllib.request.urlopen(req, timeout = 10) as r:
         return json.load(r)
 
-def wynn_fail(message):
+def wynn_fail(message, appeal = False):
     # these routes sit two folders deep: show the error on the normal page
-    return redirect('../../apology?' + urlencode({'message': message}))
+    return redirect('../../apology?' + urlencode(dict({'message': message}, **({'appeal': 1} if appeal else {}))))
 
 @app.route("/auth/wynncraft")
 def wynn_start():
@@ -968,13 +968,13 @@ def wynn_back():
             done(c, 'account')
         note = log_in(c, uid, wynn = True)
     if note:
-        return wynn_fail(note)
+        return wynn_fail(note, appeal = True)
     return redirect('../../' + session.pop('wynn_next', './'))
 
 @app.route("/apology")
 def apology():
     message = request.args.get('message', 'Something went wrong')
-    return render_template('apology.html', message = message)
+    return render_template('apology.html', message = message, appeal = bool(request.args.get('appeal')))
 
 # ---------- Multiplayer rooms ----------
 # A room is a fixed list of locations, played live by everyone who joins before
@@ -3184,6 +3184,7 @@ RANKS = {4: 'Owner', 3: 'Admin', 2: 'Moderator', 1: 'Helper'}
 MAY = {                   # the lowest rank with each power
     'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
     'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
+    'contact': 2,         # the messages of the contact page (an email address is personal)
     'staff': 3,           # give and take ranks (below one's own)
     'tags': 2,            # give and take tags
     'make_tags': 3,       # make a tag, or put one away
@@ -3289,17 +3290,20 @@ def staff_menu():
             return my_rank(c)
     def waiting():
         with connect() as c:
-            return len(pictures_waiting(c)) + len(reports_waiting(c))
+            return len(pictures_waiting(c)) + len(reports_waiting(c)) + (contact_waiting(c) if my_rank(c) >= MAY['contact'] else 0)
     return {'my_rank': rank, 'RANKS': RANKS, 'mod_waiting': waiting}
 
 @app.route("/moderation")
 def moderation():
     with connect() as c:
         r = my_rank(c)
-        first = 'photos' if r and not reports_waiting(c) and pictures_waiting(c) else 'reports'
+        # each tab says how many wait; the first one with something opens
+        waiting = {'reports': len(reports_waiting(c)), 'photos': len(pictures_waiting(c)),
+                   'messages': contact_waiting(c) if r >= MAY['contact'] else 0}
+        first = next((k for k in waiting if waiting[k]), 'reports')
     if not r:
         return render_template('apology.html', message = "This page is for the moderation team"), 403
-    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()}, first = first)
+    return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()}, first = first, waiting = waiting)
 
 @app.route("/api/mod/staff")
 def mod_staff():
@@ -3738,6 +3742,311 @@ def mod_sanction():
                 return jsonify({"success": False, "error": problem})
             c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
             logged(c, 'rename', uid, 'renamed from ' + u['username'], reason)
+    return jsonify({"success": True})
+
+# ---------- Contact ----------
+# One page for every way to reach the team (Yasuro, 2026-10-19), linked from
+# the footer: the Discord, the email, and a form whose messages land in
+# Moderation, where they are sorted and answered. The topic shapes the form
+# (a player report names the player, a bug says where it happened, a ban
+# says which account) and the sender says where to answer: here (their
+# messages on the page, and a notice on every page until they read the
+# answer), by email or on Discord (the staff writes from there), or not at
+# all. Moderators and up read them: an email address is personal. A
+# screenshot is made again here, like a profile picture, and only the team
+# and its sender see it.
+
+CONTACT_EMAIL = 'wynndle.contact@gmail.com'
+TOPICS = {   # key: (label, icon)
+    'bug': ('A bug', 'bug_report'),
+    'location': ('A location', 'place'),
+    'player': ('A player', 'flag'),
+    'account': ('My account', 'manage_accounts'),
+    'sanction': ('A ban or mute', 'gavel'),
+    'idea': ('An idea', 'lightbulb'),
+    'partner': ('Partnership', 'handshake'),
+    'other': ('Something else', 'chat'),
+}
+REPLY_BY = ('here', 'email', 'discord', 'none')
+CONTACT_TEXT = 2000       # characters in a message or an answer
+CONTACT_PAGE = 50
+CONTACT_FILES = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'contact_files')   # screenshots, not in git
+CONTACT_STATES = {'new': "m.state = 'new'", 'open': "m.state = 'open'", 'done': "m.state = 'done'", 'all': '1'}
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS contact (id INTEGER PRIMARY KEY AUTOINCREMENT, at REAL, topic TEXT,
+            user_id INTEGER, about TEXT, text TEXT, reply TEXT, email TEXT, discord TEXT, context TEXT, file TEXT,
+            state TEXT DEFAULT 'new', last REAL, seen REAL);
+        CREATE INDEX IF NOT EXISTS contact_state ON contact (state, last);
+        CREATE INDEX IF NOT EXISTS contact_user ON contact (user_id);
+        CREATE TABLE IF NOT EXISTS contact_replies (id INTEGER PRIMARY KEY AUTOINCREMENT, message INTEGER,
+            user_id INTEGER, team INTEGER, text TEXT, at REAL);
+        CREATE INDEX IF NOT EXISTS contact_replies_message ON contact_replies (message);
+    ''')
+# state: 'new' (nobody in the team opened it, or the sender wrote again),
+# 'open' (read, or answered), 'done'; last: the last word, either side;
+# seen: when the sender last read the answers
+
+def contact_waiting(c):
+    return c.execute("SELECT COUNT(*) FROM contact WHERE state = 'new'").fetchone()[0]
+
+def contact_text(text):
+    # what was typed, its lines kept, never more than one empty line in a row
+    lines = (text or '').replace('\r', '').split('\n')
+    return re.sub(r'\n{3,}', '\n\n', '\n'.join(l.rstrip() for l in lines).strip())[:CONTACT_TEXT]
+
+def contact_shot(upload):
+    # a screenshot: made again here as a webp (the file sent is never
+    # served), 2000 px at most; None if it is no picture
+    from PIL import Image, ImageOps
+    try:
+        img = Image.open(upload.stream)
+        if img.format not in ('PNG', 'JPEG', 'WEBP', 'GIF') or img.width * img.height > 40_000_000:
+            raise ValueError(img.format)
+        img = ImageOps.exif_transpose(img).convert('RGB')
+    except Exception:
+        return None
+    img.thumbnail((2000, 2000))
+    name = secrets.token_hex(10) + '.webp'
+    os.makedirs(CONTACT_FILES, exist_ok = True)
+    img.save(os.path.join(CONTACT_FILES, name), 'WEBP', quality = 82)
+    return name
+
+def contact_replies(c, ids):
+    # the answers under each message, oldest first: {message id: [rows]}
+    out = {i: [] for i in ids}
+    if ids:
+        for r in c.execute(f'''SELECT r.*, u.username FROM contact_replies r LEFT JOIN users u ON u.id = r.user_id
+                WHERE r.message IN ({','.join('?' * len(ids))}) ORDER BY r.id''', list(ids)):
+            out[r['message']].append(r)
+    return out
+
+def contact_status(m, replies):
+    # what the sender reads: sent, read, answered, closed
+    if m['state'] == 'done':
+        return 'closed'
+    if replies and replies[-1]['team']:
+        return 'answered'
+    return 'read' if m['state'] == 'open' else 'sent'
+
+def contact_mine(m, replies):
+    # a message as its sender sees it: the team answers as the team
+    return {"id": m['id'], "at": m['at'], "topic": m['topic'], "label": TOPICS[m['topic']][0], "icon": TOPICS[m['topic']][1],
+            "about": m['about'], "text": m['text'], "reply": m['reply'], "status": contact_status(m, replies),
+            "file": 'contact/file/%d' % m['id'] if m['file'] else None,
+            "new": any(r['team'] and r['at'] > (m['seen'] or 0) for r in replies),
+            "replies": [{"text": r['text'], "at": r['at'], "team": bool(r['team'])} for r in replies]}
+
+@app.context_processor
+def contact_notice():
+    # the team answered and the sender has not read it yet: a notice on
+    # every page (it slides in once, then stays put until read), but not in
+    # a room: a game is not interrupted, and the room has toasts of its own
+    def answered():
+        uid = session.get('user_id')
+        if not uid or request.endpoint in ('contact', 'room'):
+            return None
+        with connect() as c:
+            last = c.execute('''SELECT MAX(r.id) FROM contact m JOIN contact_replies r ON r.message = m.id
+                WHERE m.user_id = ? AND r.team = 1 AND r.at > COALESCE(m.seen, 0)''', (uid,)).fetchone()[0]
+        if not last:
+            return None
+        new = session.get('told') != last
+        if new:
+            session['told'] = last
+        return {'new': new}
+    return {'contact_answer': answered}
+
+@app.route("/contact")
+def contact():
+    # ?topic= picks the topic; ?name= (a player), ?x=&z= (a location) fill it in
+    a, uid = request.args, session.get('user_id')
+    with connect() as c:
+        me = uid and c.execute("SELECT username, COALESCE(guest, 0) AS guest, muted_until FROM users WHERE id = ?", (uid,)).fetchone()
+    muted = me and (me['muted_until'] or 0) > time.time() and how_long(me['muted_until'] - time.time())
+    about = ' '.join(a.get('name', '').split())[:100]
+    if re.fullmatch(r'-?\d{1,6}', a.get('x', '')) and re.fullmatch(r'-?\d{1,6}', a.get('z', '')):
+        about = a['x'] + ', ' + a['z']
+    return render_template('contact.html', topics = TOPICS, topic = a.get('topic') if a.get('topic') in TOPICS else None,
+                           about = about, me = me, muted = muted, email = CONTACT_EMAIL, discord = DISCORD,
+                           server = discord_counts(), shown = time.time())
+
+@app.route("/api/contact", methods=['POST'])
+def contact_send():
+    f, uid, now = request.form, session.get('user_id'), time.time()
+    def refuse(error, field = None):
+        return jsonify({"success": False, "error": error, "field": field})
+    # robots: a field nobody sees filled in, or a form sent within 3 s of
+    # its page. They are told it worked, and nothing is kept
+    try:
+        quick = now - float(f.get('t', 0)) < 3
+    except ValueError:
+        quick = False
+    if f.get('website') or quick:
+        return jsonify({"success": True})
+    topic, reply = f.get('topic'), f.get('reply')
+    text, about = contact_text(f.get('text')), ' '.join(f.get('about', '').split())[:100]
+    email, discord = f.get('email', '').strip()[:120], f.get('discord', '').strip()[:40]
+    if topic not in TOPICS:
+        return refuse("Pick what it is about", 'topic')
+    if topic == 'player' and not about:
+        return refuse("Who is it?", 'about')
+    if topic in ('account', 'sanction') and not uid and not about:
+        return refuse("Which account?", 'about')
+    if len(text) < 10:
+        return refuse("Tell us a little more", 'text')
+    if reply not in REPLY_BY or reply == 'here' and not uid:
+        return refuse("Where should we answer?", 'reply')
+    if topic == 'partner' and reply != 'email':
+        return refuse("Leave us an email to answer", 'email')
+    if reply == 'email' and not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+        return refuse("This email does not look right", 'email')
+    if reply == 'discord' and not re.fullmatch(r'[\w.#]{2,40}', discord):
+        return refuse("This Discord name does not look right", 'discord')
+    if (request.content_length or 0) > PICTURE_MAX + 100_000:
+        return refuse("This picture is too big: 8 MB at most", 'file')
+    if too_often('contact'):
+        return refuse("Too many messages from here: wait a few minutes")
+    upload, shot = request.files.get('file'), None
+    if upload and upload.filename:
+        shot = contact_shot(upload)
+        if not shot:
+            return refuse("This file is not a picture", 'file')
+    # a bug or a location: where it happened, on what (as the sender saw it written)
+    context = json.dumps({'page': f.get('page', '')[:200], 'screen': f.get('screen', '')[:20],
+                          'browser': f.get('browser', '')[:60], 'version': VERSION}) if topic in ('bug', 'location') else None
+    with connect() as c:
+        mid = c.execute('''INSERT INTO contact (at, topic, user_id, about, text, reply, email, discord, context, file, state, last, seen)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?)''',
+            (now, topic, uid, about or None, text, reply, email if reply == 'email' else None,
+             discord if reply == 'discord' else None, context, shot, now, now)).lastrowid
+        done(c, 'contact')
+    return jsonify({"success": True, "id": mid})
+
+@app.route("/api/contact/mine")
+def contact_list_mine():
+    # the sender's messages and the team's answers; reading them ends the notice
+    uid = session.get('user_id')
+    if not uid:
+        return jsonify({"success": True, "messages": []})
+    with connect() as c:
+        rows = c.execute("SELECT * FROM contact WHERE user_id = ? ORDER BY id DESC LIMIT 30", (uid,)).fetchall()
+        replies = contact_replies(c, [m['id'] for m in rows])
+        out = [contact_mine(m, replies[m['id']]) for m in rows]
+        c.execute("UPDATE contact SET seen = ? WHERE user_id = ?", (time.time(), uid))
+    return jsonify({"success": True, "messages": out})
+
+@app.route("/api/contact/<int:mid>/reply", methods=['POST'])
+def contact_write_again(mid):
+    # the sender writes again under a message: back among the new ones
+    uid, text = session.get('user_id'), contact_text(request.form.get('text'))
+    if not text:
+        return jsonify({"success": False, "error": "Write something first"})
+    if too_often('contact'):
+        return jsonify({"success": False, "error": "Too many messages from here: wait a few minutes"})
+    with connect() as c:
+        m = c.execute("SELECT user_id FROM contact WHERE id = ?", (mid,)).fetchone()
+        if not uid or not m or m['user_id'] != uid:
+            return jsonify({"success": False}), 403
+        now = time.time()
+        c.execute("INSERT INTO contact_replies (message, user_id, team, text, at) VALUES (?, ?, 0, ?, ?)", (mid, uid, text, now))
+        c.execute("UPDATE contact SET state = 'new', last = ?, seen = ? WHERE id = ?", (now, now, mid))
+        done(c, 'contact')
+    return jsonify({"success": True})
+
+@app.route("/api/contact/player")
+def contact_player():
+    # the player a report is about, while the name is typed: their head, or nobody
+    name = ' '.join(request.args.get('name', '').split())[:40]
+    with connect() as c:
+        u = c.execute("SELECT id, username, avatar, mc_uuid FROM users WHERE username = ? COLLATE NOCASE ORDER BY COALESCE(guest, 0), id LIMIT 1",
+                      (name,)).fetchone()
+    return jsonify({"found": bool(u), "name": u['username'] if u else None, "picture": avatar_url(u) if u else None})
+
+@app.route("/contact/file/<int:mid>")
+def contact_file(mid):
+    # a screenshot: for the team, and for whoever sent it
+    with connect() as c:
+        m = c.execute("SELECT user_id, file FROM contact WHERE id = ?", (mid,)).fetchone()
+        if not m or not m['file'] or not (may(c, 'contact') or m['user_id'] and m['user_id'] == session.get('user_id')):
+            return '', 404
+    response = send_from_directory(CONTACT_FILES, m['file'], max_age = 0)
+    response.cache_control.public, response.cache_control.private = False, True
+    return response
+
+@app.route("/api/mod/contact")
+def mod_contact():
+    # the messages, 50 at a time: by state (new first), by topic, by anything
+    # in them or in the sender's name; by the last word, newest or oldest first
+    a = request.args
+    state, topic, q = a.get('state', 'new'), a.get('topic', ''), ' '.join(a.get('q', '').split())
+    with connect() as c:
+        if not may(c, 'contact') or state not in CONTACT_STATES or topic and topic not in TOPICS:
+            return jsonify({"success": False}), 403
+        where, args = [CONTACT_STATES[state]], {'n': CONTACT_PAGE + 1, 'start': a.get('start', 0, type = int)}
+        if topic:
+            where.append('m.topic = :topic')
+            args['topic'] = topic
+        if q:
+            args['q'] = '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%'
+            where.append('''(m.text LIKE :q ESCAPE '\\' OR m.about LIKE :q ESCAPE '\\' OR m.email LIKE :q ESCAPE '\\'
+                OR m.discord LIKE :q ESCAPE '\\' OR u.username LIKE :q ESCAPE '\\'
+                OR m.id IN (SELECT message FROM contact_replies WHERE text LIKE :q ESCAPE '\\'))''')
+        rows = c.execute(f'''SELECT m.*, u.username, COALESCE(u.guest, 0) AS guest, u.avatar, u.mc_uuid
+            FROM contact m LEFT JOIN users u ON u.id = m.user_id WHERE {' AND '.join(where)}
+            ORDER BY m.last {'ASC' if a.get('sort') == 'old' else 'DESC'} LIMIT :n OFFSET :start''', args).fetchall()
+        shown = rows[:CONTACT_PAGE]
+        replies = contact_replies(c, [m['id'] for m in shown])
+        tags = tag_of(c, [m['user_id'] for m in shown if m['user_id']])
+        out = []
+        for m in shown:
+            # the account a report or a ban is about, if the name is one: its card is a click away
+            named = m['about'] and m['topic'] in ('player', 'account', 'sanction') and c.execute(
+                "SELECT id FROM users WHERE username = ? COLLATE NOCASE ORDER BY COALESCE(guest, 0), id LIMIT 1", (m['about'],)).fetchone()
+            out.append({"id": m['id'], "at": m['at'], "last": m['last'], "topic": m['topic'], "state": m['state'],
+                        "text": m['text'], "about": m['about'], "about_id": named[0] if named else None,
+                        "reply": m['reply'], "email": m['email'], "discord": m['discord'],
+                        "context": json.loads(m['context']) if m['context'] else None,
+                        "file": 'contact/file/%d' % m['id'] if m['file'] else None,
+                        "from": {"id": m['user_id'], "name": m['username'], "guest": bool(m['guest']), "tag": tags.get(m['user_id']),
+                                 "picture": avatar_url({'id': m['user_id'], 'avatar': m['avatar'], 'mc_uuid': m['mc_uuid']})}
+                                if m['user_id'] and m['username'] else None,
+                        "replies": [{"text": r['text'], "at": r['at'], "team": bool(r['team']), "by": r['username']} for r in replies[m['id']]]})
+        counts = dict(c.execute("SELECT state, COUNT(*) FROM contact GROUP BY state").fetchall())
+        topics = dict(c.execute(f"SELECT m.topic, COUNT(*) FROM contact m WHERE {CONTACT_STATES[state]} GROUP BY m.topic").fetchall())
+    return jsonify({"success": True, "messages": out, "more": len(rows) > CONTACT_PAGE, "counts": counts, "topics": topics,
+                    "labels": {k: v[0] for k, v in TOPICS.items()}, "icons": {k: v[1] for k, v in TOPICS.items()}})
+
+@app.route("/api/mod/contact", methods=['POST'])
+def mod_contact_do():
+    # open (the sender reads "Read"), answer (and close), close, open again, delete
+    f, now = request.form, time.time()
+    mid, what = f.get('id', type = int), f.get('do')
+    with connect() as c:
+        m = c.execute("SELECT * FROM contact WHERE id = ?", (mid,)).fetchone()
+        if not m or not may(c, 'contact') or what not in ('open', 'answer', 'done', 'reopen', 'delete'):
+            return jsonify({"success": False}), 403
+        if what == 'open':
+            c.execute("UPDATE contact SET state = 'open' WHERE id = ? AND state = 'new'", (mid,))
+        elif what == 'answer':
+            text = contact_text(f.get('text'))
+            if not text:
+                return jsonify({"success": False, "error": "Write something first"})
+            c.execute("INSERT INTO contact_replies (message, user_id, team, text, at) VALUES (?, ?, 1, ?, ?)", (mid, session['user_id'], text, now))
+            c.execute("UPDATE contact SET state = ?, last = ? WHERE id = ?", ('done' if f.get('close') else 'open', now, mid))
+        elif what in ('done', 'reopen'):
+            c.execute("UPDATE contact SET state = ? WHERE id = ?", ('done' if what == 'done' else 'open', mid))
+        else:
+            c.execute("DELETE FROM contact_replies WHERE message = ?", (mid,))
+            c.execute("DELETE FROM contact WHERE id = ?", (mid,))
+            if m['file']:
+                try:
+                    os.remove(os.path.join(CONTACT_FILES, m['file']))
+                except OSError:
+                    pass
+            text = m['text'] if len(m['text']) <= 80 else m['text'][:79] + '…'
+            logged(c, 'contact', m['user_id'], 'message deleted (%s): "%s"' % (TOPICS[m['topic']][0], text))
     return jsonify({"success": True})
 
 fcntl.flock(STARTING, fcntl.LOCK_UN)   # this process is ready: the next may start (see the top)

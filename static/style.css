@@ -4189,6 +4189,502 @@ body.room-playing {
     }
 }
 
+/* ---------- Contact ---------- */
+
+/* the two ways that skip the form, side by side; their buttons on one line */
+.contact-ways {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 24px;
+    max-width: 780px;
+    margin: 0 auto 30px;
+}
+.contact-way {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+}
+.contact-way > h2 {
+    align-self: stretch;
+    margin-bottom: 4px;
+}
+.panel .contact-way .btn.wide, .contact-way .btn.wide {
+    margin-top: auto;
+}
+.contact-way .btn .material-icons {
+    font-size: 20px;
+}
+.contact-live {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 22px;
+}
+.contact-live .about-dot {
+    margin-right: 7px;
+    vertical-align: -1px;
+}
+.contact-why {
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+.contact-address {
+    font: 700 19px/1.3 var(--sans);
+    color: var(--ink);
+    overflow-wrap: anywhere;
+}
+.contact-address:hover {
+    color: var(--green-dark);
+}
+
+/* the form: the topic first, then what it asks for */
+.contact-form {
+    max-width: 780px;
+    margin: 0 auto;
+}
+.contact-form fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+.contact-form legend {
+    margin-bottom: 10px;
+    padding: 0;
+    font: 400 21px/1.2 var(--hand);
+}
+.contact-topics .chips {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+    gap: 10px;
+}
+/* each topic with its sign in a square of ink, like the account's pill */
+.contact-topic {
+    gap: 9px;
+    min-height: 44px;
+    padding: 0 10px 0 0;
+    font-size: 16px;
+    overflow: hidden;
+}
+.contact-topic .material-icons {
+    display: grid;
+    place-items: center;
+    flex: none;
+    align-self: stretch;
+    width: 36px;
+    font-size: 20px;
+    color: var(--paper-light);
+    background: var(--ink);
+}
+:checked + .contact-topic .material-icons {
+    color: var(--green-light);
+}
+.contact-rest {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 18px;
+}
+.contact-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 15px;
+    background: var(--paper-light);
+    border-radius: 4px;
+}
+.contact-tip .material-icons {
+    font-size: 19px;
+    color: var(--ink-soft);
+}
+.contact-tip a, .contact-small a {
+    font-weight: 700;
+    color: var(--ink);
+}
+.contact-tip a:hover, .contact-small a:hover {
+    color: var(--green-dark);
+}
+.contact-about {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+.contact-about .field {
+    flex: 1 1 220px;
+    width: auto;
+    min-width: 0;
+}
+/* the player a report is about, found as the name is typed */
+.contact-found {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+}
+.contact-found img {
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
+    box-shadow: 0 0 0 2px var(--ink);
+    image-rendering: pixelated;
+}
+.contact-found.missing {
+    font-weight: 400;
+    color: var(--ink-soft);
+}
+.contact-form textarea.field, .mod-msg textarea.field, .contact-write .field {
+    resize: vertical;
+}
+.contact-form textarea.field {
+    min-height: 120px;
+}
+.contact-count {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+    text-align: right;
+    color: var(--ink-soft);
+}
+.contact-shot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+}
+.contact-shot .btn {
+    min-height: 40px;
+    padding: 6px 16px;
+    font-size: 15px;
+}
+.contact-shot .btn .material-icons {
+    font-size: 20px;
+}
+.contact-paste {
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+@media (hover: none) {
+    .contact-paste {
+        display: none;
+    }
+}
+.contact-preview {
+    position: relative;
+    flex: none;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+}
+.contact-preview img, .contact-thumb img {
+    display: block;
+    max-width: min(100%, 280px);
+    max-height: 160px;
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+}
+.contact-remove {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    color: #fff;
+    background: var(--red);
+    border: 2px solid var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.contact-remove .material-icons {
+    font-size: 18px;
+}
+.contact-reply {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.contact-small {
+    font-size: 14px;
+    color: var(--ink-soft);
+}
+.contact-context {
+    overflow-wrap: anywhere;
+}
+/* a field for robots only: people never see it */
+.contact-trap {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+/* what went wrong, where */
+.contact-form .field.wrong {
+    border-color: var(--red);
+    outline: 3px solid rgba(179, 48, 42, .45);
+}
+.contact-form .wrong .chip, .contact-shot.wrong .btn {
+    border-color: var(--red);
+}
+.contact-form.dropping {
+    outline: 3px dashed var(--green-dark);
+    outline-offset: 6px;
+}
+/* sent: a stamp where the form was */
+.contact-sent {
+    max-width: 520px;
+    margin: 0 auto;
+    text-align: center;
+}
+.contact-stamp {
+    display: inline-block;
+    margin: 12px 0 16px;
+    padding: 4px 18px 6px;
+    font: 700 34px/1 var(--sans);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--green-dark);
+    border: 4px solid var(--green-dark);
+    border-radius: 6px;
+    transform: rotate(-4deg);
+}
+.contact-sent .btn {
+    margin-top: 16px;
+}
+
+/* the sender's messages, and the team's answers under them */
+.contact-mine {
+    max-width: 780px;
+    margin: 30px auto 0;
+}
+#mine, .mod-inbox {
+    display: grid;
+    gap: 12px;
+}
+.contact-msg, .mod-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+    padding: 12px 14px;
+    background: var(--paper-light);
+    border-radius: 4px;
+    box-shadow: 0 3px 0 rgba(63, 39, 36, .2);
+}
+.contact-msg-head, .mod-msg-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    width: 100%;
+    margin: 0;
+}
+.contact-msg-head .material-icons, .mod-msg-head .material-icons {
+    font-size: 20px;
+}
+.contact-msg-head small, .mod-msg-head small {
+    color: var(--ink-soft);
+}
+.contact-msg-head .contact-status, .mod-msg-head .contact-status {
+    margin-left: auto;
+}
+.contact-msg-text, .mod-msg-text, .contact-line span {
+    max-width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.contact-status {
+    padding: 1px 8px 2px;
+    font: 700 13px/1.3 var(--sans);
+    white-space: nowrap;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.status-read, .status-open {
+    background: var(--teal-light);
+}
+.status-answered {
+    background: var(--green);
+}
+.status-closed, .status-done {
+    background: #c9c5ba;
+}
+.status-new {
+    color: #fff;
+    background: var(--red);
+}
+.contact-thread {
+    display: flex;
+    flex-direction: column;
+    align-self: stretch;
+    gap: 6px;
+    padding: 8px 10px;
+    background: var(--paper);
+    border-radius: 4px;
+}
+.contact-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+}
+.contact-line b {
+    flex: none;
+}
+.contact-line span {
+    flex: 1 1 200px;
+}
+.contact-line small {
+    color: var(--ink-soft);
+}
+.contact-line.team b {
+    color: var(--green-dark);
+}
+.contact-write {
+    display: flex;
+    align-self: stretch;
+    align-items: flex-end;
+    gap: 8px;
+}
+.contact-write .field {
+    flex: 1;
+    min-width: 0;
+}
+.contact-write .btn, .mod-msg-tools .btn {
+    min-height: 38px;
+    padding: 5px 16px;
+    font-size: 15px;
+}
+
+/* Moderation: how many wait, on the tabs */
+.tab-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 8px;
+    padding: 0 5px;
+    font: 700 13px/1 var(--sans);
+    color: #fff;
+    vertical-align: 3px;
+    background: var(--red);
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+}
+.chip-count:not(:empty) {
+    margin-left: 6px;
+}
+/* Moderation: the messages, sorted and searched; one opens in place */
+.mod-inbox-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 10px 16px;
+    margin-bottom: 14px;
+}
+.mod-inbox-bar .mod-find {
+    flex: 1 1 220px;
+    max-width: 320px;
+    margin: 0;
+}
+.mod-inbox-bar .field.small {
+    width: auto;
+}
+.mod-inbox {
+    max-width: 720px;
+    margin: 0 auto;
+}
+.mod-msg-head {
+    padding: 0;
+    font: inherit;
+    text-align: left;
+    color: inherit;
+    background: none;
+    border: 0;
+    cursor: pointer;
+}
+.mod-msg-head b, .mod-msg-from {
+    overflow-wrap: anywhere;
+}
+.mod-msg:not(.open) .mod-msg-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.mod-msg-more {
+    display: none;
+    flex-direction: column;
+    align-self: stretch;
+    gap: 10px;
+}
+.mod-msg.open .mod-msg-more {
+    display: flex;
+}
+.mod-msg-who, .mod-msg-about, .mod-msg-answer {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+.mod-msg-answer .chip {
+    margin-left: 4px;
+    text-decoration: none;
+    vertical-align: 1px;
+}
+.mod-msg-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+/* the team answered: a notice on every page until it is read */
+.contact-toast {
+    color: var(--ink);
+    text-decoration: none;
+    pointer-events: auto;
+}
+.contact-toast:hover {
+    background: var(--paper-light);
+}
+.contact-toast.still {
+    animation: none;
+}
+.oops .btn {
+    margin-top: 16px;
+}
+
+@media (max-width: 520px) {
+    .contact-form {
+        padding: 16px 14px 18px;
+    }
+    .contact-topics .chips {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+    }
+    .contact-topic {
+        gap: 8px;
+        min-height: 42px;
+        font-size: 15px;
+    }
+    .contact-topic .material-icons {
+        width: 32px;
+        font-size: 19px;
+    }
+    .contact-write {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         transition: none !important;

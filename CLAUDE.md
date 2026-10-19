@@ -1173,6 +1173,93 @@ dans `app.py`, tous corrigés :
   mettre à jour pour une autre ultrareview. Rien n'y est touché sans son
   accord.
 
+## Contact (2026-10-19, bêta)
+
+Demande de Yasuro : « une page entière bien pensée pour nous contacter avec
+formulaire […] accessible dans le footer […] sur notre discord ou alors en
+mail : wynndle.contact@gmail.com. Le formulaire […] sur notre page
+modération avec un moyen facile de le voir et de le trier […] le plus
+d'interactions possibles mais sans être incompréhensible et surtout sans trop
+de texte qui ne sert à rien ».
+
+- **Page `contact`** (premier lien du pied de page) : en haut les deux voies
+  sans formulaire, le Discord (membres et connectés, les chiffres d'About)
+  et l'email (copié d'un clic, ou `mailto:`) ; puis le formulaire. **Le sujet
+  d'abord** (A bug, A location, A player, My account, A ban or mute, An idea,
+  Partnership, Something else) : le reste n'apparaît qu'une fois choisi, et
+  prend sa forme (`TOPICS` de `contact.js`) :
+  - A player : son nom, cherché pendant la frappe (`api/contact/player` : sa
+    tête, ou « No player with this name », sans bloquer) ; rappel qu'un
+    message du chat se signale dans le salon (on reçoit la conversation).
+  - A bug, A location : ce qui part avec (« Sent along: Firefox 131 on
+    Windows · 1366×768 · from /room?… »), écrit sous le formulaire avant
+    l'envoi, gardé pour l'équipe (`context`, avec la version du site).
+  - My account, A ban or mute : le compte, demandé seulement sans être
+    connecté ; un joueur muet lit pour combien de temps ; liens vers la
+    récupération par code ou Edit Profile.
+  - An idea : rappel du salon de suggestions du Discord.
+  - Partnership : réponse par email seulement.
+  Capture d'écran facultative (bouton, coller, ou glisser sur le formulaire ;
+  8 Mo au plus), refaite ici en webp de 2 000 px au plus comme une photo de
+  profil, dans `contact_files/` (hors git, **pas dans le coffre**) ; seuls
+  l'équipe et son auteur la voient. Puis « Where should we answer? » : Here
+  (connecté, compte ou invité), By email, On Discord, No need. L'email et le
+  nom Discord se retiennent dans le navigateur ; un brouillon survit à un
+  rechargement (`localStorage`).
+- **Liens qui préremplissent** : `contact?topic=player&name=…`,
+  `contact?topic=location&x=…&z=…`, `contact?topic=sanction`. Ce dernier est
+  le bouton **Appeal** de la page qui annonce un ban (au chargement, à la
+  connexion, au retour de Wynncraft).
+- **Envoyé** : un tampon « Sent! » là où était le formulaire, et où viendra
+  la réponse. **Your Messages** (connecté) : chaque message, son état (Sent,
+  Read, Answered, Closed) et le fil des réponses, signées « Team » (jamais
+  le nom du modérateur) ; « Write back » répond dessous, ce qui le remet
+  parmi les nouveaux.
+- **Un avis sur toutes les pages** tant qu'une réponse n'est pas lue (« The
+  team answered you », un toast qui glisse une fois puis reste,
+  `session['told']`), **sauf dans un salon** : une partie ne s'interrompt
+  pas, et le salon a ses propres toasts (`motion.js` en aurait créé une
+  deuxième colonne par-dessus). Ouvrir la page Contact le lève.
+- **Modération, onglet Messages**, pour Moderator et plus (`MAY['contact'] =
+  2` : un email est une donnée personnelle ; un chiffre à changer si Yasuro
+  veut les Helpers). Compté dans le bouton Moderation et sur l'onglet
+  (Reports et Photos ont aussi leur nombre maintenant, et l'onglet qui
+  attend s'ouvre en premier). Filtres New / Open / Done / All avec leurs
+  nombres, sujet, Newest / Oldest (par dernier mot, de l'un ou l'autre
+  côté), recherche (texte, lieu ou nom donné, nom de l'auteur, email,
+  Discord, réponses). Un message s'ouvre sur place, ce qui le passe à Open
+  (l'auteur lit « Read »). Dedans : de qui (sa fiche d'un clic), le joueur
+  ou le compte nommé (sa fiche si le nom existe), la capture, ce qui est
+  parti avec, comment répondre (email : Copy et Write, un `mailto:` qui cite
+  le message ; Discord : Copy), le fil, puis Answer / Answer & Close
+  (l'auteur le lit sur le site ; sans compte : Save, une note pour
+  l'équipe), Close / Open again, Delete (demande deux fois ; dans le Log,
+  avec le début du message).
+- **Robots et abus** : un champ caché (`website`) rempli, ou un envoi moins
+  de 3 s après l'affichage de la page : « envoyé », rien de gardé ; 6
+  messages ou réponses par adresse et par 15 min (`ACTIONS['contact']`) ;
+  2 000 caractères. Un banni n'est plus connecté mais la page reste ouverte
+  (le ban d'adresse n'empêche que de créer des noms) : c'est par là qu'il
+  fait appel.
+- Tables `contact` (état `new` / `open` / `done` ; `last` : le dernier mot ;
+  `seen` : quand l'auteur a lu les réponses) et `contact_replies` (`team` :
+  de l'équipe ou de l'auteur). Créées au démarrage : rien à faire à la mise
+  en prod.
+- Tests : `t_contact.py` (80), `t_contact_page.py` (navigateur, 49 dans Chromium et
+  Firefox, 1280 et 375 px : du pied de page à l'envoi, la boîte de
+  Modération, l'avis, la réponse). **Piège de test payé** : Firefox vide le
+  presse-papiers d'un `ClipboardEvent` fabriqué par un script (le collage
+  simulé n'apportait rien ; un vrai collage, si) : le test pose l'image sur
+  l'événement à la main, et la page lit `clipboardData.files` en plus des
+  `items`.
+- **Proposé à Yasuro, pas fait** : un lien « Wrong location? » à la
+  révélation (préremplit `topic=location&x&z`) ; « Report » sur les profils
+  (`topic=player&name`) ; « Appeal » sous le chat d'un joueur muet (le
+  salon ne le dit aujourd'hui que dans la case du chat) ; répondre aux
+  emails depuis la page (il faudrait un mot de passe d'application Gmail, un
+  secret de plus) ; les Helpers dans l'onglet ; `contact_files/` dans le
+  coffre.
+
 ## Niveaux, XP et séries de victoires
 
 2026-10-17, demande de Yasuro : des niveaux pour les comptes, « genre barre
@@ -1562,8 +1649,9 @@ fan, sans rien voler).
   (2026-10-17), 2.1 profils, sons et Survival refait, 2.2 Survival à
   plusieurs, 2.3 About, place au classement, carte des liens de salon,
   onglets endormis (2026-10-18).
-- Pied de page hors jeu (`footer.html`) : Made by Ched3, Hosted & modified
-  by Yasuro, Wynncraft, Fan-made, not official (séparés par l'espace, plus par
+- Pied de page hors jeu (`footer.html`) : Contact (en premier, 2026-10-19,
+  voir « Contact »), Made by Ched3, Hosted & modified by Yasuro, Wynncraft,
+  Fan-made, not official (séparés par l'espace, plus par
   des points médians).
 
 ## Tester

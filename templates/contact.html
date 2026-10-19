@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+
+{% block title %}: Contact{% endblock %}
+
+{% block content %}
+{% set user = session.get('user_id') %}
+    <h1 class="sign">Contact</h1>
+
+    {# the two ways that skip the form #}
+    <div class="contact-ways">
+        <section class="panel contact-way">
+            <h2>Discord</h2>
+            {% if server.members %}
+            <p class="contact-live"><span><b>{{ '{:,}'.format(server.members) }}</b> {{ 'member' if server.members == 1 else 'members' }}</span><span><span class="about-dot"></span><b>{{ '{:,}'.format(server.online) }}</b> online</span></p>
+            {% endif %}
+            <p class="contact-why">The quickest answer, from the team and the players.</p>
+            <a class="btn wide" href="{{ discord }}" target="_blank" rel="noopener">Join the Discord</a>
+        </section>
+        <section class="panel contact-way">
+            <h2>Email</h2>
+            <a class="contact-address" href="mailto:{{ email }}">{{ email }}</a>
+            <p class="contact-why">For anything private, or to work with us.</p>
+            <button type="button" class="btn wood wide" id="copy-email" data-copy="{{ email }}"><i class="material-icons">content_copy</i><span>Copy the address</span></button>
+        </section>
+    </div>
+
+    <form class="panel contact-form" id="contact-form" autocomplete="off" novalidate>
+        <h2>Write to Us</h2>
+        <fieldset class="contact-topics">
+            <legend>What is it about?</legend>
+            <div class="chips">
+                {% for key, (label, icon) in topics.items() %}
+                <input type="radio" name="topic" id="topic-{{ key }}" value="{{ key }}"{% if key == topic %} checked{% endif %}>
+                <label class="chip contact-topic" for="topic-{{ key }}"><i class="material-icons">{{ icon }}</i>{{ label }}</label>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <div class="contact-rest" id="contact-rest"{% if not topic %} hidden{% endif %}>
+            {# a better way, or what we already know, for some topics #}
+            <p class="contact-tip" data-for="player"><i class="material-icons">info</i><span>A chat message? Click it in the room: we get the conversation with it.</span></p>
+            {% if me and not me.guest %}
+            <p class="contact-tip" data-for="account"><i class="material-icons">info</i><span>Name, picture or password: <a href="account">Edit Profile</a>.</span></p>
+            {% else %}
+            <p class="contact-tip" data-for="account"><i class="material-icons">info</i><span>Forgot your password? <a href="recover">Use your recovery code</a>.</span></p>
+            {% endif %}
+            {% if muted %}
+            <p class="contact-tip" data-for="sanction"><i class="material-icons">info</i><span>You are muted for {{ muted }}.</span></p>
+            {% endif %}
+            <p class="contact-tip" data-for="idea"><i class="material-icons">info</i><span>It can also go in the suggestions channel of the <a href="{{ discord }}" target="_blank" rel="noopener">Discord</a>.</span></p>
+
+            <div class="contact-about" id="contact-about" hidden>
+                <input class="field" name="about" id="about" maxlength="100" value="{{ about }}">
+                <span class="contact-found" id="contact-found" hidden><img alt="" width="32" height="32"><span></span></span>
+            </div>
+
+            <div class="contact-text">
+                <textarea class="field" name="text" id="text" rows="5" maxlength="2000" aria-label="Your message"></textarea>
+                <small class="contact-count" id="contact-count" hidden></small>
+            </div>
+
+            <div class="contact-shot" id="contact-shot">
+                <input class="file-input" type="file" id="shot" accept="image/png,image/jpeg,image/webp,image/gif">
+                <label for="shot" class="btn wood"><i class="material-icons">add_photo_alternate</i>Add a screenshot</label>
+                <span class="contact-paste">or paste it</span>
+                <figure class="contact-preview" id="contact-preview" hidden>
+                    <img alt="Your screenshot">
+                    <button type="button" class="contact-remove" id="shot-remove" title="Remove it" aria-label="Remove the screenshot"><i class="material-icons">close</i></button>
+                </figure>
+            </div>
+
+            <fieldset class="contact-reply" id="contact-reply">
+                <legend>Where should we answer?</legend>
+                <div class="chips">
+                    {% if user %}
+                    <input type="radio" name="reply" id="reply-here" value="here" checked>
+                    <label class="chip" for="reply-here">Here</label>
+                    {% endif %}
+                    <input type="radio" name="reply" id="reply-email" value="email"{% if not user %} checked{% endif %}>
+                    <label class="chip" for="reply-email">By email</label>
+                    <input type="radio" name="reply" id="reply-discord" value="discord">
+                    <label class="chip" for="reply-discord">On Discord</label>
+                    <input type="radio" name="reply" id="reply-none" value="none">
+                    <label class="chip" for="reply-none">No need</label>
+                </div>
+                <input class="field" type="email" name="email" id="email" placeholder="Your email" aria-label="Your email" maxlength="120" autocomplete="email">
+                <input class="field" name="discord" id="discord" placeholder="Your Discord name" aria-label="Your Discord name" maxlength="40">
+                <p class="contact-small" data-reply="here">You'll see a notice on the site when we answer.</p>
+                <p class="contact-small" data-reply="email discord">Only the team sees it.</p>
+                {% if not user %}<p class="contact-small" data-reply="email discord none"><a href="login?next=contact">Log in</a> to get the answer here.</p>{% endif %}
+            </fieldset>
+
+            <p class="contact-small contact-context" id="contact-context" hidden></p>
+            <input class="contact-trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <input type="hidden" name="t" value="{{ shown }}">
+            <button class="btn big wide" type="submit" id="contact-send">Send</button>
+            <p class="note bad" id="contact-note" role="alert" hidden></p>
+        </div>
+    </form>
+
+    {# what comes instead of the form once it is sent #}
+    <section class="panel contact-sent" id="contact-sent" hidden>
+        <p class="contact-stamp" id="contact-stamp">Sent!</p>
+        <p id="contact-where"></p>
+        <button type="button" class="btn wood" id="contact-again">Write Another</button>
+    </section>
+
+    <section class="panel contact-mine" id="messages" hidden>
+        <h2>Your Messages</h2>
+        <div id="mine"></div>
+    </section>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" integrity="sha256-wS9gmOZBqsqWxgIVgA8Y9WcQOa7PgSIX+rPA0VL2rbQ=" crossorigin=""></script>
+<script src="{{ asset('js/contact.js') }}"></script>
+{% endblock %}

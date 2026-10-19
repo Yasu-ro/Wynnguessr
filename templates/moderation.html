@@ -8,11 +8,15 @@
     <div class="tabs mod-tabs" id="mod-tabs">
         {% if may.reports %}
         <input type="radio" name="mod-tab" id="tab-reports" value="reports"{% if first == 'reports' %} checked{% endif %}>
-        <label for="tab-reports" class="tab">Reports</label>
+        <label for="tab-reports" class="tab">Reports{% if waiting.reports %}<b class="tab-count">{{ waiting.reports }}</b>{% endif %}</label>
         {% endif %}
         {% if may.pictures %}
         <input type="radio" name="mod-tab" id="tab-photos" value="photos"{% if first == 'photos' %} checked{% endif %}>
-        <label for="tab-photos" class="tab">Photos</label>
+        <label for="tab-photos" class="tab">Photos{% if waiting.photos %}<b class="tab-count">{{ waiting.photos }}</b>{% endif %}</label>
+        {% endif %}
+        {% if may.contact %}
+        <input type="radio" name="mod-tab" id="tab-messages" value="messages"{% if first == 'messages' %} checked{% endif %}>
+        <label for="tab-messages" class="tab">Messages<b class="tab-count" id="messages-count"{% if not waiting.messages %} hidden{% endif %}>{{ waiting.messages }}</b></label>
         {% endif %}
         {% if may.players %}
         <input type="radio" name="mod-tab" id="tab-players" value="players">
@@ -41,6 +45,32 @@
     <section class="mod-pane" id="pane-photos"{% if first != 'photos' %} hidden{% endif %}>
         <div class="mod-photos" id="photo-list"></div>
         <p class="hint" id="photo-empty" hidden>Nothing to look at. A picture a player sends waits here before anyone else sees it.</p>
+    </section>
+    {% endif %}
+
+    {% if may.contact %}
+    <section class="mod-pane" id="pane-messages"{% if first != 'messages' %} hidden{% endif %}>
+        <div class="mod-inbox-bar">
+            <div class="chips" id="inbox-states">
+                {% for k, label in [('new', 'New'), ('open', 'Open'), ('done', 'Done'), ('all', 'All')] %}
+                <input type="radio" name="inbox-state" id="inbox-{{ k }}" value="{{ k }}"{% if loop.first %} checked{% endif %}>
+                <label class="chip small" for="inbox-{{ k }}">{{ label }}<b class="chip-count" data-count="{{ k }}"></b></label>
+                {% endfor %}
+            </div>
+            <select class="field small" id="inbox-topic" aria-label="Topic"><option value="">Every topic</option></select>
+            <div class="chips" id="inbox-sort">
+                <input type="radio" name="inbox-sort" id="inbox-newest" value="new" checked>
+                <label class="chip small" for="inbox-newest">Newest</label>
+                <input type="radio" name="inbox-sort" id="inbox-oldest" value="old">
+                <label class="chip small" for="inbox-oldest">Oldest</label>
+            </div>
+            <form class="mod-find" id="inbox-find" autocomplete="off">
+                <input class="field" name="q" placeholder="Search a word, a name, an email" aria-label="Search" maxlength="60">
+            </form>
+        </div>
+        <div class="mod-inbox" id="inbox-list"></div>
+        <p class="hint" id="inbox-empty" hidden>Nothing here. Players write from the Contact page, linked at the bottom of every page.</p>
+        <button type="button" class="btn wood board-next" id="inbox-more" hidden>Show 50 more</button>
     </section>
     {% endif %}
 

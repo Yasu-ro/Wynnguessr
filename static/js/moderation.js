@@ -1,5 +1,6 @@
 // The moderation page (app.py, "Moderation"): the team and its ranks, the
-// log. The server decides what each one may do; this page only offers it.
+// log, the messages of the contact page. The server decides what each one
+// may do; this page only offers it.
 $(function () {
     var team = null, armed = null, armedAt = 0;
     var ARMED = 3000;   // ms the "Sure?" of a removal waits for the second click
@@ -34,6 +35,9 @@ $(function () {
         }
         if (tab == 'players' && !listed) {
             players();
+        }
+        if (tab == 'messages') {
+            inbox();
         }
     });
 
@@ -357,6 +361,156 @@ $(function () {
         tagSend({'do': 'retire', tag: $(this).data('retire')});
     });
 
+    // ---------- messages (the contact page) ----------
+    // by state, topic, words; a message opens in place, which tells its
+    // sender "Read". Answered here, the sender reads it on the site; by
+    // email or on Discord, it is written from there, then closed here
+    var inboxListed = 0, inboxAsked = 0, inboxTyping = null, opened = {}, dropArmed = null, dropAt = 0;
+    var CONTACT_STATUS = {new: 'New', open: 'Open', answered: 'Answered', done: 'Done'};
+
+    function copy(text, button) {
+        function copied() {
+            var old = button.text();
+            button.text('Copied!');
+            setTimeout(function () { button.text(old); }, 1400);
+        }
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(copied);
+        } else {
+            var field = $('<input>').val(text).appendTo('body').select();
+            document.execCommand('copy');
+            field.remove();
+            copied();
+        }
+    }
+
+    function inbox(more) {
+        var n = ++inboxAsked;
+        $.getJSON('api/mod/contact', {state: $('[name=inbox-state]:checked').val(), topic: $('#inbox-topic').val(),
+                                      sort: $('[name=inbox-sort]:checked').val(), q: $('#inbox-find [name=q]').val(),
+                                      start: more ? inboxListed : 0}).done(function (r) {
+            if (n != inboxAsked) {
+                return;   // an older search, answered late
+            }
+            var all = 0;
+            $.each(r.counts, function (k, v) { all += v; });
+            $('[data-count]').each(function () {
+                var k = $(this).data('count'), v = k == 'all' ? all : r.counts[k] || 0;
+                $(this).text(v || '');
+            });
+            $('#messages-count').text(r.counts.new || 0).prop('hidden', !r.counts.new);
+            var chosen = $('#inbox-topic').val();
+            $('#inbox-topic').html("<option value=''>Every topic</option>" + Object.keys(r.labels).map(function (k) {
+                return "<option value='" + k + "'" + (k == chosen ? ' selected' : '') + '>' + esc(r.labels[k]) +
+                    (r.topics[k] ? ' (' + r.topics[k] + ')' : '') + '</option>';
+            }).join(''));
+            var cards = r.messages.map(function (m) { return message(m, r); }).join('');
+            $('#inbox-list')[more ? 'append' : 'html'](cards);
+            inboxListed = (more ? inboxListed : 0) + r.messages.length;
+            $('#inbox-empty').prop('hidden', inboxListed > 0);
+            $('#inbox-more').prop('hidden', !r.more);
+        });
+    }
+
+    function message(m, r) {
+        var last = m.replies.length && m.replies[m.replies.length - 1];
+        var status = m.state == 'open' && last && last.team ? 'answered' : m.state;
+        // who wrote (their card a click away), and when, if they wrote again since
+        var who = (m.from ? 'From ' + "<a class='board-name' href='#' data-player='" + m.from.id + "'>" + esc(m.from.name) + '</a>' +
+            (m.from.tag ? " <span class='name-tag " + esc(m.from.tag.color) + "'>" + esc(m.from.tag.label) + '</span>' : '') +
+            (m.from.guest ? ' <small>(guest)</small>' : '') : 'Not logged in') + (m.last != m.at ? ' · sent ' + when(m.at) : '');
+        var about = '';
+        if (m.about) {
+            var word = {player: 'About', account: 'Account', sanction: 'Account', location: 'Where'}[m.topic] || 'About';
+            about = "<p class='mod-msg-about'>" + word + ': ' + (m.about_id ? "<a class='board-name' href='#' data-player='" + m.about_id + "'>" +
+                esc(m.about) + '</a>' : '<b>' + esc(m.about) + '</b>' + (m.topic == 'player' ? ' <small>(no player with this name)</small>' : '')) + '</p>';
+        }
+        var answer;
+        if (m.reply == 'email') {
+            var mail = 'mailto:' + m.email + '?subject=' + encodeURIComponent('Re: ' + r.labels[m.topic] + ' (WynnGuessr)') +
+                '&body=' + encodeURIComponent('\n\n> ' + m.text.slice(0, 600).split('\n').join('\n> '));
+            answer = 'Answer by email: <b>' + esc(m.email) + "</b> <button type='button' class='chip small' data-copy='" + esc(m.email) + "'>Copy</button>" +
+                " <a class='chip small' href='" + esc(mail) + "'>Write</a>";
+        } else if (m.reply == 'discord') {
+            answer = 'Answer on Discord: <b>' + esc(m.discord) + "</b> <button type='button' class='chip small' data-copy='" + esc(m.discord) + "'>Copy</button>";
+        } else {
+            answer = m.reply == 'here' ? 'Answer here: they read it on the site.' : 'No answer needed.';
+        }
+        var c = m.context;
+        var thread = m.replies.map(function (x) {
+            return "<p class='contact-line" + (x.team ? ' team' : '') + "'><b>" + esc(x.team ? x.by || 'Team' : m.from ? m.from.name : 'Them') + '</b>' +
+                '<span>' + esc(x.text) + '</span><small>' + when(x.at) + '</small></p>';
+        }).join('');
+        var here = m.from && m.reply != 'none';
+        return "<article class='mod-msg" + (opened[m.id] ? ' open' : '') + "' data-id='" + m.id + "' data-state='" + m.state + "'>" +
+            "<button type='button' class='mod-msg-head' aria-expanded='" + !!opened[m.id] + "'><i class='material-icons'>" + esc(r.icons[m.topic]) + '</i>' +
+            '<b>' + esc(r.labels[m.topic]) + "</b><span class='mod-msg-from'>" + (m.from ? esc(m.from.name) : 'not logged in') + '</span>' +
+            '<small>' + when(m.last) + "</small><span class='contact-status status-" + status + "'>" + CONTACT_STATUS[status] + '</span></button>' +
+            "<p class='mod-msg-text'>" + esc(m.text) + '</p>' +
+            "<div class='mod-msg-more'><p class='mod-msg-who'>" + who + '</p>' + about +
+            (m.file ? "<a class='contact-thumb' href='" + esc(m.file) + "' target='_blank' rel='noopener'><img src='" + esc(m.file) + "' alt='Screenshot'></a>" : '') +
+            (c ? "<p class='contact-small'>Sent along: " + esc([c.browser, c.screen, c.page ? 'from ' + c.page : '', 'site v' + c.version].filter(Boolean).join(' · ')) + '</p>' : '') +
+            "<p class='mod-msg-answer'>" + answer + '</p>' +
+            (thread ? "<div class='contact-thread'>" + thread + '</div>' : '') +
+            "<textarea class='field' rows='3' maxlength='2000' aria-label='Your answer' placeholder='" +
+            (here ? 'Your answer: they read it on the site' : 'What you answered, for the team') + "'></textarea>" +
+            "<div class='mod-msg-tools'><button type='button' class='btn' data-do='answer'>" + (here ? 'Answer' : 'Save') + '</button>' +
+            "<button type='button' class='btn wood' data-do='answer' data-close='1'>" + (here ? 'Answer & Close' : 'Save & Close') + '</button>' +
+            (m.state == 'done' ? "<button type='button' class='chip small' data-do='reopen'>Open again</button>"
+                               : "<button type='button' class='chip small' data-do='done'>Close</button>") +
+            "<button type='button' class='chip small" + (dropArmed == m.id ? ' armed' : '') + "' data-do='delete'>" + (dropArmed == m.id ? 'Sure?' : 'Delete') + '</button>' +
+            '</div></div></article>';
+    }
+
+    $('#inbox-states, #inbox-sort, #inbox-topic').on('change', function () { inbox(); });
+    $('#inbox-find').on('submit', function (e) {
+        e.preventDefault();
+    }).on('input', function () {
+        clearTimeout(inboxTyping);
+        inboxTyping = setTimeout(function () { inbox(); }, 250);
+    });
+    $('#inbox-more').on('click', function () { inbox(true); });
+
+    $('#inbox-list').on('click', '.mod-msg-head', function () {
+        var card = $(this).closest('.mod-msg'), id = card.data('id');
+        opened[id] = !opened[id];
+        card.toggleClass('open', opened[id]);
+        $(this).attr('aria-expanded', opened[id]);
+        // read for the first time: its sender sees "Read" (it stays in this list until the next search)
+        if (opened[id] && card.data('state') == 'new') {
+            card.data('state', 'open');
+            $.post('api/mod/contact', {id: id, 'do': 'open'}).done(function () {
+                card.find('.mod-msg-head .contact-status').attr('class', 'contact-status status-open').text('Open');
+                var left = Math.max(0, (+$('#messages-count').text() || 0) - 1);
+                $('#messages-count').text(left).prop('hidden', !left);
+                $('[data-count=new]').text(left || '');
+                $('[data-count=open]').text((+$('[data-count=open]').text() || 0) + 1);
+            });
+        }
+    }).on('click', '[data-copy]', function () {
+        copy($(this).data('copy'), $(this));
+    }).on('click', '[data-player]', function (e) {
+        e.preventDefault();
+        openPlayer($(this).data('player'));
+    }).on('click', '[data-do]', function () {
+        var b = $(this), card = b.closest('.mod-msg'), id = card.data('id'), what = b.data('do');
+        var text = $.trim(card.find('textarea').val());
+        if (what == 'answer' && !text) {
+            return card.find('textarea').focus();
+        }
+        // a message goes for good: twice
+        if (what == 'delete' && !(dropArmed == id && Date.now() - dropAt < ARMED)) {
+            dropArmed = id;
+            dropAt = Date.now();
+            b.addClass('armed').text('Sure?');
+            setTimeout(function () { if (dropArmed == id) { dropArmed = null; b.removeClass('armed').text('Delete'); } }, ARMED + 50);
+            return;
+        }
+        dropArmed = null;
+        card.find('button').prop('disabled', true);
+        $.post('api/mod/contact', {id: id, 'do': what, text: text, close: b.data('close') || ''}).always(function () { inbox(); });
+    });
+
     // ---------- the log ----------
     var oldest = null;
     var WORDS = {rank: 'rank'};
@@ -384,6 +538,9 @@ $(function () {
     }
     if ($('#pane-reports').length) {
         reports();
+    }
+    if ($('#pane-messages').length && !$('#pane-messages').prop('hidden')) {
+        inbox();
     }
     var asked_for = /[?&]player=(\d+)/.exec(location.search);
     if (asked_for && $('#pane-players').length) {

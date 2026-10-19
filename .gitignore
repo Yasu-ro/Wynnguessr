@@ -13,3 +13,4 @@ cloudflare_token
 .starting.lock
 database.db-wal
 database.db-shm
+contact_files/

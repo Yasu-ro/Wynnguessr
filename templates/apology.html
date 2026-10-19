@@ -6,5 +6,6 @@
     <div class="panel narrow oops">
         <img src="static/rat_apology_image.PNG" alt="" width="291" height="358">
         <p>{{ message }}</p>
+        {% if appeal %}<a class="btn wood" href="contact?topic=sanction">Appeal</a>{% endif %}
     </div>
 {% endblock %}

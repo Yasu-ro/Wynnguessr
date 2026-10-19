@@ -10,6 +10,8 @@
 
 <body>
 {% include "nav.html" %}
+{% set answer = contact_answer() %}
+{% if answer %}<div class="toasts"><a class="toast contact-toast{{ '' if answer.new else ' still' }}" href="contact#messages"><i class="material-icons">mail</i><span>The team answered you</span></a></div>{% endif %}
     <main class="page{% block page_class %}{% endblock %}">
 {% block content %}{% endblock %}
     </main>
