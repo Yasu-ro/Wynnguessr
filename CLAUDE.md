@@ -819,7 +819,8 @@ max), journal d'audit avec la raison. D'où :
   obnoxious ») : **une seule** à côté d'un nom, petite (chat, classement,
   joueurs du salon, résultats ; pas sur l'écran de manche), le profil les
   montre toutes. Ordre : rang de l'équipe, sinon étiquette donnée (la plus
-  récente), sinon un « #1 » automatique (`top_tags()`, premier de Survival
+  récente), sinon un « #1 » automatique (`top_tags()`, « #1 SV Hard »… :
+  « Survival » abrégé à la demande de Yasuro, trop long ; premier de Survival
   Normal/Hard/Hardcore sans lait, de Classic réglages standard, des
   niveaux, des victoires ; recalculé toutes les 2 min par processus :
   0,23 s sur une copie du vrai site, **jamais sous le verrou d'un salon**,

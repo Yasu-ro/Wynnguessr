@@ -3253,14 +3253,14 @@ with connect() as c:
         c.execute("ALTER TABLE users ADD COLUMN shown_tag TEXT")
 
 def top_tags(c):
-    # who leads each board: {user id: ["#1 Survival Hard", ...]}. Worked out
+    # who leads each board: {user id: ["#1 SV Hard", ...]}. Worked out
     # again when due, but never on a connection that holds the write lock
     # (a room's, a write already made): the levels take long to add up
     # (0.2 s for the 124 accounts of October 2026, more with every player),
     # and every room would wait. room_state asks before taking its lock
     if time.time() - TOPS['at'] > TOPS_EVERY and not c.in_transaction:
         tops = {}
-        boards = [('#1 Survival ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
+        boards = [('#1 SV ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
         boards.append(('#1 Classic', board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'})))
         boards += [('#1 Level', ladder(c, 'levels')), ('#1 Wins', ladder(c, 'wins'))]
         for label, rows in boards:
