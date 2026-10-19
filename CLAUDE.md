@@ -756,6 +756,10 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
     (`WORLD_GRACE`, `room_players.joined`) : il joue. Un joueur compte
     présent **60 s** (`GONE`), pas 10 : piège de yolo, un onglet en
     arrière-plan aurait été jeté alors qu'il était prêt.
+  - **Un joueur muet depuis 5 min sort du lobby** (`WORLD_LEFT`, demande
+    de Yasuro le 2026-10-19 : « Jogoat » restait grisé depuis un jour dans
+    un lobby qui ne partait jamais). Pas à `GONE` (60 s) : piège de yolo.
+    Il peut revenir par le lien.
   - Fin : résultats 20 s (« Next game in N s », bouton Leave), puis tout le
     monde passe ensemble au lobby ouvert (`next_code`), où Ready est
     redemandé : le contrôle anti-AFK revient à chaque partie.

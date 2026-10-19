@@ -3066,6 +3066,7 @@ WORLD_MAX = 16          # players in a lobby, then another opens
 WORLD_COUNTDOWN = 15    # seconds from half ready to the start
 WORLD_ALL_READY = 3     # ...cut to this once everyone is
 WORLD_GRACE = 10        # who came in this late before the start plays, ready or not
+WORLD_LEFT = 300        # a lobby's player silent this long is out of it (they may come back)
 WORLD_RESULTS = 20      # seconds on the results, then on to the next lobby
 WORLD_HALF_LIFE = 3     # days: a game played that long ago counts half
 NEW_FOR = 14            # days a new kind of world is helped up the page
@@ -3117,6 +3118,10 @@ def world_tick(c, r):
     # a world's lobby: the countdown and the start; once finished: the next lobby
     now, code = time.time(), r['code']
     if r['state'] == 'waiting':
+        # who left long ago leaves the lobby too: else, in a lobby that never
+        # starts, their greyed name stayed for days (Yasuro, 2026-10-19). Not
+        # at GONE: a tab in the background can stay silent most of a minute
+        c.execute("DELETE FROM room_players WHERE code = ? AND last_seen < ?", (code, now - WORLD_LEFT))
         here = c.execute("SELECT user_id, lobby_ready, joined FROM room_players WHERE code = ? AND last_seen > ?",
                          (code, now - GONE)).fetchall()
         ready = sum(p['lobby_ready'] for p in here)
