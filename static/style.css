@@ -3015,8 +3015,10 @@ body.room-playing {
     width: 20px;
     height: 20px;
     margin-right: 6px;
+    object-fit: cover;
+    background: var(--paper);
     border: 2px solid;
-    border-radius: 50%;
+    border-radius: 3px;   /* square, like every picture on the site */
 }
 .room-chat-log .chat-pic.head {
     image-rendering: pixelated;

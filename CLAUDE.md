@@ -897,7 +897,8 @@ max), journal d'audit avec la raison. D'où :
     `t_chat_page.py` et `t_players_page.py` mis à jour.
   - **Photo et série dans le chat, série dans le menu** (2026-10-19,
     demande de Yasuro) : la pastille de couleur d'une ligne de chat devient
-    la photo du joueur (`chat-pic`), entourée de sa couleur ; après son nom
+    la photo du joueur (`chat-pic`), **carrée comme partout** (un rond avait
+    été refusé), entourée de sa couleur ; après son nom
     et son étiquette, sa série de victoires en cours (flamme, dès 1, comme
     au classement). Les séries viennent de `room_streaks()` : gardées une
     minute par processus, calculées **avant le verrou du salon**
