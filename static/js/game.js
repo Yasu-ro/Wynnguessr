@@ -138,6 +138,7 @@ function showNextLocation() {
         "disableKeyboardCtrl": locked,
         "showControls": !locked
     }));
+    compassBar(viewer);   // N E S W at the top (block.js)
     document.getElementById('round-number').innerHTML = "Round: " + s.round + "/" + s.rounds;
 
     // the server's clock, when there is one; the last seconds out loud, as in rooms
@@ -335,7 +336,6 @@ function panoramaConfig(url, options) {
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
             extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
-    config.hotSpots = compass();   // N E S W on the horizon (block.js)
     for (var k in options) config[k] = options[k];
     return config;
 }

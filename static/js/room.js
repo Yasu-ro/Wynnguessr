@@ -744,6 +744,7 @@ function guess() {
             "disableKeyboardCtrl": locked,
             "showControls": !locked
         }));
+        compassBar(viewer, document.querySelector('.room-hud'));   // N E S W under the round's sign (block.js)
         $('#guess-button').prop('disabled', false).removeClass('room-warn').text('Guess!');
         heard = null;
         lastSecond = null;
@@ -1275,8 +1276,7 @@ function panoramaConfig(url, options) {
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
             extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
-    // N E S W on the horizon (block.js); no keys: they all go to the chat
-    config.hotSpots = compass();
+    // no keys: they all go to the chat
     config.disableKeyboardCtrl = true;
     for (var k in options) config[k] = options[k];
     return config;
@@ -1460,6 +1460,7 @@ function survivalViews(fx) {
                    disableKeyboardCtrl: true, showControls: false};
     }
     viewer = pannellum.viewer('room-panorama', panoramaConfig(s.url, options));
+    compassBar(viewer, document.querySelector('.room-hud'));   // N E S W under the round's sign (block.js)
 }
 
 // the round starts: what counts from its start (a reload included): Darkness, Wither

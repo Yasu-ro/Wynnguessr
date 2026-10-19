@@ -1171,10 +1171,16 @@ dans `app.py`, tous corrigés :
   attendent maintenant la fin du décompte des points (le verdict) ; avant,
   « … » dans le tableau et les cœurs d'avant la manche. Survival et Duel.
 - **N, E, S, W dans le panorama** (« pour les joueurs en besoin ») :
-  quatre points chauds Pannellum sur l'horizon (`compass()` dans
-  `block.js`), N doré, lettres cerclées d'encre comme les chiffres d'XP.
-  **Toujours affichés** : version minimale, à mettre en interrupteur si
-  Yasuro le veut. Le mod prend chaque photo face au nord (face `f`),
+  d'abord quatre points chauds sur l'horizon ; **remplacés le 2026-10-19**
+  (Yasuro : « like in Skyrim but in our own style ») par une **bande en
+  haut** (`compassBar()` dans `block.js`) : sable, contour d'encre, lettres
+  cerclées d'encre, N doré, un trait tous les 15° (plus long tous les 45°),
+  ±90° visibles, fondu aux deux bouts. Pannellum ne signale pas qu'on
+  tourne : une boucle `requestAnimationFrame` lit le lacet et ne bouge les
+  marques que s'il a changé ; elle s'arrête quand le lieu change. Dans un
+  salon, la bande va **sous le panneau de la manche** (`.room-top`), qui la
+  cachait. **Toujours affichée** : version minimale, à mettre en
+  interrupteur si Yasuro le veut. Le mod prend chaque photo face au nord (face `f`),
   l'est à droite (`r`) : **vérifié** sur le lieu (1296, −3536), au bord de
   la mer : à l'ouest la mer et des îlots, à l'est les montagnes, comme sur
   la carte. Tous les lieux jouables viennent du mod (les 622 d'origine

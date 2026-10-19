@@ -24,15 +24,45 @@ function mapTiles(m) {
     }).addTo(m);
 }
 
-// The compass of the panoramas: N, E, S, W on the horizon (Yasuro: for the
-// players who need it). Every location comes from the mod, which takes its
-// pictures facing north: the cube's front is north, its right east. New
-// objects for each panorama: Pannellum writes into them
-function compass() {
-    return [['N', 0], ['E', 90], ['S', 180], ['W', -90]].map(function (d) {
-        return {pitch: 0, yaw: d[1], cssClass: 'compass-mark' + (d[0] == 'N' ? ' north' : ''),
-                createTooltipFunc: function (div) { div.textContent = d[0]; }};
-    });
+// The compass of the panoramas, Skyrim's way (Yasuro): a band at the top
+// where N, E, S, W and small marks slide by as the view turns. Every
+// location comes from the mod, which takes its pictures facing north: yaw 0
+// is north, 90 east. Pannellum says nothing when the view turns, so each
+// frame reads the yaw, and only moves the marks when it changed. In a room
+// it goes right under the round's sign (after): on top, the sign hid it
+var COMPASS_SPAN = 90;    // degrees seen on each side of the middle
+
+function compassBar(viewer, after) {
+    var box = after ? after.parentNode : viewer.getContainer(), bar = document.createElement('div'), marks = '';
+    if (box.compass) box.compass.remove();   // the band of the last location
+    for (var d = 0; d < 360; d += 15) {
+        var letter = {0: 'N', 90: 'E', 180: 'S', 270: 'W'}[d];
+        marks += letter ? "<b class='compass-mark" + (d ? '' : ' north') + "' data-deg='" + d + "'>" + letter + '</b>'
+                        : "<i class='compass-tick" + (d % 45 ? '' : ' big') + "' data-deg='" + d + "'></i>";
+    }
+    bar.className = 'compass-bar';
+    bar.innerHTML = marks;
+    if (after) after.after(bar); else box.appendChild(bar);
+    box.compass = bar;
+    var items = [].slice.call(bar.children), last = null;
+    (function frame() {
+        if (box.compass != bar) return;
+        var yaw;
+        try {
+            yaw = viewer.getYaw();
+        } catch (e) {
+            return;   // destroyed
+        }
+        if (yaw !== last) {
+            last = yaw;
+            items.forEach(function (el) {
+                var delta = ((el.dataset.deg - yaw) % 360 + 540) % 360 - 180;
+                el.style.visibility = Math.abs(delta) > COMPASS_SPAN ? 'hidden' : '';
+                el.style.left = (50 + 50 * delta / COMPASS_SPAN) + '%';
+            });
+        }
+        requestAnimationFrame(frame);
+    })();
 }
 
 // the block under a point of the map

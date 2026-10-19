@@ -3314,16 +3314,56 @@ body.room-playing {
 .pnlm-about-msg {
     display: none !important;
 }
-/* the compass of the panoramas (block.js): N, E, S, W on the horizon, in the
-   outlined letters of the game's numbers, never in the way of a drag */
-.compass-mark {
-    font: 700 26px/1 var(--sans);
-    color: #fff;
-    text-shadow: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink), 0 4px 0 var(--ink);
+/* the compass of the panoramas (block.js), Skyrim's way: a band of sand at
+   the top, the letters in the outlined numbers of the game, N in gold, fading
+   out at both ends, never in the way of a drag */
+.compass-bar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    z-index: 3;
+    width: min(420px, 70%);
+    height: 30px;
+    overflow: hidden;
+    background: rgba(214, 200, 154, .85);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, .3);
+    transform: translateX(-50%);
     pointer-events: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+}
+/* in a room: in the column under the round's sign */
+.room-top .compass-bar {
+    position: relative;
+    top: auto;
+    left: auto;
+    flex: none;
+    width: min(420px, 70vw);
+    transform: none;
+}
+.compass-bar > * {
+    position: absolute;
+    transform: translateX(-50%);
+}
+.compass-mark {
+    top: 4px;
+    font: 700 20px/1 var(--sans);
+    color: #fff;
+    text-shadow: 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 2px 0 var(--ink), 0 -2px 0 var(--ink);
 }
 .compass-mark.north {
     color: var(--gold);
+}
+.compass-tick {
+    bottom: 0;
+    width: 2px;
+    height: 7px;
+    background: var(--ink);
+}
+.compass-tick.big {
+    height: 12px;
 }
 
 /* ---------- Narrow screens ---------- */

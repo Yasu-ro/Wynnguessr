@@ -56,7 +56,6 @@ function panoramaConfig(url, options) {
         ? {type: 'multires', multiRes: {basePath: url.slice(0, -1), path: '/%l/%s%y_%x', fallbackPath: '/fallback/%s',
             extension: 'webp', tileResolution: 512, maxLevel: 4, cubeResolution: 4096}}
         : {type: 'equirectangular', panorama: url};
-    config.hotSpots = compass();   // N E S W on the horizon (block.js)
     for (var k in options) config[k] = options[k];
     return config;
 }
@@ -101,6 +100,7 @@ function guessScreen() {
                 disableKeyboardCtrl: true, showControls: false};
     }
     viewer = pannellum.viewer('game-panorama', panoramaConfig(s.url, view));
+    compassBar(viewer);   // N E S W at the top (block.js)
     if (map) {
         map.remove();
     }
