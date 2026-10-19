@@ -17,6 +17,29 @@
         <a href="#password">Password</a>
         {% if me.password %}<a href="#code">Recovery Code</a>{% endif %}
     </nav>
+    <script>
+        // glide to the section, then light it up briefly so the eye finds it
+        document.querySelector('.side-board').addEventListener('click', function (e) {
+            var link = e.target.closest('a');
+            if (!link) return;
+            e.preventDefault();
+            var section = document.querySelector(link.getAttribute('href')), done = false;
+            var flash = function () {
+                if (done) return;
+                done = true;
+                removeEventListener('scrollend', flash);
+                section.classList.remove('flash');
+                void section.offsetWidth;   // restarts the animation on a second click
+                section.classList.add('flash');
+            };
+            var y = scrollY;
+            section.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+            history.replaceState(null, '', link.getAttribute('href'));
+            addEventListener('scrollend', flash);
+            setTimeout(function () { if (scrollY == y) flash(); }, 100);   // already there: no scroll to end
+            setTimeout(flash, 1500);                                      // no scrollend (older Safari)
+        });
+    </script>
     <div class="account">
         <section class="panel" id="picture">
             <h2>Picture</h2>

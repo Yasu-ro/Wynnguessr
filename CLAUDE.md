@@ -845,6 +845,9 @@ max), journal d'audit avec la raison. D'où :
   page, une ligne par section (ancres `#picture`…). Affiché seulement à
   partir de **1 560 px** de large, là où il tient à côté de la page ; en
   dessous, rien (question posée à Yasuro).
+  Un clic fait **glisser** jusqu'à la section (pas de saut), puis l'entoure
+  d'un cadre vert qui s'efface en 1,6 s (`.flash`, demande de Yasuro : « so
+  we know what to look at »), lancé à `scrollend` (repli : minuterie).
 - **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
   Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
   dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne
