@@ -1061,7 +1061,16 @@ max), journal d'audit avec la raison. D'où :
   Yasuro ; un cadre vert avait été refusé), qui apparaît en ~0,2 s et
   s'efface en ~1 s (demande : « fade in faster »), lancée à `scrollend`
   (repli : minuterie). La bande suppose la page à 960 px, vrai partout où
-  le panneau s'affiche.
+  le panneau s'affiche. **Piège payé (2026-10-20)** : elle existait aussi
+  en dessous de 1 560 px, invisible mais plus large que l'écran, et un
+  téléphone affichait toute la page Edit Profile dézoomée (675 px pour 390).
+  Elle n'existe plus que dans la même `@media` que le panneau.
+  **Autre piège payé le même jour** : les ancres du panneau avaient donné
+  l'id `picture` à la section, déjà porté par le champ de fichier. Le
+  `<label for="picture">` visait alors la section, et le bouton « Upload a
+  picture » ne faisait plus rien depuis le 2026-10-19. Le champ s'appelle
+  maintenant `picture-file`. `t_photos_page.py` passe désormais par le bouton,
+  comme un joueur, et plus par `set_input_files`.
 - **Photos de profil approuvées** (étape 2, 2026-10-18, décision de
   Yasuro : « approuvées par les mods d'abord ») : une image envoyée attend
   dans `users.avatar_pending` (`pending_at`) ; les autres voient l'ancienne
@@ -1998,6 +2007,53 @@ fan, sans rien voler).
   voir « Contact »), Made by Ched3, Hosted & modified by Yasuro, Wynncraft,
   Fan-made, not official (séparés par l'espace, plus par
   des points médians).
+
+### Thèmes (2026-10-20, bêta)
+
+Demande de Yasuro : « plusieurs thèmes de site comme wynncraft », dont un
+**Halloween, par défaut pendant Halloween**, choisi dans Edit Profile avec
+les autres réglages.
+
+- **Trois thèmes** (`THEMES` dans `app.py` : nom, phrase, couleur de
+  pierre). **Classic**, c'est le site validé par Yasuro, inchangé.
+  **Fruma**, glace et or, d'après le thème « fruma » de wynncraft.com : bois
+  sarcelle, papier glacé, or `#ffd241`, cordes rouges. **Halloween** : nuit
+  violette, parchemin, orange citrouille, crépuscule sur la photo
+  d'accueil, toiles d'araignée dans les coins hauts des pages.
+  wynncraft.com en a deux (Classic = leur « journey », et Fruma) ;
+  Halloween est le nôtre.
+- **Par défaut, celui de la saison** (`season_theme()`) : Halloween du
+  1er octobre au 3 novembre, Classic le reste de l'année. Sans compte, en
+  invité ou sans choix, c'est lui. Pas de cookie pour qui n'a pas de compte :
+  le choix est un réglage du profil, comme demandé.
+- **Edit Profile › Theme** : Seasonal (« Halloween for now »), Classic,
+  Fruma, Halloween. Ce sont des cartes deux par deux, chacune dans ses
+  propres couleurs (pierre, bois, papier, accent). Un clic change toute la
+  page aussitôt (`data-theme` sur `<html>`), sans recharger ni bouger. Il
+  s'enregistre en `fetch`, comme l'étiquette (`account?do=theme` : 204,
+  inconnu → 400). Colonne `users.theme`, NULL = saisonnier ; un thème retiré
+  plus tard retombe sur la saison.
+- **Comment c'est fait.** `data-theme` est posé sur `<html>` dans les cinq
+  gabarits autonomes (`layout`, `index`, `game`, `survival`, `review`).
+  `head.html` met la pierre du thème avant la feuille de style, pour éviter
+  un éclair d'une autre couleur. Les couleurs qui étaient écrites en dur
+  dans le CSS passent par des variables : vert des boutons et des choix
+  cochés, champs, cordes, pied de page, bandes de l'accueil (`--accent`,
+  `--accent-light`, `--accent-ink`, `--field`, `--rope`, `--rope-dark`,
+  `--footer-ink`, `--footer-link`, `--band`). Un thème est un bloc
+  `[data-theme="…"]` en fin de `style.css`, qui redéfinit ces variables et
+  recolore les textures de pierre et de terre ; le feutre des cases de la
+  carte est teinté par `filter`. Classic garde les valeurs de `:root`.
+- **Identiques dans tous les thèmes, exprès** : l'or de la page courante et
+  des onglets (`--gold`, la surbrillance de Wynncraft), la barre d'XP verte,
+  les cœurs, les couleurs des étiquettes et des joueurs, l'écran de mort
+  rouge, la carte.
+- **Ajouter un thème** : une entrée dans `THEMES` et un bloc `[data-theme]` ;
+  sa carte dans Edit Profile se dessine seule.
+- **Vérifié** sous Chromium et Firefox, en 1366 et en 360/390 px, sur toutes
+  les pages du site (dont un salon Survival : salle d'attente, manche,
+  révélation, marchand, mort, fantôme) : aucune n'est plus large que l'écran,
+  dans aucun thème. Tests : `t_theme.py` (34) et `t_theme_page.py` (26).
 
 ## Tester
 

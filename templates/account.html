@@ -14,6 +14,7 @@
         <a href="#picture">Picture</a>
         <a href="#name">Name</a>
         {% if tags|length > 1 %}<a href="#tag">Tag</a>{% endif %}
+        <a href="#theme">Theme</a>
         <a href="#password">Password</a>
         {% if me.password %}<a href="#code">Recovery Code</a>{% endif %}
         {% if me.id != owner %}<a href="#delete">Delete Account</a>{% endif %}
@@ -51,8 +52,8 @@
                 <img class="avatar{{ ' head' if not me.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
                 <div class="stack">
                     <form action="account?do=picture" method="post" enctype="multipart/form-data">
-                        <input class="file-input" type="file" name="picture" id="picture" accept="image/png,image/jpeg,image/webp,image/gif" onchange="this.form.submit()">
-                        <label for="picture" class="btn wood wide">Upload a picture</label>
+                        <input class="file-input" type="file" name="picture" id="picture-file" accept="image/png,image/jpeg,image/webp,image/gif" onchange="this.form.submit()">
+                        <label for="picture-file" class="btn wood wide">Upload a picture</label>
                     </form>
                     {% if me.avatar %}
                     <form action="account?do=head" method="post"><button class="btn wide">Use my Minecraft head</button></form>
@@ -107,6 +108,37 @@
             });
         </script>
         {% endif %}
+
+        <section class="panel" id="theme">
+            <h2>Theme</h2>
+            {% set season = season_theme() %}
+            {% set mine = me.theme if me.theme in THEMES else '' %}{# one since taken away: Seasonal #}
+            <form class="theme-pick" id="theme-pick">
+                <input type="radio" name="theme" id="theme-season" value="" data-look="{{ season }}"{{ ' checked' if not mine }}>
+                <label class="theme-card" for="theme-season">
+                    <span class="theme-swatch" data-theme="{{ season }}"><i></i><i></i><i></i></span>
+                    <b>Seasonal</b><small>{{ THEMES[season][0] }} for now</small>
+                </label>
+                {% for key, (name, about, stone) in THEMES.items() %}
+                <input type="radio" name="theme" id="theme-{{ key }}" value="{{ key }}" data-look="{{ key }}"{{ ' checked' if mine == key }}>
+                <label class="theme-card" for="theme-{{ key }}">
+                    <span class="theme-swatch" data-theme="{{ key }}"><i></i><i></i><i></i></span>
+                    <b>{{ name }}</b><small>{{ about }}</small>
+                </label>
+                {% endfor %}
+            </form>
+            <p class="note bad" id="theme-error" hidden>Could not save: try again</p>
+        </section>
+        <script>
+            // tried at once on the whole page, and saved (as the tag: a reload took the page back to the top)
+            document.getElementById('theme-pick').addEventListener('change', function (e) {
+                var error = document.getElementById('theme-error');
+                document.documentElement.dataset.theme = e.target.dataset.look;
+                fetch('account?do=theme', {method: 'POST', body: new FormData(this)}).then(function (r) {
+                    error.hidden = r.ok;
+                }, function () { error.hidden = false; });
+            });
+        </script>
 
         <section class="panel" id="password">
             <h2>{{ 'Password' if me.password else 'Set a Password' }}</h2>

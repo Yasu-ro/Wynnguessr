@@ -4,7 +4,7 @@
    instead of gradients, frames made of rings of wood, signs hanging from the
    menu. Every drawing below (facets, nails, stones, textures) is our own. */
 
-:root {
+:root, [data-theme="classic"] {
     --ink: #3f2724;          /* outlines; text on paper and wood */
     --ink-soft: #6f5c4f;     /* quieter text on paper */
     --wood: #877765;
@@ -26,6 +26,19 @@
     --teal-light: #77d1d7;
     --track: #465b50;
     --xp: #80ff20;           /* Minecraft's experience green */
+    /* what a theme changes besides the palette above (see Themes, at the end):
+       the colour of the buttons and choices (the greens that mean something,
+       a tag, a win, a check, stay green), the fields, the signs' ropes, the
+       footer's words, the bands of the home page */
+    --accent: var(--green);
+    --accent-light: var(--green-light);
+    --accent-ink: var(--green-ink);
+    --field: #897665;
+    --rope: #927859;
+    --rope-dark: #5d4634;
+    --footer-ink: #9d8f70;
+    --footer-link: #e0d1a6;
+    --band: #1f1a12;
     --night: #24221d;
     --stone: #1d1c19;
     --hand: 'Architects Daughter', Ubuntu, cursive;
@@ -56,6 +69,7 @@ body {
     flex-direction: column;
     min-height: 100vh;
     margin: 0;
+    background-color: var(--stone);   /* the theme's (head.html's colour waits only for this file) */
     font: 400 17px/1.45 var(--sans);
     color: var(--ink);
 }
@@ -73,7 +87,7 @@ button, input {
     display: none !important;
 }
 :focus-visible {
-    outline: 3px solid var(--green-light);
+    outline: 3px solid var(--accent-light);
     outline-offset: 2px;
 }
 
@@ -246,7 +260,7 @@ button, input {
     z-index: -1;
     width: 9px;
     height: 600px;
-    background: repeating-linear-gradient(-50deg, #927859 0 5px, #5d4634 5px 8px);
+    background: repeating-linear-gradient(-50deg, var(--rope) 0 5px, var(--rope-dark) 5px 8px);
     border: solid var(--ink);
     border-width: 0 2px;
 }
@@ -364,7 +378,7 @@ button, input {
 }
 .tag-pick :checked + .name-tag {
     opacity: 1;
-    outline: 3px solid var(--green);
+    outline: 3px solid var(--accent);
     outline-offset: 2px;
 }
 .tag-pick :focus-visible + .name-tag {
@@ -1037,16 +1051,16 @@ button, input {
     gap: 4px 28px;
     padding: 20px 16px 24px;
     font-size: 15px;
-    color: #9d8f70;
+    color: var(--footer-ink);
     background: var(--night);
     border-top: 3px solid var(--ink);
 }
 .site-footer a {
-    color: #e0d1a6;
+    color: var(--footer-link);
     text-decoration: none;
 }
 .site-footer a:hover {
-    color: var(--green-light);
+    color: var(--accent-light);
     text-decoration: underline;
 }
 
@@ -1064,8 +1078,8 @@ button, input {
     text-transform: uppercase;
     text-align: center;
     text-decoration: none;
-    color: var(--green-ink);
-    background: var(--green) var(--facet-big) center / 100% 100% no-repeat;
+    color: var(--accent-ink);
+    background: var(--accent) var(--facet-big) center / 100% 100% no-repeat;
     border: 3px solid #151513;
     border-radius: 6px;
     box-shadow: 0 4px 0 rgba(0, 0, 0, .35);
@@ -1073,7 +1087,7 @@ button, input {
     transition: filter .15s, transform .1s, box-shadow .1s;
 }
 .btn:hover, .guess-button:hover, .next-button:hover {
-    color: var(--green-ink);
+    color: var(--accent-ink);
     filter: brightness(1.08);
 }
 .btn:active, .guess-button:active, .next-button:active {
@@ -1144,12 +1158,12 @@ button, input {
 }
 :checked + .chip {
     font-weight: 700;
-    color: var(--green-ink);
-    background: var(--green) var(--facet) center / 100% 100% no-repeat;
+    color: var(--accent-ink);
+    background: var(--accent) var(--facet) center / 100% 100% no-repeat;
     box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .15);
 }
 :focus-visible + .chip, :focus-visible + .tab {
-    outline: 3px solid var(--green-light);
+    outline: 3px solid var(--accent-light);
     outline-offset: 2px;
 }
 :disabled + .chip {
@@ -1169,7 +1183,7 @@ button, input {
     padding: 9px 12px;
     font: 400 18px/1.3 var(--sans);
     color: #fff;
-    background: #897665;
+    background: var(--field);
     border: 3px solid var(--ink);
     border-radius: 4px;
     box-shadow: inset 0 3px 0 rgba(0, 0, 0, .18);
@@ -1178,7 +1192,7 @@ button, input {
     color: rgba(255, 255, 255, .65);
 }
 .field:focus {
-    outline: 3px solid var(--green-light);
+    outline: 3px solid var(--accent-light);
     outline-offset: 1px;
 }
 .field.small {
@@ -1281,7 +1295,7 @@ button, input {
     align-items: center;
     gap: clamp(36px, 5vw, 80px);
     padding: clamp(60px, 9vw, 120px) max(24px, 7vw);
-    background: #1f1a12 var(--tex-dirt);
+    background: var(--band) var(--tex-dirt);
 }
 .band + .band {
     border-top: 3px solid var(--ink);
@@ -1296,7 +1310,7 @@ button, input {
 .band h2 {
     margin-bottom: 18px;
     font: 700 clamp(38px, 4.6vw, 58px)/1.05 var(--sans);
-    color: var(--green);
+    color: var(--accent);
     text-shadow: 0 4px 0 rgba(0, 0, 0, .45);
 }
 .band p {
@@ -2002,20 +2016,24 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     scroll-margin-top: calc(var(--nav-h) + 20px);
 }
 /* the section a board link led to: a dark band across the whole page (the
-   page is 960 px wide wherever the board shows), quick in, slow out */
+   page is 960 px wide wherever the board shows), quick in, slow out. Only
+   there: on a narrower screen the band reached past it, and a phone showed
+   the whole page zoomed out to fit it */
 .account .panel {
     position: relative;
 }
-.account .panel::after {
-    content: "";
-    position: absolute;
-    inset: -15px calc(50% - 480px);
-    background: rgba(0, 0, 0, .3);
-    opacity: 0;
-    pointer-events: none;
-}
-.account .panel.flash::after {
-    animation: panel-flash 1.8s;
+@media (min-width: 1560px) {
+    .account .panel::after {
+        content: "";
+        position: absolute;
+        inset: -15px calc(50% - 480px);
+        background: rgba(0, 0, 0, .3);
+        opacity: 0;
+        pointer-events: none;
+    }
+    .account .panel.flash::after {
+        animation: panel-flash 1.8s;
+    }
 }
 @keyframes panel-flash {
     0% {
@@ -2055,7 +2073,7 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     opacity: 0;
 }
 .file-input:focus-visible + .btn {
-    outline: 3px solid var(--green-light);
+    outline: 3px solid var(--accent-light);
     outline-offset: 2px;
 }
 .note {
@@ -3254,7 +3272,7 @@ body.room-playing {
     padding: 5px 10px;
     font-size: 16px;
     color: #fff;
-    background: #897665;
+    background: var(--field);
     border: 3px solid var(--ink);
     border-radius: 4px;
 }
@@ -3265,8 +3283,8 @@ body.room-playing {
     display: flex;
     align-items: center;
     padding: 0 10px;
-    color: var(--green-ink);
-    background: var(--green) var(--facet) center / 100% 100% no-repeat;
+    color: var(--accent-ink);
+    background: var(--accent) var(--facet) center / 100% 100% no-repeat;
     border: 3px solid #151513;
     border-radius: 4px;
     cursor: pointer;
@@ -3815,7 +3833,7 @@ body.room-playing {
     z-index: -1;
     width: 7px;
     height: 40px;
-    background: repeating-linear-gradient(-50deg, #927859 0 5px, #5d4634 5px 8px);
+    background: repeating-linear-gradient(-50deg, var(--rope) 0 5px, var(--rope-dark) 5px 8px);
     border: solid var(--ink);
     border-width: 0 2px;
 }
@@ -4676,7 +4694,7 @@ body.room-playing {
     background: var(--ink);
 }
 :checked + .contact-topic .material-icons {
-    color: var(--green-light);
+    color: var(--accent-light);
 }
 .contact-rest {
     display: flex;
@@ -5087,4 +5105,166 @@ body.room-playing {
         transition: none !important;
         animation: none !important;
     }
+}
+
+/* ---------- Themes ----------
+   As on wynncraft.com, a player picks a look (Edit Profile › Theme;
+   app.py: THEMES): Classic (all of the above), Fruma (Wynncraft's own,
+   ice and gold) and Halloween (the season's, by default in its time).
+   A theme sets the palette again on [data-theme]: the page's <html>, or a
+   preview in Edit Profile, which shows itself in its own colours. The
+   greens that mean something (a tag, a win, a check, a heart) stay as they
+   are: only the accent (buttons, choices) follows the theme. */
+
+/* Fruma: wynncraft.com's Fruma theme, its teal and its gold, on frosted paper */
+[data-theme="fruma"] {
+    --ink: #08303a;
+    --ink-soft: #3f6872;
+    --wood: #3f8a95;
+    --wood-light: #5ea6b0;
+    --ring: #2d7480;
+    --ring-dark: #165260;
+    --sand: #b6d4d8;
+    --paper: #d3e8eb;
+    --paper-light: #eaf5f7;
+    --sign: #c9e2e6;
+    --line: rgba(8, 48, 58, .2);
+    --accent: #ffd241;
+    --accent-light: #ffe680;
+    --accent-ink: #3b2400;
+    --field: #2f6c76;
+    --rope: #8a2a1c;
+    --rope-dark: #5d1507;
+    --footer-ink: #8fbcc2;
+    --footer-link: #d3e8eb;
+    --band: #0f1d21;
+    --night: #10232a;
+    --stone: #0d1b1f;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%230d1b1f'/><path fill='%23122429' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%23122429' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%23122429' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%23122429' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%23102125' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%23122429' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%230b171a' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%23102125' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%23102125' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%23102125' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%230b171a' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%23122429' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%23122429' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%230b171a' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%230b171a' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%23122429' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%23122429' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%230b171a' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%230f1d21'/><path fill='%23132428' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%23132428' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%230d191c' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%23132428' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%230d191c' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%230d191c' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%230d191c' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%23132428' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%2315282c' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%23132428' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%23132428' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%230d191c' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%2315282c' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%230d191c' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%2315282c' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%23132428' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%2315282c' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%2315282c' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%230d191c' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="fruma"] .card-table::before {
+    filter: hue-rotate(45deg) saturate(.85) brightness(.95);
+}
+
+/* Halloween: pumpkins under a purple night, on candle-lit parchment */
+[data-theme="halloween"] {
+    --ink: #2b1a26;
+    --ink-soft: #6b5262;
+    --wood: #86708c;
+    --wood-light: #a08aa6;
+    --ring: #7d6585;
+    --ring-dark: #533f5c;
+    --sand: #c4a77a;
+    --paper: #dcc28f;
+    --paper-light: #eedcb3;
+    --sign: #d6b780;
+    --line: rgba(43, 26, 38, .22);
+    --accent: #f2862b;
+    --accent-light: #ffab52;
+    --accent-ink: #2b1200;
+    --field: #6f5a76;
+    --rope: #5a4562;
+    --rope-dark: #2e2133;
+    --footer-ink: #a891b2;
+    --band: #1b1018;
+    --night: #1c1522;
+    --stone: #151019;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23151019'/><path fill='%231b1421' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%231b1421' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%231b1421' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%231b1421' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%2318121d' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%231b1421' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%23120d16' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%2318121d' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%2318121d' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%2318121d' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%23120d16' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%231b1421' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%231b1421' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%23120d16' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%23120d16' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%231b1421' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%231b1421' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%23120d16' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%231b1018'/><path fill='%2320131d' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%2320131d' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%23170d14' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%2320131d' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%23170d14' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%23170d14' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%23170d14' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%2320131d' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%2323151f' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%2320131d' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%2320131d' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%23170d14' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%2323151f' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%23170d14' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%2323151f' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%2320131d' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%2323151f' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%2323151f' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%23170d14' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="halloween"] .card-table::before {
+    filter: hue-rotate(150deg) saturate(.75) brightness(.72);
+}
+/* the home page at dusk: a purple sky, the last of the sun on the stones */
+[data-theme="halloween"] .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(rgba(58, 18, 86, .6), rgba(34, 12, 44, .25) 55%, rgba(255, 122, 26, .25));
+    pointer-events: none;
+}
+[data-theme="halloween"] .hero > :not(.hero-pano) {
+    z-index: 2;
+}
+/* cobwebs in the page's top corners, under everything on it */
+[data-theme="halloween"] .page::before, [data-theme="halloween"] .page::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    z-index: -1;
+    width: 110px;
+    height: 110px;
+    background: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><g fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round'><path d='M0 0L120 8M0 0L104 54M0 0L72 92M0 0L34 116M0 0L6 120'/><path d='M30 2Q27 13 27 14Q22 22 22 24Q16 28 15 31Q8 32 6 31'/><path d='M62 4Q56 25 55 29Q46 44 44 48Q33 57 30 60Q16 63 12 63'/><path d='M94 6Q86 37 84 43Q70 66 66 72Q50 87 46 91Q26 95 20 95'/></g></svg>") center / contain no-repeat;
+    opacity: .32;
+    pointer-events: none;
+}
+[data-theme="halloween"] .page::before {
+    left: 0;
+}
+[data-theme="halloween"] .page::after {
+    right: 0;
+    transform: scaleX(-1);
+}
+
+/* Edit Profile › Theme: each card shows its theme in its own colours (its
+   data-theme): the stone under everything, the wood, the paper, the accent */
+.theme-pick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+.theme-pick input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.theme-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 10px 12px;
+    text-align: center;
+    background: var(--paper-light);
+    border: 3px solid var(--ink);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.theme-card small {
+    font-size: 13px;
+    line-height: 1.25;
+    color: var(--ink-soft);
+}
+:checked + .theme-card {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+}
+:focus-visible + .theme-card {
+    outline: 3px solid var(--accent-light);
+    outline-offset: 2px;
+}
+.theme-swatch {
+    display: flex;
+    gap: 6px;
+    height: 48px;
+    margin-bottom: 4px;
+    padding: 8px;
+    background: var(--stone) var(--tex-stone);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.theme-swatch i {
+    flex: 1;
+    border: 2px solid var(--ink);
+    border-radius: 2px;
+}
+.theme-swatch i:nth-child(1) {
+    background: var(--wood);
+}
+.theme-swatch i:nth-child(2) {
+    background: var(--paper);
+}
+.theme-swatch i:nth-child(3) {
+    background: var(--accent);
 }

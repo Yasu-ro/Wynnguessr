@@ -1,4 +1,4 @@
-from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, send_file, jsonify
+from flask import Flask, render_template, url_for, request, redirect, session, send_from_directory, send_file, jsonify, g
 import os
 import re
 import sqlite3
@@ -234,6 +234,39 @@ VERSION = '2.3'
 @app.context_processor
 def site_version():
     return {'version': VERSION}
+
+# Themes: looks of the site, as on wynncraft.com (Classic and Fruma, their
+# two) and the season's (Yasuro, 2026-10-20: Halloween, the default while it
+# is Halloween). A player picks one in Edit Profile (users.theme); with none
+# picked, or no account, it is the season's. The colours: style.css, Themes
+THEMES = {   # key: (name, what it is, its stone: the page's colour before the stylesheet comes)
+    'classic': ('Classic', 'The classic Wynncraft look', '#1d1c19'),
+    'fruma': ('Fruma', 'Ice and gold, as in Fruma', '#0d1b1f'),
+    'halloween': ('Halloween', 'Pumpkins under a purple night', '#151019'),
+}
+
+def season_theme(day = None):
+    # Halloween through October and the first days of November, else Classic
+    day = day or date.today()
+    return 'halloween' if day.month == 10 or (day.month == 11 and day.day <= 3) else 'classic'
+
+with connect() as c:
+    if 'theme' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN theme TEXT")
+
+def chosen_theme():
+    # the theme this player picked (None: the season's), looked up once a request
+    if 'theme' not in g:
+        g.theme = None
+        if session.get('loggedin'):
+            with connect() as c:
+                row = c.execute("SELECT theme FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+                g.theme = row[0] if row and row[0] in THEMES else None
+    return g.theme
+
+@app.context_processor
+def site_theme():
+    return {'theme': lambda: chosen_theme() or season_theme(), 'THEMES': THEMES, 'season_theme': season_theme}
 
 # Who comes, for the About page: a random id kept in the session (no
 # account needed) and when it was last seen, written once a minute at most.
@@ -802,6 +835,12 @@ def account():
             if not problem:
                 c.execute("UPDATE users SET username = ? WHERE id = ?", (name, uid))
             what = 'name'
+        elif what == 'theme':
+            key = form.get('theme', '')
+            if key and key not in THEMES:
+                return "No such theme", 400
+            c.execute("UPDATE users SET theme = ? WHERE id = ?", (key or None, uid))   # none: the season's
+            return '', 204   # tried on the page already, which stays where it is
         elif what == 'tag':
             label = form.get('tag', '')
             if label not in [t['label'] for t in tags_of(c, [uid])[uid]]:
