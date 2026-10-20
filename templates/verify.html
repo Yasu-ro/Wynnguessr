@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}: Verify{% endblock %}
+
+{% block content %}
+    {% if error %}
+    <div class="panel narrow oops">
+        <img src="static/rat_apology_image.PNG" alt="" width="291" height="358">
+        <p>{{ error }}</p>
+        <a class="btn wood" href="{{ back }}">Back to Discord</a>
+    </div>
+    {% else %}
+    <h1 class="sign">Verified</h1>
+    <div class="panel narrow verify">
+        <img class="avatar head" src="avatar?uuid={{ done.uuid | urlencode }}" alt="" width="128" height="128">
+        <p class="verify-name">{{ done.name }}</p>
+        <p>is now <b>{{ done.discord }}</b> on Discord.</p>
+        {% if done.moved %}<p class="hint">It was verified on another Discord account before: it's on this one now.</p>{% endif %}
+        <p class="hint">Your roles show up there in a few seconds.</p>
+        <a class="btn wide" href="{{ back }}">Back to Discord</a>
+        {% if site %}
+        <p class="hint">Your WynnGuessr tags come along, from <b>{{ site.username }}</b>.</p>
+        {% elif wynn_login %}
+        <p class="hint">Want your WynnGuessr tags there too? <a href="auth/wynncraft">{{ 'Link my Wynncraft account' if session.loggedin else 'Log in with Wynncraft' }}</a> here.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+{% endblock %}

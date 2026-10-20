@@ -2228,6 +2228,23 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     font-size: 20px;
     color: var(--red);
 }
+/* verified on Discord (verify.html) */
+.verify {
+    text-align: center;
+}
+.verify .avatar {
+    margin: 0 auto 12px;
+}
+.verify p {
+    margin: 0 0 10px;
+}
+.verify .verify-name {
+    margin: 0;
+    font: 700 22px/1.3 var(--sans);
+}
+.verify .btn {
+    margin: 6px 0 4px;
+}
 
 /* ---------- A game alone ---------- */
 

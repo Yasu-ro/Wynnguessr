@@ -621,8 +621,9 @@ def delete_user(c, uid):
             os.remove(os.path.join(CONTACT_FILES, m[0]))
         except OSError:
             pass
-    name = c.execute("SELECT username FROM users WHERE id = ?", (uid,)).fetchone()[0]
+    name, uuid = c.execute("SELECT username, mc_uuid FROM users WHERE id = ?", (uid,)).fetchone()
     c.execute("DELETE FROM fails WHERE name = ?", (name.lower(),))
+    c.execute("DELETE FROM discord_links WHERE uuid = ?", (uuid,))    # verified on Discord: not any more
     c.execute("DELETE FROM contact_replies WHERE message IN (SELECT id FROM contact WHERE user_id = ?)", (uid,))
     c.execute("DELETE FROM chat_reports WHERE by = ? OR message IN (SELECT id FROM room_chat WHERE user_id = ?)", (uid, uid))
     c.execute("DELETE FROM survival_guesses WHERE run_id IN (SELECT id FROM survival_runs WHERE user_id = ?)", (uid,))
@@ -717,6 +718,12 @@ def avatar():
     # a player's picture: the one they sent, else their Minecraft head
     uid = request.args.get('id', type = int)
     with connect() as c:
+        if request.args.get('uuid'):
+            # the head of a Minecraft account verified on Discord (the bot's
+            # cards, the verify page); no other: not a door to Mojang for all
+            known = c.execute("SELECT uuid FROM discord_links WHERE uuid = ?", (request.args['uuid'],)).fetchone()
+            path = head(known[0]) if known else None
+            return send_file(path, max_age = 3600) if path else ('', 404)
         user = c.execute("SELECT avatar, avatar_pending, mc_uuid FROM users WHERE id = ?", (uid,)).fetchone()
         if request.args.get('pending') and user and user['avatar_pending'] and (
                 uid == session.get('user_id') and session.get('loggedin') or may(c, 'pictures')):
@@ -995,6 +1002,7 @@ def wynn_start():
         return wynn_fail("Wynncraft login is not set up yet")
     session['wynn_state'] = secrets.token_urlsafe(16)
     session['wynn_next'] = next_page()
+    session.pop('wynn_discord', None)    # a Discord verifying left half done (see verify)
     url = cfg['authorize_url']
     return redirect(url + ('&' if '?' in url else '?') + urlencode({'state': session['wynn_state']}))
 
@@ -1002,21 +1010,31 @@ def wynn_start():
 def wynn_back():
     cfg = wynn_config()
     state = session.pop('wynn_state', None)
+    # verifying on Discord (see verify): its own page, and never a login
+    discord = session.pop('wynn_discord', None)
+    def fail(message, why):
+        return redirect('../../verify?' + urlencode({'error': why})) if discord else wynn_fail(message)
     if not cfg or not state or request.args.get('state') != state:
-        return wynn_fail("Wynncraft login failed, please try again")
+        return fail("Wynncraft login failed, please try again", 'old')
     if not request.args.get('code'):
-        return wynn_fail("Wynncraft login was cancelled")
+        return fail("Wynncraft login was cancelled", 'cancelled')
     try:
         token = wynn_api('https://api.wynncraft.com/v3/oauth/token', {
             'grant_type': 'authorization_code', 'code': request.args['code'], 'redirect_uri': cfg['redirect_uri'],
             'client_id': cfg['client_id'], 'client_secret': cfg['client_secret']})['access_token']
         profiles = wynn_api('https://api.wynncraft.com/v3/oauth/me', token = token)['profiles']
-        uuid, profile = sorted(profiles.items(), key = lambda p: not p[1].get('primary'))[0]
-        name = profile['username']
+        if profiles:
+            uuid, profile = sorted(profiles.items(), key = lambda p: not p[1].get('primary'))[0]
+            name = profile['username']
     except Exception as e:
         detail = e.read()[:300] if hasattr(e, 'read') else ''
         app.logger.error("Wynncraft login: %r %s", e, detail)
-        return wynn_fail("Wynncraft did not answer, please try again")
+        return fail("Wynncraft did not answer, please try again", 'down')
+    if not profiles:
+        # a wynncraft.com account with no Minecraft account in it yet
+        return fail("Your wynncraft.com account has no Minecraft account yet: add one there, then try again", 'nominecraft')
+    if discord:
+        return discord_linked(discord, uuid, name)
     with connect() as c:
         owner = c.execute("SELECT id FROM users WHERE mc_uuid = ?", (uuid,)).fetchone()
         if session.get('loggedin'):
@@ -1042,6 +1060,71 @@ def wynn_back():
     if note:
         return wynn_fail(note, appeal = True)
     return redirect('../../' + session.pop('wynn_next', './'))
+
+# ---------- Discord: verifying on the WynnGuessr server ----------
+# Yasuro (2026-10-20): know exactly who is who on Wynncraft, in as few steps
+# as possible for the player. The bot (bot.py, its own process) gives a
+# member a one-time link to verify(); it goes through Log in with Wynncraft
+# and comes back with the Minecraft account Wynncraft vouches for. The site
+# keeps only that (Discord member <-> Minecraft account): it never logs the
+# player in nor makes an account. The bot does the rest (roles, tags both
+# ways) with the tables below, made here so the two always agree on them.
+DISCORD_GUILD = '1561303699307892806'   # the WynnGuessr server
+VERIFY_LIFE = 600                       # seconds a link from the bot can be opened
+VERIFY_ERRORS = {
+    'old': "This link is too old. Press Verify again on Discord.",
+    'cancelled': "Cancelled. Press Verify again on Discord when you're ready.",
+    'nominecraft': "Your wynncraft.com account has no Minecraft account yet. Add one there "
+                   "(type /link on play.wynncraft.com), then press Verify again.",
+    'down': "Wynncraft did not answer. Press Verify again on Discord in a minute.",
+}
+
+with connect() as c:
+    c.executescript('''
+        CREATE TABLE IF NOT EXISTS discord_links (discord_id TEXT PRIMARY KEY, uuid TEXT UNIQUE NOT NULL, name TEXT, at REAL);
+        CREATE TABLE IF NOT EXISTS discord_codes (code TEXT PRIMARY KEY, discord_id TEXT, discord_name TEXT, at REAL);
+        CREATE TABLE IF NOT EXISTS discord_ids (what TEXT PRIMARY KEY, id TEXT, name TEXT, color INTEGER);
+        CREATE TABLE IF NOT EXISTS discord_held (discord_id TEXT, role_id TEXT, uuid TEXT, PRIMARY KEY (discord_id, role_id));
+    ''')
+
+@app.route("/verify")
+def verify():
+    # the bot's link: off to Wynncraft, which comes back to wynn_back, which
+    # comes back here with what happened
+    code = request.args.get('code')
+    if code:
+        cfg = wynn_config()
+        with connect() as c:
+            fresh = c.execute("SELECT 1 FROM discord_codes WHERE code = ? AND at > ?", (code, time.time() - VERIFY_LIFE)).fetchone()
+        if not cfg or not fresh:
+            return redirect('verify?error=old')
+        session['wynn_state'] = secrets.token_urlsafe(16)
+        session['wynn_discord'] = code
+        url = cfg['authorize_url']
+        return redirect(url + ('&' if '?' in url else '?') + urlencode({'state': session['wynn_state']}))
+    done = None if request.args.get('error') else session.get('verified')
+    with connect() as c:
+        channel = c.execute("SELECT id FROM discord_ids WHERE what = 'channel'").fetchone()
+        site = done and c.execute("SELECT username FROM users WHERE mc_uuid = ? AND COALESCE(guest, 0) = 0", (done['uuid'],)).fetchone()
+    back = 'https://discord.com/channels/%s/%s' % (DISCORD_GUILD, channel[0]) if channel else DISCORD
+    if not done:
+        return render_template('verify.html', error = VERIFY_ERRORS.get(request.args.get('error'), VERIFY_ERRORS['old']), back = back)
+    return render_template('verify.html', done = done, site = site, back = back)
+
+def discord_linked(code, uuid, name):
+    # Wynncraft vouched for this Minecraft account: it is now this Discord
+    # member's, and theirs only (verifying again replaces it; one verified
+    # from another Discord account moves over)
+    with room_tx() as c:
+        row = c.execute("SELECT * FROM discord_codes WHERE code = ?", (code,)).fetchone()
+        if not row:
+            return redirect('../../verify?error=old')
+        c.execute("DELETE FROM discord_codes WHERE code = ? OR at < ?", (code, time.time() - 86400))
+        moved = c.execute("SELECT 1 FROM discord_links WHERE uuid = ? AND discord_id != ?", (uuid, row['discord_id'])).fetchone()
+        c.execute("DELETE FROM discord_links WHERE uuid = ? OR discord_id = ?", (uuid, row['discord_id']))
+        c.execute("INSERT INTO discord_links (discord_id, uuid, name, at) VALUES (?, ?, ?, ?)", (row['discord_id'], uuid, name, time.time()))
+    session['verified'] = {'name': name, 'uuid': uuid, 'discord': row['discord_name'], 'moved': bool(moved)}
+    return redirect('../../verify')
 
 @app.route("/apology")
 def apology():
@@ -3339,6 +3422,7 @@ def logged(c, action, target, details = '', reason = ''):
 # moves by itself to whoever leads it next. The profile shows them all.
 TAG_COLORS = ('gold', 'red', 'orange', 'green', 'teal', 'purple', 'stone')
 TOPS = {'at': 0, 'tags': {}}
+TOP_LABELS = ['#1 SV ' + d.capitalize() for d in DIFFICULTIES] + ['#1 Classic', '#1 Level', '#1 Wins']   # one per board, in this order
 TOPS_EVERY = 120          # seconds a computed "#1" list is kept (the levels are long to work out)
 
 with connect() as c:
@@ -3360,10 +3444,10 @@ def top_tags(c):
     # and every room would wait. room_state asks before taking its lock
     if time.time() - TOPS['at'] > TOPS_EVERY and not c.in_transaction:
         tops = {}
-        boards = [('#1 SV ' + d.capitalize(), board(c, {'mode': 'survival', 'difficulty': d})) for d in DIFFICULTIES]
-        boards.append(('#1 Classic', board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'})))
-        boards += [('#1 Level', ladder(c, 'levels')), ('#1 Wins', ladder(c, 'wins'))]
-        for label, rows in boards:
+        boards = [board(c, {'mode': 'survival', 'difficulty': d}) for d in DIFFICULTIES]
+        boards.append(board(c, {'mode': 'classic', 'provinces': str(PROVINCES), 'nolook': 'No', 'rounds': '5'}))
+        boards += [ladder(c, 'levels'), ladder(c, 'wins')]
+        for label, rows in zip(TOP_LABELS, boards):
             if rows:
                 tops.setdefault(rows[0]['id'], []).append(label)
         TOPS.update(at = time.time(), tags = tops)
@@ -3575,7 +3659,8 @@ def mod_log_list():
         if not may(c, 'log'):
             return jsonify({"success": False}), 403
         before = request.args.get('before', type = int) or 2 ** 62
-        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, a.username AS by, m.target AS tid, t.username AS target
+        rows = [dict(x) for x in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, CASE WHEN m.by = 0 THEN 'Discord' ELSE a.username END AS by,
+            m.target AS tid, t.username AS target
             FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
             WHERE m.id < ? ORDER BY m.id DESC LIMIT 50''', (before,))]
     return jsonify({"success": True, "log": rows})
@@ -3851,7 +3936,8 @@ def mod_player():
         if not u:
             return jsonify({"success": False})
         now = time.time()
-        log = [dict(x) for x in c.execute('''SELECT m.at, m.details, m.reason, a.username AS by FROM mod_log m LEFT JOIN users a ON a.id = m.by
+        log = [dict(x) for x in c.execute('''SELECT m.at, m.details, m.reason, CASE WHEN m.by = 0 THEN 'Discord' ELSE a.username END AS by
+            FROM mod_log m LEFT JOIN users a ON a.id = m.by
             WHERE m.target = ? ORDER BY m.id DESC LIMIT 30''', (uid,))]
         said = [dict(x) for x in c.execute('''SELECT code AS room, at, COALESCE(raw, text) AS text, hidden_by IS NOT NULL AS hidden
             FROM room_chat WHERE user_id = ? ORDER BY id DESC LIMIT 10''', (uid,))]

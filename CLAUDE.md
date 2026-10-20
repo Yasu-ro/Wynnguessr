@@ -20,7 +20,8 @@ garde ce qu'on ne redécouvre pas en lisant le code : décisions, pièges, méth
   poussé sur le fork public, retiré par force-push. Ne jamais utiliser
   `commit -a` ici, et refaire le `--skip-worktree` après un nouveau clone), `secret_key` (clé des
   sessions, la supprimer déconnecte tout le monde), `wynncraft_oauth.json`
-  (identifiants OAuth Wynncraft, 0600).
+  (identifiants OAuth Wynncraft, 0600), `discord_token` (jeton du bot Discord,
+  0600, voir « Bot Discord »).
 - **Langues** : interface en **anglais**, textes **minimes**, compréhensibles
   par un enfant, rien d'inutile. Code et commentaires en anglais comme le code
   d'origine ; messages de commit en français.
@@ -80,8 +81,12 @@ Demande de Yasuro : tester et déboguer avant de toucher au vrai site.
 - **Sa propre base** : copie de la base de prod du 2026-10-16 (faite avec
   `sqlite3.backup`, pas `cp`, la base étant vivante). Ce qui s'y joue n'atteint
   jamais le vrai classement. Sa propre `secret_key` (donc sessions séparées).
-  Pas de `wynncraft_oauth.json` : la redirect URI enregistrée chez Wynncraft
-  est celle de wynndle.com, donc pas de bouton Wynncraft en bêta.
+  Son propre `wynncraft_oauth.json` depuis le 2026-10-20 (même application,
+  redirect `https://beta.wynndle.com/auth/wynncraft/callback`, pour le bot
+  Discord) : le bouton « Log in with Wynncraft » existe donc aussi en bêta.
+  **Cette adresse doit être ajoutée par Yasuro** dans l'application
+  (`wynncraft.com/account/dashboard?section=applications`, « Add Redirect
+  URL ») ; sans elle, Wynncraft répond `WOAUTH10`.
 - Travail : on modifie et on commite dans `~/Wynnguessr-beta`. Mise en prod,
   après accord de Yasuro : `git merge beta` dans `~/Wynnguessr`, puis pousser,
   puis `systemctl --user restart wynnguessr` si `app.py` ou un template a changé.
@@ -303,6 +308,91 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
 - API publique utile (sans clé) : `api.wynncraft.com/v3/player/<nom>` (guilde,
   rang…), 50 req/min. Profil public : `wynncraft.com/stats/player/<nom>`.
   Yasuro a refusé d'afficher guildes et autres infos : seulement coche + lien.
+
+### Bot Discord « Guesser » et vérification (2026-10-20, bêta)
+
+Demande de Yasuro : « savoir exactement qui est qui sur wynncraft et si
+c'est vraiment le bon compte sans qu'il y ait 3000 démarches ». Wynncraft
+lie bien ses comptes à Discord (API v3.5) mais **ne l'expose nulle part** :
+ni `/player`, ni `/oauth/me` (vérifié dans toute leur documentation). D'où
+notre propre liaison, par « Log in with Wynncraft ».
+
+- **Le joueur** : salon `✅・verify` (fait par le bot, sous `rules`, en
+  lecture seule comme sa catégorie), un seul message, boutons **Verify** et
+  **Questions** (les questions qu'on se pose : pas de compte wynncraft.com
+  → `/link` en jeu ; plusieurs comptes Minecraft → le principal ; nouveau
+  pseudo ; mauvais compte ; qui le voit ; tags absents ; arrêter). Verify →
+  lien à usage unique (10 min, `discord_codes`) vers `verify?code=` →
+  Wynncraft → `wynn_back` → `discord_linked()` → page « Verified » (tête
+  Minecraft, nom Discord, Back to Discord) ; le message du bot devient seul
+  « ✅ You're verified as X ». Déjà vérifié : Use another account / Unlink.
+  Clic droit sur un membre → Apps → **Wynncraft account**, ou `/whois`
+  (membre ou pseudo Minecraft) : réponses visibles du seul demandeur,
+  ouvertes à tous (c'est le but, et Questions le dit).
+- **Le site ne connecte personne** et ne crée aucun compte dans ce parcours
+  (`session['wynn_discord']`, oublié par `/auth/wynncraft`). Il ne garde
+  que `discord_links` (membre ↔ UUID, un pour un : vérifier à nouveau
+  remplace ; un compte vérifié par un autre membre déménage). Supprimer un
+  compte WynnGuessr supprime sa liaison (« tout effacer »). La tête vient
+  de `avatar?uuid=`, pour les seuls comptes vérifiés (pas une porte ouverte
+  sur Mojang).
+- **Le bot** (`bot.py`, discord.py 2.7.1, service utilisateur
+  `wynnguessr-bot`, unité hors git) partage la base et **importe
+  `app.py`** : mêmes tables, mêmes tags, mêmes « #1 » (`TOP_LABELS`, dans
+  l'ordre de `top_tags`). **Un seul bot par jeton** (deux répondraient deux
+  fois à chaque clic) : celui de la bêta jusqu'à la 3.0. Il se réveille
+  quand la base change (`PRAGMA data_version`, toutes les 2 s), à chaque
+  évènement de rôle, et toutes les 2 min (un « #1 » bouge seul) ; un
+  changement se voit en ~6 s. Couleurs : celles du site (palette des tags,
+  barre des aperçus `#a7eb64`).
+- **Rôles** (réponses de Yasuro) :
+  - `Verified` (vert du site, juste au-dessus de Members) = vérifié, tenu
+    par le bot : donné à la main il repart, retiré il revient (sinon il ne
+    prouve plus rien).
+  - un rôle par « #1 » (couleur `.tag-top`, entre les lignes, en bas),
+    **toujours là** (« devra toujours exister » : supprimé → refait), à qui
+    mène le classement **avec un compte WynnGuessr lié au même Minecraft**.
+  - **les tags, dans les deux sens** : ce sont les rôles **entre les deux
+    lignes** `━━━━━━━━` sous le staff (`TAGS_TOP`/`TAGS_BOTTOM`, des ids) ;
+    staff, Members, Voter n'y vont jamais (« il faut pas que le rôle membre
+    soit sur le site »). Tag donné/repris ↔ rôle donné/repris ; rôle fait
+    entre les lignes → tag ; tag fait sur le site → rôle juste sous la
+    ligne du haut ; rôle supprimé → tag **rangé** (rien n'est détruit, ses
+    porteurs restent) ; tag rangé → rôle supprimé ; renommé ou recoloré sur
+    Discord → le tag suit (20 caractères, couleur la plus proche de
+    `TAG_COLORS` : Patreons → rouge, Partners et OG → violet tous deux). Un
+    rôle sorti des lignes reste un tag (suivi par son id) : les lignes ne
+    servent qu'à découvrir. Une ligne supprimée : plus rien n'est créé.
+  - Accepté par Yasuro : **qui gère les rôles sur Discord donne et retire
+    des tags du site**. Au journal de Moderation, `by = 0` se lit
+    « Discord », avec le modérateur Discord entre parenthèses quand le
+    journal d'audit de Discord le donne.
+- **Qui a raison pour un tag** : `discord_held` garde ce que les deux côtés
+  avaient au dernier passage ; le côté qui a changé depuis l'emporte. Rien
+  de connu (première fois, nouvelle liaison, base neuve) → **union**,
+  jamais de retrait. Un retrait refusé par Discord reste « les deux
+  l'avaient » (réessayé, pas inversé). Avant de reprendre un tag, le bot
+  redemande le membre à Discord ; avant de changer des rôles, la liste des
+  rôles (pas le cache).
+- **Pièges payés** :
+  - un rôle créé arrive en position 1, **à égalité** avec d'autres (Discord
+    ne décale rien). Un déplacement : Discord met la position demandée,
+    passe le plus ancien de deux rôles à égalité devant, puis renumérote
+    tout (vu le 2026-10-20). Donc demander la position d'un rôle met un
+    rôle neuf juste dessous (`place()`). Le premier lancement avait laissé
+    les 7 rôles en bas, rangés à la main le jour même.
+  - un plan fait sur le cache refaisait un rôle à peine créé (pas encore
+    dans le cache) : on replanifie sur `fetch_roles()` dès qu'il y a
+    quelque chose à changer.
+  - une base qui ne connaît pas le message de #verify (le vrai site à la
+    3.0) en posterait un second : le bot reprend le sien dans l'historique.
+- **Le bot de la bêta est branché sur le vrai serveur Discord** : un tag
+  fait sur la bêta y devient un rôle (et passera au vrai site à la 3.0).
+- Tests : `t_bot.py` (33, les plans sur des états inventés),
+  `t_bot_clicks.py` (19, faux clics), `t_verify.py` (30, le parcours du
+  site, Wynncraft simulé). Vérifié en vrai le 2026-10-20 sur le compte de
+  Yasuro, lié puis délié : Verified et « #1 » donnés, tag dans les deux
+  sens, Verified retiré à la main rendu, tag fait/rangé des deux côtés.
 
 ## Modes de jeu
 
@@ -787,7 +877,13 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   base ; rejouer les migrations sur une copie d'elle d'abord ; **lui faire
   son venv neuf depuis `requirements.txt`** (Flask 3 ; puis `restart`, pas
   `HUP`) ; passer le vrai site à 4 workers (unité systemd hors git) ;
-  `VERSION = '3.0'` ; les sons, hors git (`tools/sounds.py`). (La bascule
+  `VERSION = '3.0'` ; les sons, hors git (`tools/sounds.py`) ; **le bot
+  Discord** : `stop wynnguessr-bot`, copier `discord_token` dans
+  `~/Wynnguessr`, copier **la seule table `discord_links`** de la bêta vers
+  la vraie base (ni `discord_held` : la première passe fait l'union ; ni
+  `discord_ids` : le bot retrouve ses rôles, son salon et son message par
+  leur nom), passer l'unité (hors git) sur `~/Wynnguessr`, `daemon-reload`,
+  `start` ; les tags du vrai site naissent des rôles entre les lignes. (La bascule
   des pages en WebP, attendue ici le 2026-10-18 au soir, est faite :
   3b4e33d.)
 - **Modération** : une **page à part** pour les modérateurs, à côté du bouton
