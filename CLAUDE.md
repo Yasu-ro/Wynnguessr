@@ -403,10 +403,18 @@ notre propre liaison, par « Log in with Wynncraft ».
     quelque chose à changer.
   - une base qui ne connaît pas le message de #verify (le vrai site à la
     3.0) en posterait un second : le bot reprend le sien dans l'historique.
-- **Le bot de la bêta est branché sur le vrai serveur Discord** : un tag
-  fait sur la bêta y devient un rôle (et passera au vrai site à la 3.0).
-- Tests : `t_bot.py` (33, les plans sur des états inventés),
-  `t_bot_clicks.py` (27, faux clics), `t_verify.py` (30, le parcours du
+- **Sur la bêta, le bot ne fait que vérifier** (Yasuro, 2026-10-20 :
+  « link pas les tags / roles sur la beta … y'a pas tout le monde ») :
+  Verified et `/whois`, mais aucun « #1 » (repris à qui en avait, il en
+  avait reçu quatre d'après les classements de la bêta), aucun tag ni rôle
+  de tag, rien de fait ni supprimé entre les lignes ; le message de
+  #verify, Questions et la page Verified ne parlent pas de tags (et cette
+  page ne propose pas de créer un compte sur la bêta : de vrais membres y
+  passent). `live_site()` (`app.py`) décide, d'après l'adresse de retour
+  Wynncraft : tout s'allume seul à la 3.0, quand le bot tourne pour
+  wynndle.com. Les 6 rôles « #1 » restent, vides jusque-là.
+- Tests : `t_bot.py` (39, les plans sur des états inventés),
+  `t_bot_clicks.py` (28, faux clics), `t_verify.py` (32, le parcours du
   site, Wynncraft simulé). Vérifié en vrai le 2026-10-20 sur le compte de
   Yasuro, lié puis délié : Verified et « #1 » donnés, tag dans les deux
   sens, Verified retiré à la main rendu, tag fait/rangé des deux côtés.

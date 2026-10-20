@@ -90,14 +90,16 @@ def between(roles):
     return [rid for rid, r in sorted(roles.items(), key = lambda x: -x[1]['position'])
             if bottom['position'] < r['position'] < top['position'] and not r['managed'] and re.search(r'\w', r['name'])]
 
-def plan_roles(site, disc):
-    # the roles themselves: made, deleted, renamed; and the tags that go with them
+def plan_roles(site, disc, full = True):
+    # the roles themselves: made, deleted, renamed; and the tags that go
+    # with them. Not full (the beta, see live_site in app.py): Verified only
     roles, ids, tags = disc['roles'], site['ids'], site['tags']
     acts, taken = [], set()
     # Verified and the "#1"s, found again by their name when the database
     # does not know them (the live site's, at 3.0)
     own = {'verified': (VERIFIED, GREEN, 'verified')}
-    own.update({'top:' + label: (label, TOP, 'top') for label in A.TOP_LABELS})
+    if full:
+        own.update({'top:' + label: (label, TOP, 'top') for label in A.TOP_LABELS})
     for what, (name, color, where) in own.items():
         row = ids.get(what)
         if row and row['id'] in roles:
@@ -109,6 +111,8 @@ def plan_roles(site, disc):
             acts.append(('map', what, same, name, roles[same]['color']))
         else:
             acts.append(('create', what, name, color, where))
+    if not full:
+        return acts
     for what, row in ids.items():
         if what.startswith('top:') and what not in own:      # a board gone from the site
             acts.append(('delete', what, row['id']) if row['id'] in roles else ('unmap', what))
@@ -158,22 +162,23 @@ def plan_roles(site, disc):
             acts.append(('create', 'tag:%d' % tid, t['label'], TAG_HEX.get(t['color'], 0), 'tag'))
     return acts
 
-def plan_members(site, disc):
+def plan_members(site, disc, full = True):
     # who should hold what. The bot's roles follow the site; a tag follows
     # whichever side changed since last time (synced), and when neither
-    # knows (a first look, a new link), both sides get it: nothing is lost
+    # knows (a first look, a new link), both sides get it: nothing is lost.
+    # Not full (the beta): Verified only, and a "#1" goes from whoever has it
     ids, roles = site['ids'], disc['roles']
     verified = ids.get('verified', {}).get('id')
     tops = {w[4:]: r['id'] for w, r in ids.items() if w.startswith('top:') and r['id'] in roles}
     tagged = {r['id']: int(w[4:]) for w, r in ids.items() if w.startswith('tag:') and r['id'] in roles
-              and int(w[4:]) in site['tags'] and not site['tags'][int(w[4:])]['retired']}
+              and int(w[4:]) in site['tags'] and not site['tags'][int(w[4:])]['retired'] and full}
     own = set(tops.values()) | ({verified} if verified in roles else set())
     acts, keep = [], set()
     for mid, has in disc['members'].items():
         link = site['links'].get(mid)
         uid = site['users'].get(link['uuid']) if link else None
         want = {verified} if link and verified in roles else set()
-        if uid:
+        if uid and full:
             want |= {tops[label] for label in site['tops'].get(uid, []) if label in tops}
         for rid in sorted(own):
             why = 'Verified as %s' % link['name'] if rid == verified and link else \
@@ -449,14 +454,14 @@ async def sync():
         guild = client.get_guild(GUILD.id)
         if not guild or guild.unavailable or not guild.chunked:
             return
-        site = await asyncio.to_thread(read_site)
-        if plan_roles(site, read_discord(guild)):
+        site, full = await asyncio.to_thread(read_site), A.live_site()
+        if plan_roles(site, read_discord(guild), full):
             # something to change: planned again on the roles as Discord has
             # them now (a role just made may not be in the cache yet, and
             # would be made twice)
-            if await apply_roles(guild, plan_roles(site, read_discord(guild, await guild.fetch_roles()))):
+            if await apply_roles(guild, plan_roles(site, read_discord(guild, await guild.fetch_roles()), full)):
                 site = await asyncio.to_thread(read_site)
-        acts, keep = plan_members(site, read_discord(guild))
+        acts, keep = plan_members(site, read_discord(guild), full)
         await apply_members(guild, site, acts, keep)
         await tell_waiting(site)
 
@@ -469,12 +474,13 @@ def card(text, link = None, title = None):
         e.set_thumbnail(url = site_url() + '/avatar?' + urlencode({'uuid': link['uuid']}))
     return e
 
-def door_card(verified):
+def door_card(verified, full = True):
     e = card("Show everyone here which Wynncraft player you are, in two clicks:\n\n"
              "**1.** Press **Verify**\n"
              "**2.** Log in on wynncraft.com and press **Authorize**\n\n"
-             "You get %s, and your WynnGuessr tags come along (like a **#1** on a leaderboard)."
-             % ('<@&%s>' % verified if verified else '**Verified**'), title = 'Verify your Minecraft account')
+             "You get %s%s." % ('<@&%s>' % verified if verified else '**Verified**',
+                                ', and your WynnGuessr tags come along (like a **#1** on a leaderboard)' if full else ''),
+             title = 'Verify your Minecraft account')
     e.set_footer(text = 'We only see your Minecraft name. Never your password or email.')
     return e
 
@@ -504,8 +510,8 @@ def guide(verified, support):
                  "**3.** Done! You get %s" % ('<@&%s>' % verified if verified else '**Verified**')
                  + ("\n\nStuck? Ask in %s" % support if support else ''), TAG_HEX['green'])]
 
-def questions():
-    site = site_url() or 'https://wynndle.com'
+def questions(full = True):
+    site = site_url() or A.LIVE
     return card("**No wynncraft.com account?**\n"
                 "Press **Don't know how?**: every step, from zero.\n\n"
                 "**More than one Minecraft account?**\n"
@@ -516,10 +522,10 @@ def questions():
                 "Press **Verify**, then **Use another account**.\n\n"
                 "**Who can see it?**\n"
                 "Everyone here: right-click someone, then **Apps › Wynncraft account**. Or type `/whois`.\n\n"
-                "**Tags missing?**\n"
-                "Log in on [%s](%s) with Wynncraft, with the same Minecraft account.\n\n"
+                + ("**Tags missing?**\n"
+                   "Log in on [%s](%s) with Wynncraft, with the same Minecraft account.\n\n" % (site.split('//')[1], site) if full else '') +
                 "**Want to stop?**\n"
-                "Press **Verify**, then **Unlink**." % (site.split('//')[1], site), title = 'Questions')
+                "Press **Verify**, then **Unlink**.", title = 'Questions')
 
 class Door(discord.ui.View):
     # the buttons under the message in #verify; they answer after a restart too
@@ -545,7 +551,7 @@ class Door(discord.ui.View):
 
     @discord.ui.button(label = 'Questions', style = discord.ButtonStyle.secondary, custom_id = 'wg:help')
     async def help(self, interaction, button):
-        await interaction.response.send_message(embed = questions(), ephemeral = True)
+        await interaction.response.send_message(embed = questions(A.live_site()), ephemeral = True)
 
 class Account(discord.ui.View):
     # under "You're verified as ...", seen by that member only
@@ -617,7 +623,7 @@ async def door(guild):
             if m.author == client.user and m.components:
                 message = m
                 break
-    e = door_card(ids.get('verified', {}).get('id'))
+    e = door_card(ids.get('verified', {}).get('id'), A.live_site())
     if message:
         await message.edit(embed = e, view = Door())
     else:

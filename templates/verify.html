@@ -18,7 +18,8 @@
         {% if done.moved %}<p class="hint">It was verified on another Discord account before: it's on this one now.</p>{% endif %}
         <p class="hint">Your roles show up there in a few seconds.</p>
         <a class="btn wide" href="{{ back }}">Back to Discord</a>
-        {% if site %}
+        {% if not live %}
+        {% elif site %}
         <p class="hint">Your WynnGuessr tags come along, from <b>{{ site.username }}</b>.</p>
         {% elif wynn_login %}
         <p class="hint">Want your WynnGuessr tags there too? <a href="auth/wynncraft">{{ 'Link my Wynncraft account' if session.loggedin else 'Log in with Wynncraft' }}</a> here.</p>

@@ -1088,6 +1088,7 @@ def welcome():
 # player in nor makes an account. The bot does the rest (roles, tags both
 # ways) with the tables below, made here so the two always agree on them.
 DISCORD_GUILD = '1561303699307892806'   # the WynnGuessr server
+LIVE = 'https://wynndle.com'            # the live site
 VERIFY_LIFE = 600                       # seconds a link from the bot can be opened
 VERIFY_ERRORS = {
     'old': "This link is too old. Press Verify again on Discord.",
@@ -1104,6 +1105,13 @@ with connect() as c:
         CREATE TABLE IF NOT EXISTS discord_ids (what TEXT PRIMARY KEY, id TEXT, name TEXT, color INTEGER);
         CREATE TABLE IF NOT EXISTS discord_held (discord_id TEXT, role_id TEXT, uuid TEXT, PRIMARY KEY (discord_id, role_id));
     ''')
+
+def live_site():
+    # the live site, not the beta (its Wynncraft redirect says). The beta's
+    # players are not everyone (Yasuro, 2026-10-20): from there, Discord
+    # gets Verified only, no tags nor "#1"s, and the pages promise none
+    cfg = wynn_config()
+    return bool(cfg) and cfg['redirect_uri'].startswith(LIVE + '/')
 
 @app.route("/verify")
 def verify():
@@ -1127,7 +1135,7 @@ def verify():
     back = 'https://discord.com/channels/%s/%s' % (DISCORD_GUILD, channel[0]) if channel else DISCORD
     if not done:
         return render_template('verify.html', error = VERIFY_ERRORS.get(request.args.get('error'), VERIFY_ERRORS['old']), back = back)
-    return render_template('verify.html', done = done, site = site, back = back)
+    return render_template('verify.html', done = done, site = site, back = back, live = live_site())
 
 def discord_linked(code, uuid, name):
     # Wynncraft vouched for this Minecraft account: it is now this Discord
