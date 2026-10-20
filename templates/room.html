@@ -80,6 +80,8 @@
                 <div id="hud-players" class="room-hud-players"></div>
             </div>
             <div id="room-countdown" class="room-countdown" hidden></div>
+            <!-- out of a survival room: a ghost (or watching), and how many still stand -->
+            <p class="ghost-banner" id="ghost-banner" hidden></p>
         </div>
         <!-- the players, on a sign of their own at the right (on a phone: in the round's sign) -->
         <div class="room-board" id="room-board" hidden></div>
@@ -136,6 +138,20 @@
             </div>
         </div>
         <div class="room-chat-slot" id="chat-slot-shop"></div>
+    </section>
+
+    <!-- survival: out of it. Minecraft's death screen: red, "You died!", then
+         watch on as a ghost, or go (counted already: place, XP) -->
+    <section class="death-screen" id="death-screen" hidden>
+        <h2 class="death-title">You died!</h2>
+        <p class="death-cause" id="death-cause"></p>
+        <p class="death-place" id="death-place"></p>
+        <div class="death-xp" id="death-xp"></div>
+        <p class="death-rule">Keep guessing as a ghost: half the emeralds, one potion a shop.</p>
+        <div class="death-buttons">
+            <button type="button" class="btn wide" id="death-spectate">Spectate</button>
+            <a class="btn wood wide" id="death-leave" href="{{ ('multiplayer?join=' ~ world.key) if world else 'mode' }}">{{ 'Join New Lobby' if world else 'Leave' }}</a>
+        </div>
     </section>
 
     <section id="results" class="room-page" hidden>

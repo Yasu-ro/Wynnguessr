@@ -4,6 +4,7 @@
 var code = $('#room').attr('data-code');
 var COLORS = ['#e6194b', '#4363d8', '#ffe119', '#911eb4', '#f58231', '#42d4f4', '#f032e6', '#9a6324'];
 var ANSWER = '#3cb44b';
+var GHOST = '#9a9a9a';   // a ghost's pin (survival, out of it): grey
 var bounds = [[0, -2560], [6144, 2048]]; // Map bounds: Wynntils main map, 1 px = 1 block
 var s = null;            // last state received
 var view = '';           // screen on display, e.g. "guess3"
@@ -12,6 +13,8 @@ var finished = false;    // that player asked for the results
 var settingsKey = null;  // settings shown in the lobby
 var pending = 0;         // settings changes on their way to the server
 var map = null, revealMap = null, viewer = null, marker = null;
+var livePins = null, livePinsKey = '';   // the living's pins as they land, for a ghost or who watches
+var deathFor = null;                     // the round whose death screen was shown (once)
 var submitted = false;
 var deadline = null;     // when the round closes, local clock
 var shownAt = 0;         // when the round appeared, local clock
@@ -805,7 +808,7 @@ function roundPlayers(list, value, extra) {
 
 // auto: the clock ran out, send the marker if there is one
 function submit(auto) {
-    if (submitted || (s.live && !s.playing)) {
+    if (submitted || (s.live && !s.playing && !s.ghost)) {
         return;
     }
     if (!marker && (s.live || !auto)) {
@@ -914,6 +917,18 @@ function reveal() {
                 Sfx.play('note', noteBlock(SCALE[Math.min(i, SCALE.length - 1)]));
             }, DROP * (i + 1));
         });
+        // the ghosts' pins, in grey, once the living's have landed
+        (s.reveal.ghosts || []).forEach(function (g, i) {
+            var pos = blockSpot(g.x, g.z);
+            spots.push(pos);
+            setTimeout(function () {
+                if (view != key) {
+                    return;
+                }
+                drop(L.marker(pos, {icon: pin(GHOST)}).addTo(revealMap)
+                    .bindTooltip(esc(g.name), {permanent: true, direction: 'top', className: 'room-tip ghost-tip'}), true);
+            }, DROP * (drops.length + 1 + i));
+        });
         // your zone shows with the verdict (count), but the map frames it now
         var safe = s.mode == 'survival' && me().result && me().result.safe;
         if (safe) {
@@ -940,6 +955,10 @@ function reveal() {
         // the points only, for now
     } else if (s.mode == 'survival' && you.seat && (you.out == null || you.out == s.round)) {
         line = survivalLine(you, guessed ? line : 'Boom! No guess in time', bad, good);
+    } else if (s.mode == 'survival' && you.seat && s.ghost) {
+        var haunted = (s.reveal.ghosts || []).some(function (g) { return g.name == you.name; });
+        line = (haunted ? 'Ghost guess' : 'No ghost guess') +
+            (s.me && s.me.earned ? " <span class='room-earn'>+" + s.me.earned + emeraldIcon() + '</span>' : '');
     } else if (s.mode != 'classic' && you.seat && (you.out == null || you.out == s.round)) {
         if (you.out == s.round) {
             line += bad + "you're out!</span>";
@@ -1057,7 +1076,9 @@ function count() {
         if (c.verdict == 'perfect') {
             replay(document.getElementById('reveal-mine'), 'stamp');
         }
-        if (c.verdict) {
+        if (c.verdict == 'out' && s.mode == 'survival' && s.state == 'playing' && !lastRound()) {
+            setTimeout(deathScreen, 700);   // the hearts take the knock first
+        } else if (c.verdict) {
             Sfx.play(c.verdict);
         }
         if (c.earned) {
@@ -1075,6 +1096,41 @@ function count() {
     }
     requestAnimationFrame(count);
 }
+
+// Out of a survival room, the game goes on: Minecraft's death screen, once
+// (friends thought they were still in it, Yasuro 2026-10-20). How it ended,
+// the place (settled), the XP (counted already, see room_level), then
+// Spectate (a ghost: guessing on) or go
+function deathScreen() {
+    var you = me();
+    if (deathFor == s.round || !you || you.out != s.round || view.indexOf('reveal') != 0) {
+        return;
+    }
+    deathFor = s.round;
+    var r = you.result || {}, lost = (r.damage || 0) + (r.wither || 0);
+    $('#death-cause').html(r.creeper ? 'Boom! No guess in time'
+        : (r.wither && r.damage ? 'Too far, and Wither' : r.wither ? 'Wither' : 'Too far') + ': −' + amount(lost) + ' ' + heartIcon(hardcore()));
+    var rows = contestants().slice().sort(standingOrder);
+    var place = 1 + rows.filter(function (p) { return standingOrder(p, you) < 0; }).length;
+    $('#death-place').text(ordinal(place) + ' of ' + rows.length);
+    var slot = document.getElementById('death-xp');
+    slot.innerHTML = '';
+    $.ajax({url: 'api/room/' + code + '/xp', dataType: 'json', timeout: 8000}).done(function (x) {
+        if (x.success) {
+            xpGain(slot, x.xp, x.gained, []);
+        } else if (x.guest) {
+            var back = encodeURIComponent('room?code=' + code);
+            slot.innerHTML = "<p class='xp-note'><a href='login?next=" + back + "'>Log in</a> or <a href='register?next=" + back + "'>make an account</a> " +
+                "to keep the XP of your games.</p>";
+        }
+    });
+    $('#death-screen').prop('hidden', false);
+    Sfx.play('hurt');   // a player's death in Minecraft: the same "oof"
+}
+
+$('#death-spectate').on('click', function () {
+    $('#death-screen').prop('hidden', true);
+});
 
 // is the round on display the last one?
 function lastRound() {
@@ -1116,7 +1172,19 @@ $('#next-button').on('click', function () {
 
 // ---------- end of the game ----------
 
+// survival, duel: still standing first, then the latest to fall (the results,
+// and the place on a death screen: whoever falls later finishes above)
+function standingOrder(a, b) {
+    return (a.out != null) - (b.out != null) || b.left - a.left || (b.out || 0) - (a.out || 0) || b.total - a.total;
+}
+
+function ordinal(n) {
+    var t = n % 100, u = n % 10;
+    return n + (t >= 11 && t <= 13 ? 'th' : u == 1 ? 'st' : u == 2 ? 'nd' : u == 3 ? 'rd' : 'th');
+}
+
 function results() {
+    $('#death-screen').prop('hidden', true);   // the game ended while it was up
     var fresh = view != 'results';
     if (view != 'results') {
         view = 'results';
@@ -1136,10 +1204,7 @@ function results() {
         };
         same = function (a, b) { return a.total == b.total; };
     } else {
-        // still standing first, then the latest to fall
-        rows = contestants().sort(function (a, b) {
-            return (a.out != null) - (b.out != null) || b.left - a.left || (b.out || 0) - (a.out || 0) || b.total - a.total;
-        });
+        rows = contestants().sort(standingOrder);
         value = function (p) {
             return ['', p.out != null ? 'Out in round ' + p.out : standing(p)];
         };
@@ -1404,10 +1469,26 @@ function guessSurvival() {
     if (s.answered) {
         submitted = true;
     }
-    if (!s.playing) {
+    if (!s.playing && !s.ghost) {
         $('#guess-button').prop('disabled', true).text(you && you.seat ? "You're out" : 'Spectating');
     } else if (submitted && !exploded) {
         $('#guess-button').prop('disabled', true).text('Waiting for the others...');
+    }
+    // out of it, said all the time (and not only on the button)
+    $('#ghost-banner').prop('hidden', s.playing).html(s.ghost ? "You're a ghost · <b>" + standingNow().length + '</b> still alive'
+        : "Spectating · you'll play the next game");
+    // a ghost, or who watches, sees the living's pins land
+    var pins = round && !s.playing ? s.live_pins || [] : [], pinsKey = JSON.stringify(pins);
+    if (livePins && pinsKey != livePinsKey) {
+        livePinsKey = pinsKey;
+        livePins.clearLayers();
+        pins.forEach(function (g) {
+            var p = s.players.filter(function (q) { return q.uid == g.uid; })[0];
+            if (p) {
+                L.marker(blockSpot(g.x, g.z), {icon: pin(color(p)), interactive: false, keyboard: false})
+                    .bindTooltip(esc(p.name), {permanent: true, direction: 'top', className: 'room-tip'}).addTo(livePins);
+            }
+        });
     }
 
     // your hearts where Minecraft keeps them; the round's potions on the sign
@@ -1420,7 +1501,7 @@ function guessSurvival() {
     $('#hud-mult').html(s.playing ? effectList(fx).map(function (k) {
         return "<b class='room-effect'>" + potionIcon(k) + POTIONS[k][0] + roman(fx[k]) + '</b>';
     }).join(' ') : '');
-    $('#hud-score').text(s.playing ? '' : 'Watching');
+    $('#hud-score').text(s.playing ? '' : s.ghost ? 'Ghost' : 'Watching');
     $('#hud-call').text('');   // no last call in survival: everyone has their whole clock
     roundPlayers(standingNow(), function (p) { return lifeLeft(p.left); }, function (p) { return bottles(p.effects || {}); });
 }
@@ -1432,15 +1513,17 @@ function survivalViews(fx) {
     }
     map = makeMap('map', -2);
     blockCursor(map);
+    livePins = L.layerGroup().addTo(map);
+    livePinsKey = '';
     map.on('click', function (e) {
-        if (submitted || !s.playing || s.phase != 'guess') {
+        if (submitted || !(s.playing || s.ghost) || s.phase != 'guess') {
             return;
         }
         if (marker) {
             map.removeLayer(marker);
         }
         var b = blockAt(e.latlng);
-        marker = L.marker(blockSpot(b.x, b.z), {icon: pin(color(me()))}).addTo(map);
+        marker = L.marker(blockSpot(b.x, b.z), {icon: pin(s.ghost ? GHOST : color(me()))}).addTo(map);
         drop(marker);
         Sfx.play('pin');
         $('#guess-button').removeClass('room-warn').text('Guess!');
@@ -1587,6 +1670,15 @@ function clocksSurvival() {
             return;
         }
         var left = Math.max(0, (deadline - Date.now()) / 1000), guessing = !submitted && s.playing;
+        if (!submitted && s.ghost && left <= 0.2) {
+            // a ghost: their pin goes, if any; no creeper for the dead
+            if (marker) {
+                submit(true);
+            } else {
+                submitted = true;
+                $('#guess-button').prop('disabled', true).text('Waiting for the others...');
+            }
+        }
         $('#room-countdown').prop('hidden', false).html("<i class='material-icons'>timer</i>" + clock(left))
             .toggleClass('urgent', left <= 10);
         wither();
@@ -1700,7 +1792,7 @@ function shop() {
     var mine = s.me, wares = s.wares || {}, alive = you && you.seat && you.out == null;
     $('#shop-purse').html(mine ? emeraldIcon() + '<b>' + mine.emeralds + '</b>' : '').prop('hidden', !mine);
     var says = shopSays && Date.now() < shopSays.until ? shopSays.text
-        : !mine ? 'You are watching.' : !alive ? "You're out, but your emeralds still work." : '';
+        : !mine ? 'You are watching.' : !alive ? "You're a ghost: one potion this shop." : '';
     $('#shop-note').prop('hidden', !says).text(says).toggleClass('bad', !!(shopSays && Date.now() < shopSays.until));
     var items = !mine ? [] : SHOP_ITEMS.filter(function (k) { return k in wares || (k == 'milk' && alive && mine.milk_left <= 0); });
     var slots = items.map(function (k) {

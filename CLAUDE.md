@@ -828,6 +828,49 @@ Décisions de Yasuro, après un plan complet (« let's fully plan this idea ») 
   l'interrogation **suivante** le dernier guess, la révélation finit donc
   une seconde plus tard que le guess + 10 s.
 
+### Mort et fantômes (2026-10-20, bêta)
+
+Demande de Yasuro : refaire le mode spectateur après une mort ; « my friends
+thought they where still in game » ; l'XP tout de suite à la mort, pour
+pouvoir partir ; « should we let them still be able to play to gain
+emeralds at a lower frequency to kill other players ? ». Ses choix :
+moitié des émeraudes (pas une manche sur deux), les potions des fantômes
+**tuent**, la carte reste (« J'aime pas l'idée de plus avoir de carte »),
+les épingles des vivants **en direct** pour les morts, celles des fantômes
+à la révélation ; rien pour le Duel (« le mode de jeu va dégager »).
+- **La partie d'un mort est comptée à sa mort** (`room_players.dead`, posé
+  à la clôture de la manche) : `history()` la compte encore en cours (sa
+  place est déjà définitive : qui tombe après finit devant ; calculée sur
+  la dernière manche close), donc l'XP, la série cassée, et le classement
+  Survival (`survival_room_record`, qui n'enregistre qu'une fois).
+  `room_level` répond aux morts (leur écran de mort). Règle la partie
+  abandonnée, qui ne finit jamais : avant, personne n'avait son XP. Une fois
+  la partie finie, elle n'est pas comptée deux fois.
+- **Écran de mort façon Minecraft** (`#death-screen`), seulement si la
+  partie continue (sinon les résultats suivent) : voile rouge flouté,
+  « You died! », la cause (Too far / Wither / Boom! No guess in time, avec
+  les cœurs perdus), la place (« 3rd of 4 », `standingOrder()`, le même
+  ordre que les résultats), l'XP (`xpGain`), une phrase de règle, puis
+  **Spectate** ou **Leave** (dans un monde : **Join New Lobby**, vers
+  `multiplayer?join=<monde>`, le lobby ouvert du même monde). Le son : le
+  « oof » (`hurt`), celui de la mort d'un joueur dans Minecraft.
+- **Fantôme** (un mort encore là ; pas qui est arrivé en retard, qui ne fait
+  que regarder) : il répond toujours, sur l'horloge de la manche, sans
+  potion sur lui ; ses épingles vont dans **`room_ghosts`**, à part de
+  `room_guesses` que lisent tous les comptes de points (sa partie ne bouge
+  plus). La manche ne l'attend pas. **La moitié des émeraudes** de la même
+  réponse (`GHOST_SHARE`, arrondi au-dessus), **une potion par boutique**
+  (`GHOST_SHOP`, `shop_limit()`), jamais pour lui (Regeneration, lait).
+  Son épingle est grise ; la révélation montre celles des fantômes en gris
+  (`reveal.ghosts`, hors du tableau). Les morts et les spectateurs voient
+  les épingles des vivants tomber en direct (`live_pins`, jamais envoyées
+  à un vivant). Bannière « You're a ghost · N still alive » sous l'enseigne
+  (« Ghost » dessus) ; arrivé en retard : « Spectating · you'll play the
+  next game ». Boutique : « You're a ghost: one potion this shop. »
+- Tests : `t_ghosts.py` (37, moteur, horloge à la main), `t_death_page.py`
+  (20, navigateur : téléphone, portable, monde) ; toute la série rejouée
+  verte.
+
 ## Worlds : serveurs publics (planifié le 2026-10-18, rien de codé)
 
 Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne

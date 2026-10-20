@@ -631,7 +631,7 @@ def delete_user(c, uid):
     c.execute("DELETE FROM room_shop WHERE buyer = ? OR target = ?", (uid, uid))
     for table, col in (('contact', 'user_id'), ('room_chat', 'user_id'), ('scores', 'user_id'), ('survival_runs', 'user_id'),
                        ('solo_games', 'user_id'), ('room_players', 'user_id'), ('room_guesses', 'user_id'), ('room_milk', 'user_id'),
-                       ('room_bans', 'user_id'), ('staff', 'user_id'), ('user_tags', 'user_id'), ('ignores', 'user_id'),
+                       ('room_bans', 'user_id'), ('room_ghosts', 'user_id'), ('staff', 'user_id'), ('user_tags', 'user_id'), ('ignores', 'user_id'),
                        ('ignores', 'target'), ('player_reports', 'by'), ('player_reports', 'target'), ('users', 'id')):
         c.execute(f"DELETE FROM {table} WHERE {col} = ?", (uid,))
     # what others did keeps its line, without their id
@@ -861,7 +861,7 @@ def history(c, uid):
     # scores, marked with their room: they are not counted twice)
     games = []
     for r in c.execute('''SELECT r.* FROM rooms r JOIN room_players p ON p.code = r.code
-            WHERE p.user_id = ? AND r.state = 'finished' ''', (uid,)).fetchall():
+            WHERE p.user_id = ? AND (r.state = 'finished' OR p.dead IS NOT NULL)''', (uid,)).fetchall():
         # only who played it live: a finished classic room can be replayed
         # alone later, and that score once moved the win to someone else after
         # the fact (Yasuro: "we all seem to lose our streak randomly")
@@ -875,7 +875,10 @@ def history(c, uid):
             players = list(totals)
             key = lambda u: totals[u]
         else:
-            st = standings(c, r, r['round'])
+            # a game still on counts for who died in it (room_players.dead):
+            # their place is settled, up to the last round closed
+            closed = r['state'] == 'finished' or r['round_end'] is not None
+            st = standings(c, r, r['round'] if closed else r['round'] - 1)
             players = list(st)
             key = lambda u: (st[u]['out'] is None, st[u]['left'], st[u]['out'] or 0, totals.get(u, 0))
         if uid not in players or len(players) < 2:
@@ -1798,7 +1801,7 @@ def room_level(code):
     # the wins in a row if it was one (guests earn none)
     with connect() as c:
         r, me = member(c, code)
-        if not r or r['state'] != 'finished':
+        if not r or not (r['state'] == 'finished' or me['dead']):     # (the dead: on their death screen)
             return jsonify({"success": False})
         if not session.get('loggedin'):
             return jsonify({"success": False, "guest": True})
@@ -2786,6 +2789,13 @@ EMERALDS = (10, 6, 2)
 PRICES = {'mining_fatigue': 2, 'swiftness': 2, 'wither': 3, 'nausea': 3, 'blindness': 3, 'milk': 4,
           'darkness': 5, 'regeneration': 6}
 SHOP_MAX = 3            # purchases a player may make in one shop (Yasuro: nobody buys every potion for one player)
+# Out of a survival room, a player plays on as a ghost (Yasuro, 2026-10-20:
+# revenge, and something to do for who dies early): they guess for half the
+# emeralds, and buy one potion a shop at most, which may well kill. Their own
+# game is over at their death (points, place, XP, the leaderboard) and
+# counted at once (room_players.dead), whether they stay or go
+GHOST_SHARE = 2         # a ghost earns 1/2 of the emeralds of the same guess (rounded up)
+GHOST_SHOP = 1          # purchases a ghost may make in one shop
 SELF = ('regeneration', 'milk')   # bought for oneself; every other potion is thrown at someone else
 MILK_BUYS = 2           # buckets a player may buy in a game (then: out of stock)
 SWIFT_STEP = 5          # Swiftness II gives 5 seconds less than I, III 10 less...
@@ -2814,6 +2824,12 @@ with connect() as c:
     if 'aim_x' not in [col[1] for col in c.execute("PRAGMA table_info(room_guesses)")]:
         c.execute("ALTER TABLE room_guesses ADD COLUMN aim_x REAL")
         c.execute("ALTER TABLE room_guesses ADD COLUMN aim_z REAL")
+    # the round a player died in (survival): from then on their game is counted
+    if 'dead' not in [col[1] for col in c.execute("PRAGMA table_info(room_players)")]:
+        c.execute("ALTER TABLE room_players ADD COLUMN dead INTEGER")
+    # a ghost's pins: apart from room_guesses, which every count of points reads
+    c.execute('''CREATE TABLE IF NOT EXISTS room_ghosts (code TEXT, user_id INTEGER, round INTEGER, x REAL, z REAL, at REAL,
+        PRIMARY KEY (code, user_id, round))''')
 
 def room_effects(shop, milked, uid, n):
     # what hits a player in round n, {potion: level}: random, thrown or drunk;
@@ -2848,6 +2864,7 @@ def survivors(c, r, upto):
     code, full = r['code'], DIFFICULTIES[r['difficulty']]
     seats = [p[0] for p in c.execute("SELECT user_id FROM room_players WHERE code = ? AND seat = 1 ORDER BY rowid", (code,))]
     guesses = {(g['user_id'], g['round']): g for g in c.execute("SELECT * FROM room_guesses WHERE code = ? AND round <= ?", (code, upto))}
+    ghosts = {(g['user_id'], g['round']): g for g in c.execute("SELECT * FROM room_ghosts WHERE code = ? AND round <= ?", (code, upto))}
     shop, milked = room_shop_rows(c, code)
     ids = json.loads(r['locations'])[:upto]
     where = {l[0]: (l[1], l[2]) for l in c.execute(
@@ -2904,6 +2921,17 @@ def survivors(c, r, upto):
                                "distance": d, "damage": damage, "wither": wither, "heal": heal if after > 0 else 0,
                                "points": points, "earned": earned, "effects": fx, "creeper": d is None,
                                "safe": safe, "far": far, "kill": kill_radius(n, swift, hp - wither)}
+        # who died in a round before: a ghost, half the emeralds of the same guess
+        for u in seats:
+            s, g = st[u], ghosts.get((u, n))
+            if s['out'] is None or s['out'] >= n or not g:
+                continue
+            d = math.hypot(loc[0] - g['x'], loc[1] - g['z'])
+            safe, far, cap = zone(n, None)
+            earned = -(-(EMERALDS[0] if d <= NEAR else EMERALDS[1] if d <= safe else EMERALDS[2] if d < far else 0) // GHOST_SHARE)
+            s['emeralds'] += earned
+            if n == upto:
+                s['ghost'] = {"x": g['x'], "z": g['z'], "distance": d, "earned": earned}
     return st
 
 def next_fog(c, r):
@@ -2926,10 +2954,14 @@ def bought(c, r, uid):
     return c.execute("SELECT COUNT(*) FROM room_shop WHERE code = ? AND round = ? AND buyer = ?",
                      (r['code'], r['round'] + 1, uid)).fetchone()[0]
 
+def shop_limit(s):
+    # purchases this player may make in one shop: fewer for a ghost
+    return GHOST_SHOP if s['out'] is not None else SHOP_MAX
+
 def shopping(c, r, uid, s):
-    # can this player still buy something here: emeralds enough, and fewer than SHOP_MAX purchases
+    # can this player still buy something here: emeralds enough, and fewer purchases than their limit
     prices = wares(c, r, s).values()
-    return bool(prices) and s['emeralds'] >= min(prices) and bought(c, r, uid) < SHOP_MAX
+    return bool(prices) and s['emeralds'] >= min(prices) and bought(c, r, uid) < shop_limit(s)
 
 def present(c, r):
     # who a round or the shop still waits for
@@ -2963,9 +2995,15 @@ def survival_room_tick(c, r):
             c.execute("""INSERT OR IGNORE INTO room_guesses (code, user_id, round, x, z, score, at, time)
                     VALUES (?, ?, ?, NULL, NULL, 0, ?, ?)""", (code, u, n, now, max(0, min(now, end) - r['round_start'])))
         r = find_room(c, code)
+        st = survivors(c, r, n)
+        for u, s in st.items():
+            if s['out'] == n:
+                # their game is over: counted now (XP, place, the leaderboard), whether they stay or go
+                c.execute("UPDATE room_players SET dead = ? WHERE code = ? AND user_id = ?", (n, code, u))
+                survival_room_record(c, r, u)
         # the random potions of the next round, thrown with the reveal (never
         # two random ones in a row for the same player, as alone)
-        left = [u for u, s in survivors(c, r, n).items() if s['out'] is None]
+        left = [u for u, s in st.items() if s['out'] is None]
         if len(left) >= 2 and n < r['rounds']:
             fog = next_fog(c, r)
             had = {row['target'] for row in shop if row['round'] == n and row['buyer'] is None}
@@ -3012,8 +3050,10 @@ def survival_room_guess(c, r, me, n):
     # a guess in its round, within the player's own clock (Nausea: the hand shakes)
     now, uid = time.time(), me['user_id']
     if (not me['live'] or r['state'] != 'playing' or n != r['round'] or r['round_end'] is not None
-            or now < r['round_start'] or uid not in guessers(c, r)):
+            or now < r['round_start']):
         return False
+    if uid not in guessers(c, r):
+        return ghost_guess(c, r, uid, n, now)
     shop, milked = room_shop_rows(c, r['code'])
     fx = room_effects(shop, milked, uid, n)
     deadline = survival_deadline(r, fx)
@@ -3041,6 +3081,21 @@ def survival_room_guess(c, r, me, n):
             (r['code'], uid, n, x, z, guess_score(x, z, loc) if x is not None else 0, now,
              min(now, deadline) - r['round_start'], aim_x, aim_z))
     return True
+
+def ghost_guess(c, r, uid, n, now):
+    # a ghost's pin: who sat at the start and died since, on the round's own
+    # clock (no potion on a ghost), once, and a pin only
+    s = survivors(c, r, n - 1).get(uid)
+    if not s or s['out'] is None or now > survival_deadline(r, {}) + GRACE:
+        return False
+    try:
+        x, z = float(request.form['x']), float(request.form['z'])
+    except (KeyError, ValueError):
+        return False
+    if not (math.isfinite(x) and math.isfinite(z)):
+        return False
+    return c.execute("INSERT OR IGNORE INTO room_ghosts (code, user_id, round, x, z, at) VALUES (?, ?, ?, ?, ?, ?)",
+                     (r['code'], uid, n, x, z, now)).rowcount == 1
 
 def survival_phase(r, now):
     if r['state'] != 'playing':
@@ -3082,11 +3137,13 @@ def survival_view(c, r, me, out, now):
             p['result'] = {k: v for k, v in s['result'].items() if k != 'earned'}
     mine = st.get(uid)
     out['playing'] = bool(mine and mine['out'] is None and me['live'] and phase != 'finished')
+    # out of it, and still here: a ghost, who guesses on (see GHOST_SHARE)
+    out['ghost'] = bool(mine and mine['out'] is not None and me['live'] and phase != 'finished')
     if mine:
         out['me'] = {"emeralds": mine['emeralds'], "milk": mine['milk'], "milk_left": MILK_BUYS - mine['milk_bought'],
-                     "earned": mine.get('result', {}).get('earned') if closed else None}
+                     "earned": (mine.get('result') or mine.get('ghost') or {}).get('earned') if closed else None}
         if phase == 'shop':
-            out['me']['buys_left'] = SHOP_MAX - bought(c, r, uid)
+            out['me']['buys_left'] = shop_limit(mine) - bought(c, r, uid)
     if phase == 'shop':
         out['phase_left'] = max(0, r['round_end'] + REVEAL + SHOP - now)
         if mine:
@@ -3116,12 +3173,25 @@ def survival_view(c, r, me, out, now):
             if phase == 'guess':
                 # elapsed: since the start, for what counts from it (Darkness, Wither)
                 out.update({"time_left": max(0, survival_deadline(r, fx) - now), "elapsed": now - r['round_start']})
+        elif out['ghost']:
+            out.update({"time": room_time(r['difficulty'], {}), "answered": bool(c.execute(
+                "SELECT 1 FROM room_ghosts WHERE code = ? AND user_id = ? AND round = ?", (code, uid, n)).fetchone())})
+            if phase == 'guess':
+                out.update({"time_left": max(0, survival_deadline(r, {}) - now), "elapsed": now - r['round_start']})
+        if phase == 'guess' and not out['playing']:
+            # who is out of it (a ghost, or watching) sees the living's pins as they land
+            standing = {u for u, s in st.items() if s['out'] is None}
+            out['live_pins'] = [{"uid": g[0], "x": g[1], "z": g[2]} for g in c.execute(
+                "SELECT user_id, x, z FROM room_guesses WHERE code = ? AND round = ? AND x IS NOT NULL", (code, n)) if g[0] in standing]
     elif n:
         loc = c.execute("SELECT x_position, z_position FROM locations WHERE location_id = ?", (ids[n - 1],)).fetchone()
         totals = {p['uid']: p['total'] for p in out['players']}
         out['reveal'] = {"X": loc[0], "Z": loc[1], "guesses": [
             {"name": names[u], "x": s['result']['x'], "z": s['result']['z'], "score": s['result']['points'], "upto": totals.get(u, 0)}
-            for u, s in st.items() if 'result' in s and u in names]}
+            for u, s in st.items() if 'result' in s and u in names],
+            # the ghosts' pins, apart (in grey): no points, no place in the table
+            "ghosts": [{"name": names[g[0]], "x": g[1], "z": g[2]} for g in c.execute(
+                "SELECT user_id, x, z FROM room_ghosts WHERE code = ? AND round = ?", (code, n)) if g[0] in names]}
     return out
 
 @app.route("/api/room/<code>/buy", methods=['POST'])
@@ -3146,12 +3216,12 @@ def room_buy(code):
             return jsonify({"success": False, "error": "Pick another player"})
         if s['emeralds'] < PRICES[item]:
             return jsonify({"success": False, "error": "Not enough emeralds"})
-        done = bought(c, r, uid)
-        if done >= SHOP_MAX:
-            return jsonify({"success": False, "error": "That's %d for this round" % SHOP_MAX})
+        done, limit = bought(c, r, uid), shop_limit(s)
+        if done >= limit:
+            return jsonify({"success": False, "error": "A ghost buys one potion a shop" if s['out'] is not None else "That's %d for this round" % limit})
         c.execute("INSERT INTO room_shop (code, round, buyer, target, item, at) VALUES (?, ?, ?, ?, ?, ?)",
                   (r['code'], r['round'] + 1, uid, target, item, time.time()))
-    return jsonify({"success": True, "emeralds": s['emeralds'] - PRICES[item], "buys_left": SHOP_MAX - done - 1})
+    return jsonify({"success": True, "emeralds": s['emeralds'] - PRICES[item], "buys_left": limit - done - 1})
 
 @app.route("/api/room/<code>/ready", methods=['POST'])
 def room_ready(code):
