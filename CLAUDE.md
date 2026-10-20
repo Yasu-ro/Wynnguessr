@@ -384,6 +384,18 @@ notre propre liaison, par « Log in with Wynncraft ».
     des tags du site**. Au journal de Moderation, `by = 0` se lit
     « Discord », avec le modérateur Discord entre parenthèses quand le
     journal d'audit de Discord le donne.
+- **Le journal de l'équipe dans 📛・moderation-logs** (2026-10-20, demande
+  de Yasuro) : chaque ligne du journal du site (Moderation › Log) y arrive
+  aussitôt écrite : qui (en haut), sur qui (le titre, qui ouvre sa fiche
+  dans Moderation), quoi, pourquoi, quand ; couleur selon le poids (ban et
+  suppression rouges, sourdine, message caché, renommage et mot de passe
+  orange, rangs et tags or). Pas les lignes faites sur Discord (`by = 0` :
+  Discord a son propre journal). Dix par message ; `discord_ids` « modlog »
+  garde la dernière envoyée ; une base sans ce repère (premier lancement,
+  vrai site à la 3.0) part de sa dernière ligne, sans l'historique. Depuis
+  la bêta, chaque ligne est marquée « Beta · beta.wynndle.com ». Test :
+  `t_bot_log.py` (14) ; vérifié en vrai avec une ligne de test, effacée
+  ensuite du salon et du journal.
 - **Qui a raison pour un tag** : `discord_held` garde ce que les deux côtés
   avaient au dernier passage ; le côté qui a changé depuis l'emporte. Rien
   de connu (première fois, nouvelle liaison, base neuve) → **union**,

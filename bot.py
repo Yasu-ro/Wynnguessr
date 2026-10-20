@@ -13,6 +13,8 @@
 #     two lines of the server (Yasuro: "entre les lignes c'est tout les
 #     roles perso"): staff ranks, Members and the like never reach the site.
 #   - Who is it: right-click a member > Apps > Wynncraft account, or /whois.
+#   - The site's staff log (Moderation > Log) goes to 📛・moderation-logs too
+#     (Yasuro, 2026-10-20), line by line, as it is written.
 #
 # Its own process (user service wynnguessr-bot), next to the site whose
 # database it shares: it imports app.py, so the tables, tags and "#1"s are
@@ -27,6 +29,7 @@ import re
 import secrets
 import sqlite3
 import time
+from datetime import datetime, timezone
 from urllib.parse import quote, urlencode
 
 import discord
@@ -40,6 +43,7 @@ TAGS_TOP = 1561308593221795850      # the line above the tags...
 TAGS_BOTTOM = 1561308596627570789   # ...and the one below them
 MEMBERS = 1561308599274311730       # Verified goes right above this role
 RULES = 1561308617401958450         # #verify comes right after this channel
+MODLOG = 1561308656975351808        # 📛・moderation-logs, the staff's channel: the site's log goes there
 CHANNEL = '✅・verify'
 VERIFIED = 'Verified'
 # the site's colours (style.css), so a tag looks the same on both
@@ -297,6 +301,16 @@ def fresh_name(link):
             c.execute("UPDATE discord_links SET name = ? WHERE uuid = ?", (name, link['uuid']))
     return name
 
+def log_after(last):
+    # the staff's log after this line, oldest first; not what was done on
+    # Discord (by 0: Discord's own log has it). None: no line seen yet
+    with A.connect() as c:
+        if last is None:
+            return c.execute("SELECT COALESCE(MAX(id), 0) FROM mod_log").fetchone()[0]
+        return [dict(r) for r in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, m.target AS tid,
+            a.username AS by, t.username AS target FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
+            WHERE m.id > ? AND COALESCE(m.by, -1) != 0 ORDER BY m.id LIMIT 50''', (last,))]
+
 def known(what):
     # the id of one thing the bot looks after (discord_ids), or None
     row = A.connect().execute("SELECT id FROM discord_ids WHERE what = ?", (what,)).fetchone()
@@ -464,6 +478,7 @@ async def sync():
         acts, keep = plan_members(site, read_discord(guild), full)
         await apply_members(guild, site, acts, keep)
         await tell_waiting(site)
+        await post_log(guild, full)
 
 
 # ---------- what members see ----------
@@ -473,6 +488,46 @@ def card(text, link = None, title = None):
     if link and site_url():
         e.set_thumbnail(url = site_url() + '/avatar?' + urlencode({'uuid': link['uuid']}))
     return e
+
+# a line of the staff's log, coloured as it weighs
+WEIGHT = {'ban': 'red', 'delete': 'red', 'mute': 'orange', 'hide': 'orange', 'rename': 'orange', 'password': 'orange',
+          'rank': 'gold', 'tag': 'gold'}
+
+def log_card(row, site, full = True):
+    # who (above), on whom (the title, which opens their card in Moderation), what, why, when
+    esc = discord.utils.escape_markdown
+    e = discord.Embed(description = esc(row['details'] or row['action']), color = TAG_HEX[WEIGHT.get(row['action'], 'stone')],
+                      timestamp = datetime.fromtimestamp(row['at'], timezone.utc))
+    e.set_author(name = row['by'] or '(gone)')
+    if row['tid']:
+        e.title = esc(row['target'] or '(gone)')
+        e.url = site + '/moderation?player=%d' % row['tid']
+    if row['reason']:
+        e.add_field(name = 'Why', value = esc(row['reason'])[:1024])
+    e.set_footer(text = site.split('//')[1] if full else 'Beta · ' + site.split('//')[1])
+    return e
+
+async def post_log(guild, full):
+    # the site's new lines, ten to a message, and where we got to (discord_ids 'modlog')
+    channel = guild.get_channel(MODLOG) or discord.utils.find(lambda c: 'moderation-log' in c.name, guild.text_channels)
+    if not channel or not due(('modlog',)):
+        return
+    last = await asyncio.to_thread(known, 'modlog')
+    rows = await asyncio.to_thread(log_after, last and int(last))
+    if last is None:
+        # the first time: from now on, not the whole past
+        await asyncio.to_thread(write_site, [('map', 'modlog', str(rows), None, None)])
+        return
+    site = site_url() or A.LIVE
+    for i in range(0, len(rows), 10):
+        batch = rows[i:i + 10]
+        try:
+            await channel.send(embeds = [log_card(r, site, full) for r in batch])
+        except discord.HTTPException as e:
+            FAILED[('modlog',)] = time.time()
+            log.warning("moderation log refused: %s", e)
+            return
+        await asyncio.to_thread(write_site, [('map', 'modlog', str(batch[-1]['id']), None, None)])
 
 def door_card(verified, full = True):
     e = card("Show everyone here which Wynncraft player you are, in two clicks:\n\n"
