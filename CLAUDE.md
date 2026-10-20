@@ -396,6 +396,18 @@ notre propre liaison, par « Log in with Wynncraft ».
   la bêta, chaque ligne est marquée « Beta · beta.wynndle.com ». Test :
   `t_bot_log.py` (14) ; vérifié en vrai avec une ligne de test, effacée
   ensuite du salon et du journal.
+- **Le compteur `🎮・Players online: N`** (2026-10-20, demande de Yasuro :
+  un salon vocal « sans accès pour personne mais visible à tout le
+  monde », les joueurs du site, « pas la bêta bien sûr ») : en haut du
+  serveur, hors catégorie, @everyone sans droit de se connecter. N est
+  le « Online » de la page About **du vrai site** (visiteurs vus dans les
+  `ONLINE` = 5 dernières minutes), lu dans sa base en lecture seule
+  (`LIVE_DB`, `~/Wynnguessr/database.db`) : même depuis la bêta, et la
+  sienne à partir de la 3.0. Toutes les 5 min, et seulement si le nombre
+  change (Discord ne renomme un salon que deux fois en 10 min), dans sa
+  propre boucle : une attente imposée par Discord ne bloque pas le reste.
+  Une base qui ne le connaît pas le retrouve par son nom. Test :
+  `t_bot_count.py` (7).
 - **Qui a raison pour un tag** : `discord_held` garde ce que les deux côtés
   avaient au dernier passage ; le côté qui a changé depuis l'emporte. Rien
   de connu (première fois, nouvelle liaison, base neuve) → **union**,

@@ -15,6 +15,8 @@
 #   - Who is it: right-click a member > Apps > Wynncraft account, or /whois.
 #   - The site's staff log (Moderation > Log) goes to 📛・moderation-logs too
 #     (Yasuro, 2026-10-20), line by line, as it is written.
+#   - A voice channel nobody can join, seen by all, named after the players
+#     on the live site right now (Yasuro: "pas la beta bien sûr").
 #
 # Its own process (user service wynnguessr-bot), next to the site whose
 # database it shares: it imports app.py, so the tables, tags and "#1"s are
@@ -44,6 +46,9 @@ TAGS_BOTTOM = 1561308596627570789   # ...and the one below them
 MEMBERS = 1561308599274311730       # Verified goes right above this role
 RULES = 1561308617401958450         # #verify comes right after this channel
 MODLOG = 1561308656975351808        # 📛・moderation-logs, the staff's channel: the site's log goes there
+LIVE_DB = os.path.expanduser('~/Wynnguessr/database.db')   # the live site's: counted there even from the beta
+COUNTER = '🎮・Players online: %d'
+COUNT_EVERY = 300                   # seconds: Discord renames a channel twice in 10 minutes at most
 CHANNEL = '✅・verify'
 VERIFIED = 'Verified'
 # the site's colours (style.css), so a tag looks the same on both
@@ -310,6 +315,14 @@ def log_after(last):
         return [dict(r) for r in c.execute('''SELECT m.id, m.at, m.action, m.details, m.reason, m.target AS tid,
             a.username AS by, t.username AS target FROM mod_log m LEFT JOIN users a ON a.id = m.by LEFT JOIN users t ON t.id = m.target
             WHERE m.id > ? AND COALESCE(m.by, -1) != 0 ORDER BY m.id LIMIT 50''', (last,))]
+
+def online_now():
+    # who is on the live site right now, as its About page counts them
+    c = sqlite3.connect('file:%s?mode=ro' % LIVE_DB, uri = True, timeout = 10)
+    try:
+        return c.execute("SELECT COUNT(*) FROM visitors WHERE last > ?", (time.time() - A.ONLINE,)).fetchone()[0]
+    finally:
+        c.close()
 
 def known(what):
     # the id of one thing the bot looks after (discord_ids), or None
@@ -775,12 +788,41 @@ async def syncing():
             await asyncio.sleep(30)
         await asyncio.sleep(1)
 
+async def count(guild):
+    # the counter: made once (at the top, @everyone may see it but not join),
+    # then renamed when the number changes
+    n = await asyncio.to_thread(online_now)
+    cid = await asyncio.to_thread(known, 'counter')
+    channel = guild.get_channel(int(cid)) if cid else None
+    # one the database does not know (the live site's, at 3.0): found by its name
+    channel = channel or discord.utils.find(lambda c: c.name.startswith(COUNTER.split(':')[0]), guild.voice_channels)
+    if channel is None:
+        channel = await guild.create_voice_channel(COUNTER % n, position = 0, reason = 'WynnGuessr: players online',
+                                                   overwrites = {guild.default_role: discord.PermissionOverwrite(connect = False)})
+    elif channel.name != COUNTER % n:
+        await channel.edit(name = COUNTER % n, reason = 'WynnGuessr: players online')
+    if cid != str(channel.id):
+        await asyncio.to_thread(write_site, [('map', 'counter', str(channel.id), None, None)])
+
+async def counting():
+    # its own loop: a rename Discord makes wait must not hold the syncing up
+    await client.wait_until_ready()
+    while not client.is_closed():
+        guild = client.get_guild(GUILD.id)
+        try:
+            if guild:
+                await count(guild)
+        except Exception:
+            log.exception("counter")
+        await asyncio.sleep(COUNT_EVERY)
+
 async def setup():
     client.add_view(Door())
     client.add_view(Account())
     await tree.sync(guild = GUILD)
     asyncio.create_task(watch())
     asyncio.create_task(syncing())
+    asyncio.create_task(counting())
 
 client.setup_hook = setup
 
