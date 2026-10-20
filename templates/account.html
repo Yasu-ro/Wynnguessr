@@ -139,7 +139,7 @@
         {% if me.id != owner %}
         <section class="panel" id="delete">
             <h2>Delete Account</h2>
-            <p class="hint">Your name, pictures, scores, levels and messages are gone for good. In others' past games, you become "Deleted player".</p>
+            <p class="hint">Everything goes: your name, pictures, scores, levels, games and messages. For good.</p>
             <form class="stack" action="account?do=delete" method="post">
                 {% if me.password %}
                 <input class="field" type="password" name="current" placeholder="Your password" aria-label="Your password" autocomplete="current-password" required>

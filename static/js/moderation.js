@@ -556,7 +556,7 @@ $(function () {
                 // the reason under what was done, on every screen: it is the point of a log
                 var what = (e.tid ? '<b>' + esc(e.target || '(gone)') + '</b> ' : '') + esc(e.details || WORDS[e.action] || e.action) +
                     (e.reason ? "<small class='mod-why'>" + esc(e.reason) + '</small>' : '');
-                return "<tr class='leaderboard-row'><td class='mod-when'>" + when(e.at) + '</td><td>' + esc(e.by) + '</td><td>' + what + '</td></tr>';
+                return "<tr class='leaderboard-row'><td class='mod-when'>" + when(e.at) + '</td><td>' + esc(e.by || '(gone)') + '</td><td>' + what + '</td></tr>';
             }).join('');
             $('#log-rows')[more ? 'append' : 'html'](html);
             if (r.log.length) {

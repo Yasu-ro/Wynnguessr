@@ -422,9 +422,9 @@ def still_logged_in():
         return
     if session.get('user_id'):
         with connect() as c:
-            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until, deleted FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until FROM users WHERE id = ?", (session['user_id'],)).fetchone()
             note = me and (me['banned_until'] or 0) > time.time() and ban_note(c, session['user_id'])
-        if not me or me['deleted']:
+        if not me:
             session.clear()   # deleted, guest or not: out of every browser
         elif note:
             session.clear()
@@ -607,38 +607,37 @@ def avatar_url(user):
     # the version changes with the picture, so a browser never shows an old one
     return 'avatar?' + urlencode({'id': user['id'], 'v': user['avatar'] or (user['mc_uuid'] or 'steve')[:8]})
 
-# Deleting an account (2026-10-20, Yasuro: "get rid of everything they own").
-# Gone: name, password, pictures, Minecraft link, scores, solo games, chat
-# messages, reports, contact messages, ranks, tags. Kept, under "Deleted
-# player": their guesses in finished rooms, so nobody else's results, wins
-# or streaks change; and the id (a guest row, never reused: SQLite would
-# give a freed top id to the next account, with whatever still points at it).
-DELETED = 'Deleted player'
-
-with connect() as c:
-    if 'deleted' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
-        c.execute("ALTER TABLE users ADD COLUMN deleted REAL")
-
+# Deleting an account (2026-10-20, Yasuro: "get rid of everything they own",
+# then "tout tout tout effacer"): the row and every trace of them, their
+# games with others included (those players' past wins, streaks and XP may
+# change: replayed without them). Only the staff's log keeps its lines, with
+# no link to the id: SQLite gives a freed top id to the next account, which
+# must inherit nothing. Their address bans stay (else deleting would lift one).
 def delete_user(c, uid):
     drop_picture(c, uid)
     drop_picture(c, uid, 'avatar_pending')
-    c.execute('''UPDATE users SET username = ?, password = '', guest = 1, deleted = ?, mc_uuid = NULL, mc_name = NULL,
-        recovery = NULL, avatar_note = NULL, pending_at = NULL, shown_tag = NULL, seen_from = NULL, ban_reason = NULL WHERE id = ?''',
-        (DELETED, time.time(), uid))
     for m in c.execute("SELECT file FROM contact WHERE user_id = ? AND file IS NOT NULL", (uid,)).fetchall():
         try:
             os.remove(os.path.join(CONTACT_FILES, m[0]))
         except OSError:
             pass
+    name = c.execute("SELECT username FROM users WHERE id = ?", (uid,)).fetchone()[0]
+    c.execute("DELETE FROM fails WHERE name = ?", (name.lower(),))
     c.execute("DELETE FROM contact_replies WHERE message IN (SELECT id FROM contact WHERE user_id = ?)", (uid,))
     c.execute("DELETE FROM chat_reports WHERE by = ? OR message IN (SELECT id FROM room_chat WHERE user_id = ?)", (uid, uid))
     c.execute("DELETE FROM survival_guesses WHERE run_id IN (SELECT id FROM survival_runs WHERE user_id = ?)", (uid,))
     c.execute("DELETE FROM solo_guesses WHERE game_id IN (SELECT id FROM solo_games WHERE user_id = ?)", (uid,))
-    c.execute("DELETE FROM room_players WHERE user_id = ? AND code IN (SELECT code FROM rooms WHERE state = 'waiting')", (uid,))
+    c.execute("DELETE FROM room_shop WHERE buyer = ? OR target = ?", (uid, uid))
     for table, col in (('contact', 'user_id'), ('room_chat', 'user_id'), ('scores', 'user_id'), ('survival_runs', 'user_id'),
-                       ('solo_games', 'user_id'), ('staff', 'user_id'), ('user_tags', 'user_id'), ('ignores', 'user_id'),
-                       ('ignores', 'target'), ('player_reports', 'by'), ('player_reports', 'target')):
+                       ('solo_games', 'user_id'), ('room_players', 'user_id'), ('room_guesses', 'user_id'), ('room_milk', 'user_id'),
+                       ('room_bans', 'user_id'), ('staff', 'user_id'), ('user_tags', 'user_id'), ('ignores', 'user_id'),
+                       ('ignores', 'target'), ('player_reports', 'by'), ('player_reports', 'target'), ('users', 'id')):
         c.execute(f"DELETE FROM {table} WHERE {col} = ?", (uid,))
+    # what others did keeps its line, without their id
+    for table, col in (('rooms', 'host_id'), ('mod_log', 'by'), ('mod_log', 'target'), ('staff', 'by'), ('tags', 'by'),
+                       ('user_tags', 'by'), ('contact_replies', 'user_id'), ('place_bans', 'user_id')):
+        c.execute(f"UPDATE {table} SET {col} = NULL WHERE {col} = ?", (uid,))
+    c.execute("UPDATE room_chat SET hidden_by = 0 WHERE hidden_by = ?", (uid,))   # still hidden
 
 def show_profile(uid):
     with connect() as c:
@@ -3291,7 +3290,7 @@ MAY = {                   # the lowest rank with each power
     'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
     'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
     'password': 2,        # give a locked-out player a new, easy password
-    'delete': 2,          # delete a player and everything they own
+    'delete': 3,          # delete a player and everything they own
     'contact': 2,         # the messages of the contact page (an email address is personal)
     'staff': 3,           # give and take ranks (below one's own)
     'tags': 2,            # give and take tags
@@ -3833,7 +3832,7 @@ def mod_players():
                 u.muted_until > :now AS muted, u.banned_until > :now AS banned,
                 (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) +
                 (SELECT COUNT(*) FROM player_reports WHERE target = u.id) AS reported
-            FROM users u WHERE {KINDS[kind]} AND u.deleted IS NULL AND u.username LIKE :q ESCAPE '\\'
+            FROM users u WHERE {KINDS[kind]} AND u.username LIKE :q ESCAPE '\\'
             ORDER BY u.username = :exact COLLATE NOCASE DESC, u.id DESC LIMIT :n OFFSET :start''',
             {'now': now, 'q': '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%', 'exact': q, 'n': PLAYERS_PAGE + 1, 'start': start}).fetchall()
         tags = tag_of(c, [u['id'] for u in rows])

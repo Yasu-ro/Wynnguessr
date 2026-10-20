@@ -963,24 +963,30 @@ max), journal d'audit avec la raison. D'où :
     Tests : `t_password.py` (13), `t_password_page.py` (navigateur, 5 × 2).
   - **Supprimer un compte** (2026-10-20, demande de Yasuro : « get rid of
     everything they own », par le joueur avec son mot de passe, et par
-    l'équipe). Section **Delete Account** en bas d'Edit Profile (et dans le
-    panneau de navigation) : mot de passe, ou le pseudo tapé pour un compte
-    Wynncraft sans mot de passe ; mêmes limites d'essais que la connexion.
-    Fiche Players : **Delete Account** (Moderator, `MAY['delete']`, deux
-    clics, règle d'en dessous, invités compris ; journal « account deleted:
-    <ancien nom> » + raison). L'Owner ne peut pas être supprimé.
-    `delete_user()` efface pseudo, mot de passe, photos (fichiers compris),
-    lien Minecraft, scores, parties solo et Survival, messages du chat et
-    leurs signalements, signalements faits ou reçus, ignores, messages
-    Contact (captures comprises), rang, étiquettes. **Gardés** : ses guess
-    dans les salons finis, sous « Deleted player » (sinon les victoires,
-    séries et XP des autres changeraient, `progress()` rejoue tout), et la
-    ligne `users` elle-même, vidée, en invité, `users.deleted` : SQLite
-    redonnerait un id libéré au compte suivant, qui hériterait de ce qui le
-    vise encore (journal…). Ses bans d'adresse restent (sinon supprimer son
-    compte lèverait le ban). Déconnecté de partout (`still_logged_in`),
-    absent de Players, des classements et des profils ; son pseudo est
-    libre. Tests : `t_delete.py` (33), `t_delete_page.py` (navigateur, 6 × 2).
+    l'équipe ; puis « admins + tout tout tout effacer »). Section **Delete
+    Account** en bas d'Edit Profile (et dans le panneau de navigation) : mot
+    de passe, ou le pseudo tapé pour un compte Wynncraft sans mot de passe ;
+    mêmes limites d'essais que la connexion. Fiche Players : **Delete
+    Account** pour les **Admins** (`MAY['delete'] = 3`, deux clics, règle
+    d'en dessous, invités compris ; journal « account deleted: <ancien nom> »
+    + raison). L'Owner ne peut pas être supprimé.
+    `delete_user()` efface **tout**, la ligne `users` comprise : photos
+    (fichiers), scores, parties solo et Survival, **ses parties avec les
+    autres** (`room_players`, `room_guesses`, achats, lait : les victoires,
+    séries et XP des autres sont recalculées sans lui, choix de Yasuro),
+    chat et signalements, ignores, Contact (captures), rang, étiquettes,
+    échecs de connexion. **Seul le journal de l'équipe garde ses lignes**,
+    sans l'id. Piège évité : SQLite redonne un id libéré (le plus grand) au
+    compte suivant ; tout ce qui pointait vers l'ancien (`mod_log` by/target,
+    hôte d'un salon, `staff.by`, `tags.by`, `contact_replies`, `place_bans`)
+    est mis à NULL, sinon le nouveau venu en hériterait ; `hidden_by` passe à
+    0 (NULL ferait réapparaître un message caché par un modérateur
+    supprimé). Ses bans d'adresse restent (sinon supprimer son compte
+    lèverait le ban). Déconnecté de partout (`still_logged_in` : plus de
+    ligne = session vidée). La colonne `users.deleted` d'une première
+    version reste dans la base de la bêta, inutilisée (la retirer a été
+    refusé par le classifieur ; sans effet). Tests : `t_delete.py` (35),
+    `t_delete_page.py` (navigateur, 6 × 2).
   - Durées écrites « 6 more days » (`how_long`, une minute de marge : sans
     elle, une heure lue une milliseconde après disait « 60 more minutes ») :
     pareilles dans tous les fuseaux.
