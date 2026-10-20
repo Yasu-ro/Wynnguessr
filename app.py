@@ -3242,12 +3242,14 @@ RANKS = {4: 'Owner', 3: 'Admin', 2: 'Moderator', 1: 'Helper'}
 MAY = {                   # the lowest rank with each power
     'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
     'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
+    'password': 2,        # give a locked-out player a new, easy password
     'contact': 2,         # the messages of the contact page (an email address is personal)
     'staff': 3,           # give and take ranks (below one's own)
     'tags': 2,            # give and take tags
     'make_tags': 3,       # make a tag, or put one away
 }
 HELPER_MUTE = 3600        # a Helper mutes for an hour at most
+EASY_WORDS = ('emerald', 'potion', 'ragni', 'detlas', 'almuj', 'creeper', 'compass', 'lantern')   # a reset password: word + 4 digits
 
 with connect() as c:
     c.executescript('''
@@ -3812,6 +3814,7 @@ def mod_player():
                "muted": how_long(u['muted_until'] - now) if (u['muted_until'] or 0) > now else None,
                "banned": ('forever' if u['banned_until'] >= FOREVER else 'for ' + how_long(u['banned_until'] - now)) if (u['banned_until'] or 0) > now else None,
                "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename')}}
+        out['may']['password'] = may(c, 'password', uid) and not u['guest']
         out['mutes'] = [m for m in MUTES if out['may']['long_mute'] or m <= HELPER_MUTE]
         r = my_rank(c)
         if r >= MAY['staff'] and not u['guest'] and rank_of(c, uid) < r:
@@ -3824,7 +3827,7 @@ def mod_player():
 def mod_sanction():
     f = request.form
     uid, what, reason = f.get('id', type = int), f.get('do'), f.get('reason', '').strip()[:200]
-    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename'}.get(what)
+    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename', 'password': 'password'}.get(what)
     with room_tx() as c:
         u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
         if not u or not need or not may(c, need, uid):
@@ -3850,6 +3853,15 @@ def mod_sanction():
             c.execute("UPDATE users SET banned_until = NULL, ban_reason = NULL WHERE id = ?", (uid,))
             c.execute("UPDATE place_bans SET until = ? WHERE user_id = ? AND until > ?", (now, uid, now))
             logged(c, 'ban', uid, 'unbanned', reason)
+        elif what == 'password':
+            # easy to read out, but never the same twice: a fixed default
+            # would let anyone in before its player
+            if u['guest']:
+                return jsonify({"success": False, "error": "A guest has no password"})
+            new = secrets.choice(EASY_WORDS) + str(secrets.randbelow(9000) + 1000)
+            c.execute("UPDATE users SET password = ? WHERE id = ?", (hashed(new), uid))   # their other browsers are logged out
+            logged(c, 'password', uid, 'password reset', reason)
+            return jsonify({"success": True, "password": new})
         else:
             name = clean_name(f.get('name', ''))
             problem = name_problem(c, name, uid)

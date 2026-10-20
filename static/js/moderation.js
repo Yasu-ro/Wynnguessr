@@ -163,9 +163,9 @@ $(function () {
 
     // ---------- players ----------
     // find a player, see how things stand and what happened, and act: mute,
-    // ban (asks twice), rename. The server says what this rank may do.
+    // ban (asks twice), rename, new password (asks twice). The server says what this rank may do.
     var LENGTHS = {600: '10 min', 3600: '1 hour', 86400: '1 day', 604800: '7 days', 2419200: '28 days', 0: 'Forever'};
-    var shown = null, banArmed = 0;
+    var shown = null, banArmed = 0, armedAct = null;
 
     // the list: every player, filtered by kind and by name, 50 at a time;
     // a row opens the player's card, which goes back to the list
@@ -223,7 +223,7 @@ $(function () {
         }).join('') + '</div>';
     }
 
-    function player(id) {
+    function player(id, then) {
         $.getJSON('api/mod/player', {id: id}).done(function (p) {
             if (!p.success) {
                 return;
@@ -252,6 +252,10 @@ $(function () {
                 acts += "<div class='mod-act'><h3>Rename</h3><div class='mod-rename'><input class='field' name='name' value='" + esc(p.name) +
                     "' aria-label='New name' maxlength='20'><button type='button' class='btn' data-act='rename'>Rename</button></div></div>";
             }
+            if (p.may.password) {
+                acts += "<div class='mod-act'><h3>Password <small>a new, easy one to give them</small></h3>" +
+                    "<button type='button' class='btn wood' data-act='password'>Reset Password</button></div>";
+            }
             if (acts) {
                 acts = "<input class='field' name='reason' placeholder='Why (kept in the log; a banned player reads it)' aria-label='Why' maxlength='200'>" + acts +
                     "<p class='note' id='player-note' hidden></p>";
@@ -273,18 +277,24 @@ $(function () {
                 '<h3>Last Messages</h3>' + (p.said.length ? "<div class='mod-chat'>" + p.said.map(function (m) {
                     return '<p' + (m.hidden ? " class='gone'" : '') + '><small>' + esc(m.room) + ' · ' + when(m.at) + '</small> ' + esc(m.text) + '</p>';
                 }).join('') + '</div>' : "<p class='hint'>Nothing yet.</p>") + '</section>');
+            if (then) {
+                then();
+            }
         });
     }
 
     $('#player-card').on('click', '[data-act]', function () {
         var card = $(this).closest('.mod-player'), what = $(this).data('act'), button = $(this);
-        // a ban asks twice
-        if (what == 'ban' && Date.now() - banArmed > ARMED) {
+        // a ban and a new password ask twice
+        if ((what == 'ban' || what == 'password') && (armedAct != what || Date.now() - banArmed > ARMED)) {
+            var label = button.text();
             banArmed = Date.now();
+            armedAct = what;
             button.text('Sure?');
-            setTimeout(function () { if (Date.now() - banArmed >= ARMED) button.text('Ban'); }, ARMED + 50);
+            setTimeout(function () { if (Date.now() - banArmed >= ARMED) button.text(label); }, ARMED + 50);
             return;
         }
+        armedAct = null;
         banArmed = 0;
         if (what == 'rank') {
             // by id: a guest may have had the same name before the account
@@ -295,7 +305,12 @@ $(function () {
         }
         $.post('api/mod/sanction', {id: shown, 'do': what, reason: card.find('[name=reason]').val(), name: card.find('[name=name]').val(),
                                     length: card.find('[name=' + what + '-length]:checked').val()}).done(function (r) {
-            if (r.success) {
+            if (r.password) {
+                // shown once: the card is drawn again, then told
+                player(shown, function () {
+                    $('#player-note').prop('hidden', false).removeClass('bad').html('New password: <b>' + esc(r.password) + '</b> · give it to them');
+                });
+            } else if (r.success) {
                 player(shown);
             } else {
                 $('#player-note').prop('hidden', false).addClass('bad').text(r.error || 'Refused');

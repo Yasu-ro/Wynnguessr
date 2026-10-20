@@ -952,6 +952,15 @@ max), journal d'audit avec la raison. D'où :
     à la même adresse joue toujours). L'équipe ne voit jamais d'adresse.
   - **Rename** (Moderator) : mêmes règles qu'un pseudo choisi, et refusé
     s'il passe par le filtre ; l'ancien nom au journal.
+  - **Reset Password** (Moderator, 2026-10-20, demande de Yasuro : « reset a
+    password for anyone that needs (default password something easy) ») :
+    un mot + 4 chiffres (`EASY_WORDS`, « creeper4341 »), **jamais le même
+    mot de passe pour tous** (un défaut fixe laisserait n'importe qui entrer
+    avant le joueur). Deux clics, montré une seule fois au modérateur, qui
+    le transmet ; jamais écrit au journal (« password reset » + la raison).
+    Les autres navigateurs du joueur sont déconnectés (`stamp`). Pas pour
+    un invité. Le joueur n'est pas obligé de le changer ensuite.
+    Tests : `t_password.py` (13), `t_password_page.py` (navigateur, 5 × 2).
   - Durées écrites « 6 more days » (`how_long`, une minute de marge : sans
     elle, une heure lue une milliseconde après disait « 60 more minutes ») :
     pareilles dans tous les fuseaux.
