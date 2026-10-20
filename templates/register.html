@@ -6,6 +6,11 @@
     {% set next = '?next=' ~ (request.args['next'] | urlencode) if request.args.get('next') else '' %}
     <h1 class="sign">Register</h1>
     <div class="panel narrow">
+        {% if wynn_login %}
+        <a class="btn wide wynn-button" href="auth/wynncraft{{ next }}">Sign up with Wynncraft</a>
+{% include "wynn_perks.html" %}
+        <p class="or">or</p>
+        {% endif %}
         <form class="stack" action="register{{ next }}" method="post">
             <input class="field" placeholder="Username" aria-label="Username" name="username" autocomplete="off" maxlength="20">
             <input class="field" placeholder="Password" aria-label="Password" type="password" name="password" autocomplete="off" minlength="8" maxlength="64">

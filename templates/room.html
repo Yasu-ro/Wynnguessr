@@ -15,6 +15,11 @@
 
     <section id="lobby" class="room-page" hidden>
         <h1 class="sign">{% if world %}{{ world.title }} · {{ world.line }}{% else %}Room {{ code }}{% endif %}</h1>
+        {# under the sign, seen without scrolling, on a laptop and a phone alike #}
+        <div class="room-go">
+            <p class="world-status" id="world-status" hidden></p>
+            <button type="button" id="start-button" class="btn big wide room-start" disabled>Start the Game</button>
+        </div>
         <div class="room-columns">
             <div class="room-column">
                 {% if not world %}
@@ -62,8 +67,6 @@
             </form>
             {% endif %}
         </div>
-        <p class="world-status" id="world-status" hidden></p>
-        <button type="button" id="start-button" class="btn big wide room-start" disabled>Start the Game</button>
     </section>
 
     <section id="guess-screen" class="room-screen" hidden>

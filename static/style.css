@@ -2756,8 +2756,15 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     font-weight: 700;
     color: var(--red);
 }
-.room-start {
-    margin-top: 30px;
+/* the lobby's Start, or what it waits for: under the sign (it was below
+   the settings and the chat, out of sight on a laptop, three screens down
+   on a phone; Yasuro's party test, 2026-10-20) */
+.room-go {
+    max-width: 480px;
+    margin: 0 auto 26px;
+}
+.room-go .world-status {
+    margin: 0 0 10px;
 }
 
 body.room-playing {

@@ -16,7 +16,7 @@
     </form>
     <script>showRules();</script>
 {% elif play == 'friends' %}
-    <h1 class="sign">Custom Game</h1>
+    <h1 class="sign">With Friends</h1>
     <a class="back" href="mode"><i class="material-icons">arrow_back</i>Back</a>
     {% if session['user_id'] %}
     <div class="duo">
@@ -56,7 +56,7 @@
         <a class="pcard-slot" href="multiplayer">{{ cards.card('JOKER', None, tilt = 1.5, wear = 2) }}
             <span class="pcard-slip" style="--slip: -1deg"><b>Multiplayer</b><small>Play with anyone online</small>{% if online %}<span class="live">{{ online }} playing</span>{% endif %}<span class="btn">Play</span></span></a>
         <a class="pcard-slot" href="mode?play=friends">{{ cards.card('K', 'pins', tilt = 3, wear = 1) }}
-            <span class="pcard-slip" style="--slip: 0.5deg"><b>Custom Game</b><small>Your rules, a code for your friends</small><span class="btn">Play</span></span></a>
+            <span class="pcard-slip" style="--slip: 0.5deg"><b>With Friends</b><small>Your rules, a code for your friends</small><span class="btn">Play</span></span></a>
     </div>
     <script src="{{ asset('js/cards.js') }}"></script>
 {% endif %}

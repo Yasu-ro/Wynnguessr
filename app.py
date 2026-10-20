@@ -3096,6 +3096,8 @@ def survival_view(c, r, me, out, now):
                              if row['round'] == n + 1 and row['buyer'] == uid]
     elif phase == 'reveal':
         out['phase_left'] = max(0, r['round_end'] + REVEAL - now)
+        # will the shop open? Not if nobody here can buy anything (shop_shut)
+        out['shop'] = any(shopping(c, r, u, st[u]) for u in present(c, r) & set(st))
     elif phase in ('throw', 'prep'):
         out['phase_left'] = max(0, r['round_start'] - (PREP if phase == 'throw' else 0) - now)
         out['starts_in'] = max(0, r['round_start'] - now)
@@ -3324,7 +3326,11 @@ def room_lobby(code):
         if not r or not r['world'] or r['state'] != 'waiting':
             return jsonify({"success": False})
         if request.form.get('gone'):
-            c.execute("UPDATE room_players SET last_seen = 0 WHERE code = ? AND user_id = ?", (r['code'], me['user_id']))
+            # not here at once, but still in the lobby for WORLD_LEFT: at 0, the
+            # tick right below took them out of it, a reload lost its Ready, and
+            # one gone before the start was not set aside as away
+            c.execute("UPDATE room_players SET last_seen = ? WHERE code = ? AND user_id = ?",
+                      (time.time() - GONE - 1, r['code'], me['user_id']))
         else:
             c.execute("UPDATE room_players SET lobby_ready = ? WHERE code = ? AND user_id = ?",
                       (int(request.form.get('ready') == '1'), r['code'], me['user_id']))

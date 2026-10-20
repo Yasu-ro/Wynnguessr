@@ -1082,7 +1082,8 @@ function lastRound() {
 }
 
 function nextButton() {
-    var b = $('#next-button'), label = lastRound() ? 'See Results' : s.mode == 'survival' ? 'Shop' : 'Next Round';
+    // survival: the shop, unless nobody can buy anything (then it is skipped)
+    var b = $('#next-button'), label = lastRound() ? 'See Results' : s.mode == 'survival' && s.shop !== false ? 'Shop' : 'Next Round';
     if (!s.live) {
         b.prop('disabled', false).text(lastRound() ? label : 'Next Location');
         return;

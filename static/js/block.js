@@ -91,4 +91,39 @@ function blockCursor(m) {
         }
     });
     m.on('mouseout zoomstart', hide);
+    touchOpens(m);    // every guess map has both
+}
+
+// On a phone, the small map grows at the first touch (style.css: its
+// :hover), and that touch also dropped the pin, somewhere the grown map no
+// longer showed: a quick Guess! went there (Yasuro's party test, 2026-10-20).
+// Now a touch on the closed map only opens it; the next touches aim. The
+// map is closed again once a touch lands elsewhere (its :hover goes).
+var TOUCH_GAP = 800;      // ms: a touch with no click after it (a drag, a pinch) counts for nothing
+function touchOpens(m) {
+    var box = m.getContainer().closest('.map-container');
+    if (!box) {
+        return;
+    }
+    if (!box.touchState) {
+        // the box outlives the maps of a room (one per round): its watch, once
+        box.touchState = {open: false, skip: 0};
+        box.addEventListener('pointerdown', function (e) {
+            var st = box.touchState, onMap = !!e.target.closest('.leaflet-container');
+            st.skip = e.pointerType != 'mouse' && !st.open && onMap ? Date.now() : 0;
+            st.open = true;
+        }, true);
+        document.addEventListener('pointerdown', function (e) {
+            if (!box.contains(e.target)) {
+                box.touchState.open = false;
+            }
+        }, true);
+    }
+    m.getContainer().addEventListener('click', function (e) {
+        var st = box.touchState;
+        if (st.skip && Date.now() - st.skip < TOUCH_GAP) {
+            e.stopImmediatePropagation();    // before Leaflet hears it (it listens here too): no pin
+        }
+        st.skip = 0;
+    }, true);
 }

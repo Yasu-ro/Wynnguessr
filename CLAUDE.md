@@ -305,7 +305,9 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
     `wynn_api()` envoie `WynnGuessr (+https://wynndle.com)` ;
   - les erreurs de ces routes redirigent vers `apology` (deux dossiers de
     profondeur : une page rendue sur place perdait son CSS).
-- **Ce que ça apporte, dit sur `login`** (2026-10-20, demande de Yasuro :
+- **Ce que ça apporte, dit sur `login` et `register`** (`wynn_perks.html` ;
+  Register a « Sign up with Wynncraft » depuis le test de soirée : la fin
+  d'une partie y envoie les invités) (2026-10-20, demande de Yasuro :
   « explique bien les bénéfices ») : quatre lignes cochées sous le bouton
   (coche verte « it's really you », tête Minecraft en photo, tags sur le
   Discord, pas de mot de passe). **Un compte neuf** fait par Wynncraft
@@ -874,7 +876,9 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
     Custom = Roi). Montré à Yasuro : « I really like it », avec trois
     retouches, faites : (1) la page Play ne montre que les trois cartes
     (Solo → page solo, **Multiplayer** → les mondes, Custom Game → comme
-    avant) ; (2) cartes « lifeless, bland » → **tapis de feutre vert** cadré
+    avant ; renommée **With Friends** le 2026-10-20 : sur téléphone, seuls
+    les titres des cartes s'affichent, et une bande d'amis allait dans
+    Multiplayer, voir « Test de soirée ») ; (2) cartes « lifeless, bland » → **tapis de feutre vert** cadré
     de bois (tout était beige sur beige), **rangs en pixel art** (police 5×7
     à nous, `card-ranks.png` : une police d'ordinateur à côté d'enseignes en
     pixels faisait plat, comme dans Balatro tout est pixel), la carte
@@ -907,7 +911,12 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
   - **Un joueur muet depuis 5 min sort du lobby** (`WORLD_LEFT`, demande
     de Yasuro le 2026-10-19 : « Jogoat » restait grisé depuis un jour dans
     un lobby qui ne partait jamais). Pas à `GONE` (60 s) : piège de yolo.
-    Il peut revenir par le lien.
+    Il peut revenir par le lien. **Piège payé** (trouvé le 2026-10-20 par
+    `t_review_worlds`) : une page qui se ferme se disait partie avec
+    `last_seen = 0`, et le `WORLD_LEFT` du même passage la sortait aussitôt
+    du lobby : un rechargement perdait son Ready, et qui partait juste
+    avant le départ n'était plus mis de côté (`away`). Elle met désormais
+    `now − GONE − 1` : absente tout de suite, sortie après 5 min.
   - Fin : résultats 20 s (« Next game in N s », bouton Leave), puis tout le
     monde passe ensemble au lobby ouvert (`next_code`), où Ready est
     redemandé : le contrôle anti-AFK revient à chaque partie.
@@ -1420,6 +1429,43 @@ dans `app.py`, tous corrigés :
   fork) et la copie `~/Wynnguessr-review` : les fermer et effacer, ou les
   mettre à jour pour une autre ultrareview. Rien n'y est touché sans son
   accord.
+
+### Test de soirée (2026-10-20, bêta)
+
+Demande de Yasuro : « fait plusieurs passes en tant que joueur qui se fait
+chier avec des potes en soirée […] est-ce que tout est bien simple ». Fait
+dans de vrais navigateurs sur la copie isolée : Max organise sur un
+portable (1366×657), Léa et Tom rejoignent par le lien sur téléphone
+(Chromium et Firefox), Sam arrive en pleine manche ; Classic 5 manches,
+revanche, Survival à deux, Multiplayer, solo sur téléphone. **Marche
+seul** : le lien (un pseudo, Play), l'arrivée en retard (joue tout de
+suite), l'onglet fermé puis rouvert (même manche), Play Again (tout le
+monde suit), les 15 s données aux autres dès une réponse, la révélation
+(< 1 s), le podium. **Réparé** (« répare tout ça proprement et sans rien
+casser ») :
+- la carte « Custom Game » s'appelle **With Friends** (voir les cartes) ;
+- **Start** (ou « Waiting for X to start… », ou Ready dans un monde) passe
+  **sous l'enseigne** de la salle (`.room-go`) : il était sous les réglages
+  et le chat, à 920 px (hors de l'écran d'un portable), à trois écrans
+  sur téléphone ;
+- **le premier toucher sur la petite carte ne fait que l'ouvrir**
+  (`touchOpens()`, `block.js`, pour le solo, le Survival et les salons) :
+  il posait l'épingle là où la carte agrandie ne montrait plus rien, et un
+  Guess! rapide partait au hasard. Un toucher ailleurs la referme ; la
+  souris ne change pas ;
+- en Survival à plusieurs, la révélation dit si la boutique ouvrira
+  (`shop`, d'après `shopping()` comme `shop_shut`) : sans émeraudes, le
+  bouton dit **Next Round** et non « Shop » (la boutique est sautée) ;
+- Register propose Wynncraft (voir « Login with Wynncraft »).
+Pas faits (options, pas des réparations) : QR code à côté du code de la
+salle, menu de partage du téléphone pour Copy Link, « Milk » expliqué sur
+les cartes des mondes. Tests : `t_party_fixes.py` (19, Chromium portable
+et téléphone, Firefox téléphone), `t_party_solo.py` (6), `t_shop_flag.py`
+(5), `t_shop_label.py` (4) ; toute la série rejouée verte, sauf deux
+vieux tests : `t_kick.py` comptait le drapeau Report (à tous depuis le
+2026-10-19) comme un outil d'hôte, corrigé ; `t_solo.py` lisait les
+réponses dans la page, ce que le moteur solo ne permet plus (remplacé par
+`t_solo_engine.py` et `t_classic_page.py`).
 
 ## Contact (2026-10-19, bêta)
 
