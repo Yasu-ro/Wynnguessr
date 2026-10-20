@@ -305,6 +305,16 @@ Demande de Yasuro (« better profile »), choix faits avec lui :
     `wynn_api()` envoie `WynnGuessr (+https://wynndle.com)` ;
   - les erreurs de ces routes redirigent vers `apology` (deux dossiers de
     profondeur : une page rendue sur place perdait son CSS).
+- **Ce que ça apporte, dit sur `login`** (2026-10-20, demande de Yasuro :
+  « explique bien les bénéfices ») : quatre lignes cochées sous le bouton
+  (coche verte « it's really you », tête Minecraft en photo, tags sur le
+  Discord, pas de mot de passe). **Un compte neuf** fait par Wynncraft
+  passe une fois par `welcome` (« Welcome! », sa photo avec une coche,
+  « Your account is ready », puis le Discord : Join the Discord et Verify
+  dans #verify ; ou « Your Discord is verified too » s'il l'était déjà),
+  et Continue le ramène où il allait (`session['welcome']`). Pas pour une
+  simple connexion, ni pour un compte à mot de passe (pas demandé). Tests :
+  `t_welcome.py` (14).
 - API publique utile (sans clé) : `api.wynncraft.com/v3/player/<nom>` (guilde,
   rang…), 50 req/min. Profil public : `wynncraft.com/stats/player/<nom>`.
   Yasuro a refusé d'afficher guildes et autres infos : seulement coche + lien.

@@ -8,6 +8,12 @@
     <div class="panel narrow">
         {% if wynn_login %}
         <a class="btn wide wynn-button" href="auth/wynncraft{{ next }}">Log in with Wynncraft</a>
+        <ul class="perks">
+            <li><i class="material-icons">check</i>A green check next to your name: it's really you</li>
+            <li><i class="material-icons">check</i>Your Minecraft head as your picture</li>
+            <li><i class="material-icons">check</i>Your tags on our Discord too</li>
+            <li><i class="material-icons">check</i>No password to remember</li>
+        </ul>
         <p class="or">or</p>
         {% endif %}
         <form class="stack" action="login{{ next }}" method="post">

@@ -1035,6 +1035,7 @@ def wynn_back():
         return fail("Your wynncraft.com account has no Minecraft account yet: add one there, then try again", 'nominecraft')
     if discord:
         return discord_linked(discord, uuid, name)
+    new = False
     with connect() as c:
         owner = c.execute("SELECT id FROM users WHERE mc_uuid = ?", (uuid,)).fetchone()
         if session.get('loggedin'):
@@ -1056,10 +1057,27 @@ def wynn_back():
         else:
             uid = c.execute("INSERT INTO users (username, password, mc_uuid, mc_name) VALUES (?, '', ?, ?)", (name, uuid, name)).lastrowid
             done(c, 'account')
+            new = True
         note = log_in(c, uid, wynn = True)
     if note:
         return wynn_fail(note, appeal = True)
+    if new:
+        session['welcome'] = session.pop('wynn_next', './')
+        return redirect('../../welcome')
     return redirect('../../' + session.pop('wynn_next', './'))
+
+@app.route("/welcome")
+def welcome():
+    # once, right after Log in with Wynncraft made the account (Yasuro,
+    # 2026-10-20): it is ready, and our Discord, where verifying brings the
+    # tags along; then on to where the player was going
+    then = session.pop('welcome', None)
+    if then is None or not session.get('loggedin'):
+        return redirect('./')
+    with connect() as c:
+        user = c.execute("SELECT id, username, mc_uuid, avatar FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+        verified = c.execute("SELECT 1 FROM discord_links WHERE uuid = ?", (user['mc_uuid'],)).fetchone()
+    return render_template('welcome.html', user = user, avatar = avatar_url(user), verified = verified, discord = DISCORD, then = then)
 
 # ---------- Discord: verifying on the WynnGuessr server ----------
 # Yasuro (2026-10-20): know exactly who is who on Wynncraft, in as few steps

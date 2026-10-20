@@ -2228,6 +2228,56 @@ a.pcard-slot:hover .pcard, a.pcard-slot:focus-visible .pcard, .pcard-slot input:
     font-size: 20px;
     color: var(--red);
 }
+/* what Log in with Wynncraft brings (login.html) */
+.perks {
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.perks li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 7px 0;
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+.perks .material-icons {
+    flex: none;
+    font-size: 19px;
+    color: var(--green-dark);
+}
+/* a new account (welcome.html) */
+.welcome {
+    text-align: center;
+}
+.welcome-pic {
+    position: relative;
+    width: 128px;
+    margin: 0 auto 12px;
+}
+.welcome-pic .avatar {
+    margin: 0;
+}
+.welcome-pic .material-icons {
+    position: absolute;
+    right: -14px;
+    bottom: -14px;
+    font-size: 44px;
+    color: var(--green-dark);
+    background: var(--paper);
+    border-radius: 50%;
+}
+.welcome p {
+    margin: 0 0 10px;
+}
+.welcome .welcome-name {
+    margin: 0;
+    font: 700 22px/1.3 var(--sans);
+}
+.welcome .btn {
+    margin: 6px 0 4px;
+}
 /* verified on Discord (verify.html) */
 .verify {
     text-align: center;

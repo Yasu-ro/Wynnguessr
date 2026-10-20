@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block title %}: Welcome{% endblock %}
+
+{% block content %}
+    <h1 class="sign">Welcome!</h1>
+    <div class="panel narrow welcome">
+        <div class="welcome-pic">
+            <img class="avatar{{ ' head' if not user.avatar }}" src="{{ avatar }}" alt="" width="128" height="128">
+            <i class="material-icons">check_circle</i>
+        </div>
+        <p class="welcome-name">{{ user.username }}</p>
+        <p>Your account is ready.</p>
+        {% if verified %}
+        <p class="hint">Your Discord is verified too: your tags show up there.</p>
+        <a class="btn wide" href="{{ then }}">Continue</a>
+        {% else %}
+        <p class="hint">Join our Discord too, then press <b>Verify</b> in #verify: your tags show up next to your name there.</p>
+        <a class="btn wide" href="{{ discord }}" target="_blank" rel="noopener">Join the Discord</a>
+        <a class="btn wood wide" href="{{ then }}">Continue</a>
+        {% endif %}
+    </div>
+{% endblock %}
