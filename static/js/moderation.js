@@ -256,6 +256,10 @@ $(function () {
                 acts += "<div class='mod-act'><h3>Password <small>a new, easy one to give them</small></h3>" +
                     "<button type='button' class='btn wood' data-act='password'>Reset Password</button></div>";
             }
+            if (p.may['delete']) {
+                acts += "<div class='mod-act'><h3>Delete <small>the account and everything it owns, for good</small></h3>" +
+                    "<button type='button' class='btn red' data-act='delete'>Delete Account</button></div>";
+            }
             if (acts) {
                 acts = "<input class='field' name='reason' placeholder='Why (kept in the log; a banned player reads it)' aria-label='Why' maxlength='200'>" + acts +
                     "<p class='note' id='player-note' hidden></p>";
@@ -285,8 +289,8 @@ $(function () {
 
     $('#player-card').on('click', '[data-act]', function () {
         var card = $(this).closest('.mod-player'), what = $(this).data('act'), button = $(this);
-        // a ban and a new password ask twice
-        if ((what == 'ban' || what == 'password') && (armedAct != what || Date.now() - banArmed > ARMED)) {
+        // a ban, a new password and a deletion ask twice
+        if ((what == 'ban' || what == 'password' || what == 'delete') && (armedAct != what || Date.now() - banArmed > ARMED)) {
             var label = button.text();
             banArmed = Date.now();
             armedAct = what;
@@ -310,6 +314,8 @@ $(function () {
                 player(shown, function () {
                     $('#player-note').prop('hidden', false).removeClass('bad').html('New password: <b>' + esc(r.password) + '</b> · give it to them');
                 });
+            } else if (r.success && what == 'delete') {
+                $('#player-card [data-back]').trigger('click');   // nothing left to show
             } else if (r.success) {
                 player(shown);
             } else {

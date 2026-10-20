@@ -961,6 +961,26 @@ max), journal d'audit avec la raison. D'où :
     Les autres navigateurs du joueur sont déconnectés (`stamp`). Pas pour
     un invité. Le joueur n'est pas obligé de le changer ensuite.
     Tests : `t_password.py` (13), `t_password_page.py` (navigateur, 5 × 2).
+  - **Supprimer un compte** (2026-10-20, demande de Yasuro : « get rid of
+    everything they own », par le joueur avec son mot de passe, et par
+    l'équipe). Section **Delete Account** en bas d'Edit Profile (et dans le
+    panneau de navigation) : mot de passe, ou le pseudo tapé pour un compte
+    Wynncraft sans mot de passe ; mêmes limites d'essais que la connexion.
+    Fiche Players : **Delete Account** (Moderator, `MAY['delete']`, deux
+    clics, règle d'en dessous, invités compris ; journal « account deleted:
+    <ancien nom> » + raison). L'Owner ne peut pas être supprimé.
+    `delete_user()` efface pseudo, mot de passe, photos (fichiers compris),
+    lien Minecraft, scores, parties solo et Survival, messages du chat et
+    leurs signalements, signalements faits ou reçus, ignores, messages
+    Contact (captures comprises), rang, étiquettes. **Gardés** : ses guess
+    dans les salons finis, sous « Deleted player » (sinon les victoires,
+    séries et XP des autres changeraient, `progress()` rejoue tout), et la
+    ligne `users` elle-même, vidée, en invité, `users.deleted` : SQLite
+    redonnerait un id libéré au compte suivant, qui hériterait de ce qui le
+    vise encore (journal…). Ses bans d'adresse restent (sinon supprimer son
+    compte lèverait le ban). Déconnecté de partout (`still_logged_in`),
+    absent de Players, des classements et des profils ; son pseudo est
+    libre. Tests : `t_delete.py` (33), `t_delete_page.py` (navigateur, 6 × 2).
   - Durées écrites « 6 more days » (`how_long`, une minute de marge : sans
     elle, une heure lue une milliseconde après disait « 60 more minutes ») :
     pareilles dans tous les fuseaux.

@@ -16,6 +16,7 @@
         {% if tags|length > 1 %}<a href="#tag">Tag</a>{% endif %}
         <a href="#password">Password</a>
         {% if me.password %}<a href="#code">Recovery Code</a>{% endif %}
+        {% if me.id != owner %}<a href="#delete">Delete Account</a>{% endif %}
     </nav>
     <script>
         // glide to the section, then light it up briefly so the eye finds it
@@ -132,6 +133,22 @@
             <form action="account?do=code" method="post"><button type="submit" class="btn wide{{ ' wood' if me.recovery }}">{{ 'Make a new code' if me.recovery else 'Make a recovery code' }}</button></form>
             {% endif %}
             {% if me.mc_uuid %}<p class="hint">You can also get back in with "Log in with Wynncraft".</p>{% endif %}
+        </section>
+        {% endif %}
+
+        {% if me.id != owner %}
+        <section class="panel" id="delete">
+            <h2>Delete Account</h2>
+            <p class="hint">Your name, pictures, scores, levels and messages are gone for good. In others' past games, you become "Deleted player".</p>
+            <form class="stack" action="account?do=delete" method="post">
+                {% if me.password %}
+                <input class="field" type="password" name="current" placeholder="Your password" aria-label="Your password" autocomplete="current-password" required>
+                {% else %}
+                <input class="field" name="current" placeholder="Type your name: {{ me.username }}" aria-label="Your name" autocomplete="off" required>
+                {% endif %}
+                <button type="submit" class="btn red wide">Delete My Account</button>
+            </form>
+            {{ note('delete') }}
         </section>
         {% endif %}
     </div>

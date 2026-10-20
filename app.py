@@ -422,9 +422,11 @@ def still_logged_in():
         return
     if session.get('user_id'):
         with connect() as c:
-            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until FROM users WHERE id = ?", (session['user_id'],)).fetchone()
+            me = c.execute("SELECT password, COALESCE(guest, 0) AS guest, banned_until, deleted FROM users WHERE id = ?", (session['user_id'],)).fetchone()
             note = me and (me['banned_until'] or 0) > time.time() and ban_note(c, session['user_id'])
-        if note:
+        if not me or me['deleted']:
+            session.clear()   # deleted, guest or not: out of every browser
+        elif note:
             session.clear()
             session['banned'] = note
         elif session.get('loggedin') and not (me and not me['guest'] and session.setdefault('stamp', stamp(me[0])) == stamp(me[0])):
@@ -605,6 +607,39 @@ def avatar_url(user):
     # the version changes with the picture, so a browser never shows an old one
     return 'avatar?' + urlencode({'id': user['id'], 'v': user['avatar'] or (user['mc_uuid'] or 'steve')[:8]})
 
+# Deleting an account (2026-10-20, Yasuro: "get rid of everything they own").
+# Gone: name, password, pictures, Minecraft link, scores, solo games, chat
+# messages, reports, contact messages, ranks, tags. Kept, under "Deleted
+# player": their guesses in finished rooms, so nobody else's results, wins
+# or streaks change; and the id (a guest row, never reused: SQLite would
+# give a freed top id to the next account, with whatever still points at it).
+DELETED = 'Deleted player'
+
+with connect() as c:
+    if 'deleted' not in [col[1] for col in c.execute("PRAGMA table_info(users)")]:
+        c.execute("ALTER TABLE users ADD COLUMN deleted REAL")
+
+def delete_user(c, uid):
+    drop_picture(c, uid)
+    drop_picture(c, uid, 'avatar_pending')
+    c.execute('''UPDATE users SET username = ?, password = '', guest = 1, deleted = ?, mc_uuid = NULL, mc_name = NULL,
+        recovery = NULL, avatar_note = NULL, pending_at = NULL, shown_tag = NULL, seen_from = NULL, ban_reason = NULL WHERE id = ?''',
+        (DELETED, time.time(), uid))
+    for m in c.execute("SELECT file FROM contact WHERE user_id = ? AND file IS NOT NULL", (uid,)).fetchall():
+        try:
+            os.remove(os.path.join(CONTACT_FILES, m[0]))
+        except OSError:
+            pass
+    c.execute("DELETE FROM contact_replies WHERE message IN (SELECT id FROM contact WHERE user_id = ?)", (uid,))
+    c.execute("DELETE FROM chat_reports WHERE by = ? OR message IN (SELECT id FROM room_chat WHERE user_id = ?)", (uid, uid))
+    c.execute("DELETE FROM survival_guesses WHERE run_id IN (SELECT id FROM survival_runs WHERE user_id = ?)", (uid,))
+    c.execute("DELETE FROM solo_guesses WHERE game_id IN (SELECT id FROM solo_games WHERE user_id = ?)", (uid,))
+    c.execute("DELETE FROM room_players WHERE user_id = ? AND code IN (SELECT code FROM rooms WHERE state = 'waiting')", (uid,))
+    for table, col in (('contact', 'user_id'), ('room_chat', 'user_id'), ('scores', 'user_id'), ('survival_runs', 'user_id'),
+                       ('solo_games', 'user_id'), ('staff', 'user_id'), ('user_tags', 'user_id'), ('ignores', 'user_id'),
+                       ('ignores', 'target'), ('player_reports', 'by'), ('player_reports', 'target')):
+        c.execute(f"DELETE FROM {table} WHERE {col} = ?", (uid,))
+
 def show_profile(uid):
     with connect() as c:
         user = c.execute("SELECT id, username, mc_name, mc_uuid, avatar FROM users WHERE id = ? AND COALESCE(guest, 0) = 0", (uid,)).fetchone()
@@ -780,6 +815,19 @@ def account():
                 new = hashed(form['password'])
                 c.execute("UPDATE users SET password = ? WHERE id = ?", (new, uid))
                 session['stamp'] = stamp(new)   # this browser stays logged in, the others are out
+        elif what == 'delete':
+            # their password, or their name when they have none (Wynncraft only)
+            if uid == OWNER:
+                return account_page(what, "The owner's account stays")
+            if too_many(me['username']):
+                return account_page(what, "Too many tries: wait a few minutes")
+            if not (bcrypt.check_password_hash(me['password'], form.get('current', '')) if me['password']
+                    else form.get('current', '').strip().lower() == me['username'].lower()):
+                failed(me['username'])
+                return account_page(what, "Wrong password" if me['password'] else "Type your name exactly")
+            delete_user(c, uid)
+            session.clear()
+            return render_template('apology.html', message = "Your account is deleted. Goodbye!")
         elif what == 'code' and me['password']:
             # shown once; only its hash is kept, and a new one replaces the old
             raw = ''.join(secrets.choice(CODE_CHARS) for _ in range(12))
@@ -799,7 +847,7 @@ def account_page(section = None, error = None, code = None):
         tags = tags_of(c, [me['id']], picked = False)[me['id']]
         shown = tag_of(c, [me['id']])[me['id']]
     return render_template('account.html', me = me, avatar = avatar_url(me), tags = tags, shown = shown, section = section, error = error,
-                           code = code, saved = request.args.get('saved'), need_current = bool(me['password']) and not session.get('wynn'))
+                           code = code, saved = request.args.get('saved'), owner = OWNER, need_current = bool(me['password']) and not session.get('wynn'))
 
 def history(c, uid):
     # the player's games, newest first: finished rooms with at least two
@@ -3243,6 +3291,7 @@ MAY = {                   # the lowest rank with each power
     'pictures': 1, 'hide': 1, 'mute': 1, 'reports': 1, 'players': 1,
     'long_mute': 2, 'ban': 2, 'rename': 2, 'log': 2,
     'password': 2,        # give a locked-out player a new, easy password
+    'delete': 2,          # delete a player and everything they own
     'contact': 2,         # the messages of the contact page (an email address is personal)
     'staff': 3,           # give and take ranks (below one's own)
     'tags': 2,            # give and take tags
@@ -3784,7 +3833,7 @@ def mod_players():
                 u.muted_until > :now AS muted, u.banned_until > :now AS banned,
                 (SELECT COUNT(DISTINCT cr.message) FROM chat_reports cr JOIN room_chat m ON m.id = cr.message WHERE m.user_id = u.id) +
                 (SELECT COUNT(*) FROM player_reports WHERE target = u.id) AS reported
-            FROM users u WHERE {KINDS[kind]} AND u.username LIKE :q ESCAPE '\\'
+            FROM users u WHERE {KINDS[kind]} AND u.deleted IS NULL AND u.username LIKE :q ESCAPE '\\'
             ORDER BY u.username = :exact COLLATE NOCASE DESC, u.id DESC LIMIT :n OFFSET :start''',
             {'now': now, 'q': '%' + re.sub(r'([\\%_])', r'\\\1', q) + '%', 'exact': q, 'n': PLAYERS_PAGE + 1, 'start': start}).fetchall()
         tags = tag_of(c, [u['id'] for u in rows])
@@ -3813,7 +3862,7 @@ def mod_player():
                "picture": None if u['guest'] else avatar_url(u), "reported": reported, "log": log, "said": said,
                "muted": how_long(u['muted_until'] - now) if (u['muted_until'] or 0) > now else None,
                "banned": ('forever' if u['banned_until'] >= FOREVER else 'for ' + how_long(u['banned_until'] - now)) if (u['banned_until'] or 0) > now else None,
-               "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename')}}
+               "may": {k: may(c, k, uid) for k in ('mute', 'long_mute', 'ban', 'rename', 'delete')}}
         out['may']['password'] = may(c, 'password', uid) and not u['guest']
         out['mutes'] = [m for m in MUTES if out['may']['long_mute'] or m <= HELPER_MUTE]
         r = my_rank(c)
@@ -3827,7 +3876,7 @@ def mod_player():
 def mod_sanction():
     f = request.form
     uid, what, reason = f.get('id', type = int), f.get('do'), f.get('reason', '').strip()[:200]
-    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename', 'password': 'password'}.get(what)
+    need = {'mute': 'mute', 'unmute': 'mute', 'ban': 'ban', 'unban': 'ban', 'rename': 'rename', 'password': 'password', 'delete': 'delete'}.get(what)
     with room_tx() as c:
         u = c.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
         if not u or not need or not may(c, need, uid):
@@ -3862,6 +3911,10 @@ def mod_sanction():
             c.execute("UPDATE users SET password = ? WHERE id = ?", (hashed(new), uid))   # their other browsers are logged out
             logged(c, 'password', uid, 'password reset', reason)
             return jsonify({"success": True, "password": new})
+        elif what == 'delete':
+            logged(c, 'delete', uid, 'account deleted: ' + u['username'], reason)
+            delete_user(c, uid)
+            return jsonify({"success": True})
         else:
             name = clean_name(f.get('name', ''))
             problem = name_problem(c, name, uid)
