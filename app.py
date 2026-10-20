@@ -3527,6 +3527,8 @@ def moderation():
         waiting = {'reports': len(reports_waiting(c)) + len(players_reported(c)), 'photos': len(pictures_waiting(c)),
                    'messages': contact_waiting(c) if r >= MAY['contact'] else 0}
         first = next((k for k in waiting if waiting[k]), 'reports')
+        if request.args.get('tab') == 'messages' and r >= MAY['contact']:
+            first = 'messages'      # Open, under a message sent to Discord (bot.py)
     if not r:
         return render_template('apology.html', message = "This page is for the moderation team"), 403
     return render_template('moderation.html', rank = r, may = {k: r >= v for k, v in MAY.items()}, first = first, waiting = waiting)

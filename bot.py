@@ -14,7 +14,8 @@
 #     roles perso"): staff ranks, Members and the like never reach the site.
 #   - Who is it: right-click a member > Apps > Wynncraft account, or /whois.
 #   - The site's staff log (Moderation > Log) goes to 📛・moderation-logs too
-#     (Yasuro, 2026-10-20), line by line, as it is written.
+#     (Yasuro, 2026-10-20), line by line, as it is written; and so does a
+#     line for each new message of the contact page (never the address).
 #   - A voice channel nobody can join, seen by all, named after the players
 #     on the live site right now (Yasuro: "pas la beta bien sûr").
 #
@@ -324,6 +325,19 @@ def online_now():
     finally:
         c.close()
 
+def contact_after(last_message, last_reply):
+    # the contact page's new messages and the senders' new answers, oldest
+    # first; never their email nor Discord name. None: none seen yet
+    with A.connect() as c:
+        if last_message is None or last_reply is None:
+            return (c.execute("SELECT COALESCE(MAX(id), 0) FROM contact").fetchone()[0],
+                    c.execute("SELECT COALESCE(MAX(id), 0) FROM contact_replies").fetchone()[0])
+        return ([dict(r) for r in c.execute('''SELECT m.id, m.at, m.topic, m.about, m.text, u.username AS name FROM contact m
+                    LEFT JOIN users u ON u.id = m.user_id WHERE m.id > ? ORDER BY m.id LIMIT 20''', (last_message,))],
+                [dict(r) for r in c.execute('''SELECT r.id, r.at, m.topic, m.about, r.text, u.username AS name FROM contact_replies r
+                    JOIN contact m ON m.id = r.message LEFT JOIN users u ON u.id = r.user_id
+                    WHERE r.id > ? AND r.team = 0 ORDER BY r.id LIMIT 20''', (last_reply,))])
+
 def known(what):
     # the id of one thing the bot looks after (discord_ids), or None
     row = A.connect().execute("SELECT id FROM discord_ids WHERE what = ?", (what,)).fetchone()
@@ -513,7 +527,7 @@ def log_card(row, site, full = True):
                       timestamp = datetime.fromtimestamp(row['at'], timezone.utc))
     e.set_author(name = row['by'] or '(gone)')
     if row['tid']:
-        e.title = esc(row['target'] or '(gone)')
+        e.title = row['target'] or '(gone)'    # a title shows its text as it is (as /whois)
         e.url = site + '/moderation?player=%d' % row['tid']
     if row['reason']:
         e.add_field(name = 'Why', value = esc(row['reason'])[:1024])
@@ -541,6 +555,44 @@ async def post_log(guild, full):
             log.warning("moderation log refused: %s", e)
             return
         await asyncio.to_thread(write_site, [('map', 'modlog', str(batch[-1]['id']), None, None)])
+    try:
+        await post_contact(guild, full, channel)
+    except discord.HTTPException as e:
+        FAILED[('modlog',)] = time.time()
+        log.warning("contact message refused: %s", e)
+
+def first_words(text, most = 200):
+    # the first sentence (or the start of a long one), any email in it hidden
+    words = re.split(r'(?<=[.!?])\s|\n', (text or '').strip(), maxsplit = 1)[0]
+    words = re.sub(r'\S+@\S+\.\S+', '[email]', words)
+    return words if len(words) <= most else words[:most - 1] + '…'
+
+def contact_card(row, answer, site, full = True):
+    # who, about what, its first sentence, and where to read and answer it
+    esc = discord.utils.escape_markdown
+    topic = A.TOPICS.get(row['topic'], ('Message', ''))[0]
+    e = discord.Embed(title = ('Reply: ' if answer else 'New message: ') + topic + (' · ' + row['about'] if row['about'] else ''),
+                      url = site + '/moderation?tab=messages', color = TAG_HEX['teal'],
+                      description = esc(first_words(row['text'])) + '\n[Open in Moderation](%s/moderation?tab=messages)' % site,
+                      timestamp = datetime.fromtimestamp(row['at'], timezone.utc))
+    e.set_author(name = row['name'] or 'Someone, not logged in')
+    e.set_footer(text = site.split('//')[1] if full else 'Beta · ' + site.split('//')[1])
+    return e
+
+async def post_contact(guild, full, channel):
+    # the contact page's news, after the log's (discord_ids 'contact', 'contact_reply')
+    last_message, last_reply = await asyncio.gather(asyncio.to_thread(known, 'contact'), asyncio.to_thread(known, 'contact_reply'))
+    found = await asyncio.to_thread(contact_after, last_message and int(last_message), last_reply and int(last_reply))
+    if last_message is None or last_reply is None:
+        # the first time: from now on, not the whole past
+        await asyncio.to_thread(write_site, [('map', 'contact', str(found[0]), None, None), ('map', 'contact_reply', str(found[1]), None, None)])
+        return
+    site = site_url() or A.LIVE
+    for rows, answer, what in ((found[0], False, 'contact'), (found[1], True, 'contact_reply')):
+        for i in range(0, len(rows), 10):
+            batch = rows[i:i + 10]
+            await channel.send(embeds = [contact_card(r, answer, site, full) for r in batch])
+            await asyncio.to_thread(write_site, [('map', what, str(batch[-1]['id']), None, None)])
 
 def door_card(verified, full = True):
     e = card("Show everyone here which Wynncraft player you are, in two clicks:\n\n"

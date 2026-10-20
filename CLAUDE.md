@@ -396,6 +396,15 @@ notre propre liaison, par « Log in with Wynncraft ».
   la bêta, chaque ligne est marquée « Beta · beta.wynndle.com ». Test :
   `t_bot_log.py` (14) ; vérifié en vrai avec une ligne de test, effacée
   ensuite du salon et du journal.
+  **Et les messages de Contact** (même jour, « comme tu l'as dit ») : une
+  ligne par nouveau message et par réponse de l'expéditeur (pas celles de
+  l'équipe) : qui, le sujet (et sur qui), la première phrase, Open →
+  `moderation?tab=messages` (ouvre l'onglet Messages, Moderator et plus).
+  **Jamais l'adresse e-mail ni le pseudo Discord** laissés pour la réponse,
+  et une adresse tapée dans le texte devient `[email]` : sur le site,
+  Contact est réservé aux Moderators, le salon est aussi vu par Support.
+  Repères `contact` et `contact_reply`. Test : `t_bot_contact.py` (12) ;
+  vérifié en vrai, message de test effacé.
 - **Le compteur `🎮・Players online: N`** (2026-10-20, demande de Yasuro :
   un salon vocal « sans accès pour personne mais visible à tout le
   monde », les joueurs du site, « pas la bêta bien sûr ») : en haut du
