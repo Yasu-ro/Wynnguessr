@@ -292,6 +292,11 @@ def fresh_name(link):
             c.execute("UPDATE discord_links SET name = ? WHERE uuid = ?", (name, link['uuid']))
     return name
 
+def known(what):
+    # the id of one thing the bot looks after (discord_ids), or None
+    row = A.connect().execute("SELECT id FROM discord_ids WHERE what = ?", (what,)).fetchone()
+    return row and row[0]
+
 def unlink(mid):
     with A.connect() as c:
         c.execute("DELETE FROM discord_links WHERE discord_id = ?", (mid,))
@@ -473,10 +478,36 @@ def door_card(verified):
     e.set_footer(text = 'We only see your Minecraft name. Never your password or email.')
     return e
 
+def guide(verified, support):
+    # every step from nothing (Yasuro: "un tutoriel super facile à
+    # comprendre"), with wynncraft.com's own words, as its code had them
+    # on 2026-10-20: SIGN IN, CONTINUE, VERIFY, REGISTER, then LINK
+    def step(title, text, color):
+        return discord.Embed(title = title, description = text, color = color)
+    return [step('1. Make a Wynncraft account',
+                 "Already have one? Go to **2**.\n\n"
+                 "**1.** Open [wynncraft.com/account/login](https://wynncraft.com/account/login)\n"
+                 "**2.** Type your email and press **SIGN IN**\n"
+                 "**3.** Press **CONTINUE**\n"
+                 "**4.** Wynncraft emails you a code: type it and press **VERIFY**\n"
+                 "**5.** Pick a password and press **REGISTER**", TAG_HEX['gold']),
+            step('2. Add your Minecraft account',
+                 "**1.** On your computer, open Minecraft (Java Edition) and join `play.wynncraft.com`\n"
+                 "**2.** On wynncraft.com, press **Link your Minecraft account**\n"
+                 "*Closed it? Open your [dashboard](https://wynncraft.com/account/dashboard) and press* **ADD MINECRAFT ACCOUNT**\n"
+                 "**3.** Type your Minecraft name and press **LINK**\n"
+                 "**4.** A code shows up in your Minecraft chat: type it on wynncraft.com and press **LINK**\n"
+                 "*No code? Type `/link` in Minecraft*", TAG_HEX['teal']),
+            step('3. Verify here',
+                 "**1.** Press **Verify**, then **Verify with Wynncraft**\n"
+                 "**2.** Log in if asked, then press **Authorize**\n"
+                 "**3.** Done! You get %s" % ('<@&%s>' % verified if verified else '**Verified**')
+                 + ("\n\nStuck? Ask in %s" % support if support else ''), TAG_HEX['green'])]
+
 def questions():
     site = site_url() or 'https://wynndle.com'
     return card("**No wynncraft.com account?**\n"
-                "Make one on [wynncraft.com](https://wynncraft.com), then type `/link` on play.wynncraft.com to add your Minecraft account.\n\n"
+                "Press **Don't know how?**: every step, from zero.\n\n"
                 "**More than one Minecraft account?**\n"
                 "We take your main one. You can pick it on wynncraft.com.\n\n"
                 "**New Minecraft name?**\n"
@@ -505,6 +536,12 @@ class Door(discord.ui.View):
                                                      view = Account())
         else:
             await give_link(interaction)
+
+    @discord.ui.button(label = "Don't know how?", style = discord.ButtonStyle.secondary, custom_id = 'wg:guide')
+    async def steps(self, interaction, button):
+        verified = await asyncio.to_thread(known, 'verified')
+        support = discord.utils.find(lambda c: 'support' in c.name, interaction.guild.text_channels) if interaction.guild else None
+        await interaction.response.send_message(embeds = guide(verified, support and support.mention), ephemeral = True)
 
     @discord.ui.button(label = 'Questions', style = discord.ButtonStyle.secondary, custom_id = 'wg:help')
     async def help(self, interaction, button):

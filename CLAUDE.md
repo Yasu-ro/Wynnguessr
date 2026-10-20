@@ -318,10 +318,17 @@ ni `/player`, ni `/oauth/me` (vérifié dans toute leur documentation). D'où
 notre propre liaison, par « Log in with Wynncraft ».
 
 - **Le joueur** : salon `✅・verify` (fait par le bot, sous `rules`, en
-  lecture seule comme sa catégorie), un seul message, boutons **Verify** et
-  **Questions** (les questions qu'on se pose : pas de compte wynncraft.com
-  → `/link` en jeu ; plusieurs comptes Minecraft → le principal ; nouveau
-  pseudo ; mauvais compte ; qui le voit ; tags absents ; arrêter). Verify →
+  lecture seule comme sa catégorie), un seul message, boutons **Verify**,
+  **Don't know how?** et **Questions**. Don't know how? (demande de Yasuro :
+  « un tutoriel complet de 0 … super facile à comprendre ») : trois cartes
+  aux couleurs du site, 1. faire le compte wynncraft.com, 2. y ajouter son
+  Minecraft (code affiché en jeu, `/link` sinon), 3. vérifier ; avec les
+  **mots exacts des boutons de wynncraft.com** (SIGN IN, CONTINUE, VERIFY,
+  REGISTER, Link your Minecraft account, ADD MINECRAFT ACCOUNT, LINK),
+  relevés dans leur code le 2026-10-20 (`guide()` : à revoir si leur site
+  change), et le salon support pour qui reste bloqué. Questions : plusieurs
+  comptes Minecraft → le principal ; nouveau pseudo ; mauvais compte ; qui
+  le voit ; tags absents ; arrêter. Verify →
   lien à usage unique (10 min, `discord_codes`) vers `verify?code=` →
   Wynncraft → `wynn_back` → `discord_linked()` → page « Verified » (tête
   Minecraft, nom Discord, Back to Discord) ; le message du bot devient seul
@@ -389,7 +396,7 @@ notre propre liaison, par « Log in with Wynncraft ».
 - **Le bot de la bêta est branché sur le vrai serveur Discord** : un tag
   fait sur la bêta y devient un rôle (et passera au vrai site à la 3.0).
 - Tests : `t_bot.py` (33, les plans sur des états inventés),
-  `t_bot_clicks.py` (19, faux clics), `t_verify.py` (30, le parcours du
+  `t_bot_clicks.py` (27, faux clics), `t_verify.py` (30, le parcours du
   site, Wynncraft simulé). Vérifié en vrai le 2026-10-20 sur le compte de
   Yasuro, lié puis délié : Verified et « #1 » donnés, tag dans les deux
   sens, Verified retiré à la main rendu, tag fait/rangé des deux côtés.
