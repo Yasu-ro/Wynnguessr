@@ -1467,9 +1467,10 @@ dans `app.py`, tous corrigés :
   nécessaire (le vrai site, le 2026-10-19 : ~6 joueurs en salon au plus
   fort, plus le solo).
 - **Les tests de cette session** (les `t_*.py` cités dans ce fichier, le
-  test de charge `load/`, `run_browser.sh`, `calib/clean_zz.py`,
-  `wg/dev_app.py`) sont gardés dans
-  `/data/claude-scratch/wynnguessr-tests-3.0.tgz` (73 Ko) pour la mise en
+  test de charge `load/`, `calib/clean_zz.py`, `wg/dev_app.py`, et
+  `run_all.sh`, qui les relance tous, navigateur puis moteur, depuis le
+  dossier où l'archive est extraite à côté de la copie `wg/`) sont gardés
+  dans `/data/claude-scratch/wynnguessr-tests-3.0.tgz` pour la mise en
   prod ; à effacer, avec le dossier, une fois la 3.0.0 en ligne. Copies,
   venvs et navigateurs Playwright effacés (`playwright install chromium
   firefox` les remet).
