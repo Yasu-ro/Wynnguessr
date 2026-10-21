@@ -5353,12 +5353,13 @@ body.room-playing {
     transform: scaleX(-1);
 }
 
-/* Edit Profile › Theme: each card shows its theme in its own colours (its
-   data-theme): the stone under everything, the wood, the paper, the accent */
+/* Edit Profile › Theme: each card is its place (the home page's panorama,
+   a still), then a plate with its name, all in the theme's own colours (the
+   card's data-theme): its ink, its paper, its accent under the picture */
 .theme-pick {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    gap: 16px 14px;
 }
 @media (max-width: 560px) {
     .theme-pick {
@@ -5371,50 +5372,69 @@ body.room-playing {
     pointer-events: none;
 }
 .theme-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 3px;
-    padding: 10px 10px 12px;
-    text-align: center;
+    overflow: hidden;
+    color: var(--ink);
     background: var(--paper-light);
     border: 3px solid var(--ink);
     border-radius: 4px;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, .25);
     cursor: pointer;
+    transition: transform .15s;
 }
-.theme-card small {
-    font-size: 13px;
+.theme-card:hover {
+    transform: translateY(-2px);
+}
+.theme-card img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: var(--stone);
+    border-bottom: 5px solid var(--accent);
+}
+.theme-plate {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 6px 8px;
+    text-align: center;
+}
+.theme-plate b {
+    font: 400 19px/1.15 var(--hand);
+    -webkit-text-stroke: .3px currentColor;
+}
+.theme-plate small {
+    font-size: 12.5px;
     line-height: 1.25;
     color: var(--ink-soft);
 }
 :checked + .theme-card {
     outline: 3px solid var(--accent);
-    outline-offset: 2px;
+    outline-offset: 3px;
 }
 :focus-visible + .theme-card {
-    outline: 3px solid var(--accent-light);
-    outline-offset: 2px;
+    outline: 3px dashed var(--accent);
+    outline-offset: 3px;
 }
-.theme-swatch {
-    display: flex;
-    gap: 6px;
-    height: 48px;
-    margin-bottom: 4px;
-    padding: 8px;
-    background: var(--stone) var(--tex-stone);
-    border: 2px solid var(--ink);
-    border-radius: 3px;
-}
-.theme-swatch i {
-    flex: 1;
-    border: 2px solid var(--ink);
-    border-radius: 2px;
-}
-.theme-swatch i:nth-child(1) {
-    background: var(--wood);
-}
-.theme-swatch i:nth-child(2) {
-    background: var(--paper);
-}
-.theme-swatch i:nth-child(3) {
+/* the one picked: a check on its picture */
+.theme-tick {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    font-size: 19px;
+    color: var(--accent-ink);
     background: var(--accent);
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+}
+:checked + .theme-card .theme-tick {
+    display: grid;
 }

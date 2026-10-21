@@ -115,15 +115,17 @@
             {% set mine = me.theme if me.theme in THEMES else '' %}{# one since taken away: Seasonal #}
             <form class="theme-pick" id="theme-pick">
                 <input type="radio" name="theme" id="theme-season" value="" data-look="{{ season }}"{{ ' checked' if not mine }}>
-                <label class="theme-card" for="theme-season">
-                    <span class="theme-swatch" data-theme="{{ season }}"><i></i><i></i><i></i></span>
-                    <b>Seasonal</b><small>{{ THEMES[season][0] }} for now</small>
+                <label class="theme-card" for="theme-season" data-theme="{{ season }}">
+                    <img src="{{ asset('hero/' ~ season ~ '/thumb.webp') }}" alt="" width="400" height="225" loading="lazy">
+                    <span class="theme-plate"><b>Seasonal</b><small>{{ THEMES[season][0] }} for now</small></span>
+                    <i class="material-icons theme-tick">check</i>
                 </label>
-                {% for key, (name, about, stone) in THEMES.items() %}
+                {% for key, (name, stone) in THEMES.items() %}
                 <input type="radio" name="theme" id="theme-{{ key }}" value="{{ key }}" data-look="{{ key }}"{{ ' checked' if mine == key }}>
-                <label class="theme-card" for="theme-{{ key }}">
-                    <span class="theme-swatch" data-theme="{{ key }}"><i></i><i></i><i></i></span>
-                    <b>{{ name }}</b><small>{{ about }}</small>
+                <label class="theme-card" for="theme-{{ key }}" data-theme="{{ key }}">
+                    <img src="{{ asset('hero/' ~ key ~ '/thumb.webp') }}" alt="" width="400" height="225" loading="lazy">
+                    <span class="theme-plate"><b>{{ name }}</b></span>
+                    <i class="material-icons theme-tick">check</i>
                 </label>
                 {% endfor %}
             </form>

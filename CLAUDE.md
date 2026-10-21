@@ -2016,7 +2016,7 @@ Demande de Yasuro : « plusieurs thèmes de site comme wynncraft », dont un
 les autres réglages.
 
 - **Huit thèmes, chacun au nom du lieu de son panorama** (`THEMES` dans
-  `app.py` : nom, phrase, couleur de pierre ; 2026-10-21, demande de Yasuro).
+  `app.py` : nom, couleur de pierre ; 2026-10-21, demande de Yasuro).
   Les clés enregistrées n'ont pas changé, seuls les noms : **Ragni**
   (`classic`, le site validé par Yasuro, inchangé), **Hyloch** (`fruma`,
   d'après le thème « fruma » de wynncraft.com : bois sarcelle, papier glacé,
@@ -2031,7 +2031,8 @@ les autres réglages.
   photos de Yasuro **avec shaders**, prises exprès pour l'accueil et **jamais
   pour le jeu** : leurs lieux (1492 à 1499 sur la bêta) sont passés en
   `deleted` dans le tri, mais leurs tuiles complètes restent dans
-  `/data/wynnguessr-tiles`. **Gavel dans la lave (Molten Heights) ne doit
+  `/data/wynnguessr-tiles`. `thumb.webp` se refait depuis `fallback/r.webp`
+  (bande 16:9 prise à 12 % du haut). **Gavel dans la lave (Molten Heights) ne doit
   jamais être le thème d'Halloween** (Yasuro : « on va se foutre de ma
   gueule ») : c'est Detlas de nuit. Les noms viennent des étiquettes de la
   carte Wynntils (`Static-Storage/Reference/places.json`), le lieu le plus
@@ -2045,8 +2046,12 @@ les autres réglages.
   1er octobre au 3 novembre, Classic le reste de l'année. Sans compte, en
   invité ou sans choix, c'est lui. Pas de cookie pour qui n'a pas de compte :
   le choix est un réglage du profil, comme demandé.
-- **Edit Profile › Theme** : Seasonal (« Detlas for now ») puis les huit.
-  Chaque carte est dans ses propres couleurs (pierre, bois, papier, accent). Un clic change toute la
+- **Edit Profile › Theme** (refait le 2026-10-21, « très mal présenté » avec
+  des pastilles de couleur) : Seasonal (« Detlas for now ») puis les huit.
+  Chaque carte est la photo de son lieu (`static/hero/<clé>/thumb.webp`,
+  400×225, tirée de la face est), un trait de son accent, et son nom sur une
+  plaque, sans phrase (le nom et la photo suffisent) ; la carte choisie porte
+  une coche. Chaque carte est dans ses propres couleurs (pierre, bois, papier, accent). Un clic change toute la
   page aussitôt (`data-theme` sur `<html>`), sans recharger ni bouger. Il
   s'enregistre en `fetch`, comme l'étiquette (`account?do=theme` : 204,
   inconnu → 400). Colonne `users.theme`, NULL = saisonnier ; un thème retiré

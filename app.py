@@ -242,15 +242,15 @@ def site_version():
 # Profile (users.theme); with none picked, or no account, it is the
 # season's. The colours: style.css, Themes. The keys stay as they were
 # saved, whatever the names become
-THEMES = {   # key: (name, what it is, its stone: the page's colour before the stylesheet comes)
-    'classic': ('Ragni', 'The classic Wynncraft look', '#1d1c19'),
-    'fruma': ('Hyloch', 'Teal and gold, as in Fruma', '#0d1b1f'),
-    'halloween': ('Detlas', 'Halloween night', '#151019'),
-    'llevigar': ('Llevigar', 'White stone and spruce', '#181d1d'),
-    'royal-dam': ('Royal Dam', 'Blue sky over the dam', '#101a26'),
-    'auburn': ('Auburn Forest', 'Autumn leaves', '#1a1210'),
-    'toxic': ('Toxic Wastes', 'Poison under the stars', '#0c120d'),
-    'molten': ('Molten Heights', 'Lava and ash', '#140b09'),
+THEMES = {   # key: (name, its stone: the page's colour before the stylesheet comes)
+    'classic': ('Ragni', '#1d1c19'),
+    'fruma': ('Hyloch', '#0d1b1f'),
+    'halloween': ('Detlas', '#151019'),
+    'llevigar': ('Llevigar', '#181d1d'),
+    'royal-dam': ('Royal Dam', '#101a26'),
+    'auburn': ('Auburn Forest', '#1a1210'),
+    'toxic': ('Toxic Wastes', '#0c120d'),
+    'molten': ('Molten Heights', '#140b09'),
 }
 
 def season_theme(day = None):
