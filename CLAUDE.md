@@ -2015,21 +2015,38 @@ Demande de Yasuro : « plusieurs thèmes de site comme wynncraft », dont un
 **Halloween, par défaut pendant Halloween**, choisi dans Edit Profile avec
 les autres réglages.
 
-- **Trois thèmes** (`THEMES` dans `app.py` : nom, phrase, couleur de
-  pierre). **Classic**, c'est le site validé par Yasuro, inchangé.
-  **Fruma**, glace et or, d'après le thème « fruma » de wynncraft.com : bois
-  sarcelle, papier glacé, or `#ffd241`, cordes rouges. **Halloween** : nuit
-  violette, parchemin, orange citrouille, crépuscule sur la photo
-  d'accueil, toiles d'araignée dans les coins hauts des pages.
-  wynncraft.com en a deux (Classic = leur « journey », et Fruma) ;
-  Halloween est le nôtre.
+- **Huit thèmes, chacun au nom du lieu de son panorama** (`THEMES` dans
+  `app.py` : nom, phrase, couleur de pierre ; 2026-10-21, demande de Yasuro).
+  Les clés enregistrées n'ont pas changé, seuls les noms : **Ragni**
+  (`classic`, le site validé par Yasuro, inchangé), **Hyloch** (`fruma`,
+  d'après le thème « fruma » de wynncraft.com : bois sarcelle, papier glacé,
+  or), **Detlas** (`halloween` : nuit violette, parchemin, orange citrouille,
+  toiles d'araignée dans les coins des pages), puis **Llevigar** (pierre
+  blanche, sapin, turquoise), **Royal Dam** (ciel bleu, grès, cuivre vert),
+  **Auburn Forest** (feuilles d'automne, rouge), **Toxic Wastes** (vert
+  poison, bougies violettes) et **Molten Heights** (lave, basalte, cendre).
+- **Le panorama de l'accueil est celui du thème** : `static/hero/<clé>/`,
+  niveaux 1 à 3 et `fallback` en webp seulement (~4 Mo chacun). Pendant le
+  chargement, la face est (`fallback/r.webp`) sert d'image fixe. Ce sont des
+  photos de Yasuro **avec shaders**, prises exprès pour l'accueil et **jamais
+  pour le jeu** : leurs lieux (1492 à 1499 sur la bêta) sont passés en
+  `deleted` dans le tri, mais leurs tuiles complètes restent dans
+  `/data/wynnguessr-tiles`. **Gavel dans la lave (Molten Heights) ne doit
+  jamais être le thème d'Halloween** (Yasuro : « on va se foutre de ma
+  gueule ») : c'est Detlas de nuit. Les noms viennent des étiquettes de la
+  carte Wynntils (`Static-Storage/Reference/places.json`), le lieu le plus
+  proche de chaque photo. Le crépuscule peint par-dessus l'accueil
+  d'Halloween a été retiré : la photo de Detlas est déjà de nuit.
+- Le bois des thèmes reste **clair comme celui de Ragni** : le texte du menu
+  est à l'encre sur le bois, et un bois foncé le rendait illisible (payé sur
+  Llevigar, Auburn, Toxic et Molten).
+- Dans Edit Profile, les cartes vont trois par ligne, deux sur téléphone.
 - **Par défaut, celui de la saison** (`season_theme()`) : Halloween du
   1er octobre au 3 novembre, Classic le reste de l'année. Sans compte, en
   invité ou sans choix, c'est lui. Pas de cookie pour qui n'a pas de compte :
   le choix est un réglage du profil, comme demandé.
-- **Edit Profile › Theme** : Seasonal (« Halloween for now »), Classic,
-  Fruma, Halloween. Ce sont des cartes deux par deux, chacune dans ses
-  propres couleurs (pierre, bois, papier, accent). Un clic change toute la
+- **Edit Profile › Theme** : Seasonal (« Detlas for now ») puis les huit.
+  Chaque carte est dans ses propres couleurs (pierre, bois, papier, accent). Un clic change toute la
   page aussitôt (`data-theme` sur `<html>`), sans recharger ni bouger. Il
   s'enregistre en `fetch`, comme l'étiquette (`account?do=theme` : 204,
   inconnu → 400). Colonne `users.theme`, NULL = saisonnier ; un thème retiré
@@ -2049,12 +2066,14 @@ les autres réglages.
   des onglets (`--gold`, la surbrillance de Wynncraft), la barre d'XP verte,
   les cœurs, les couleurs des étiquettes et des joueurs, l'écran de mort
   rouge, la carte.
-- **Ajouter un thème** : une entrée dans `THEMES` et un bloc `[data-theme]` ;
-  sa carte dans Edit Profile se dessine seule.
+- **Ajouter un thème** : une entrée dans `THEMES`, un bloc `[data-theme]`
+  (palette, textures décalées depuis celles de `:root`, feutre) et son
+  panorama dans `static/hero/<clé>/` ; sa carte dans Edit Profile se dessine
+  seule.
 - **Vérifié** sous Chromium et Firefox, en 1366 et en 360/390 px, sur toutes
   les pages du site (dont un salon Survival : salle d'attente, manche,
   révélation, marchand, mort, fantôme) : aucune n'est plus large que l'écran,
-  dans aucun thème. Tests : `t_theme.py` (34) et `t_theme_page.py` (26).
+  dans aucun thème. Tests : `t_theme.py`, `t_theme_page.py` et `t_wide.py`.
 
 ## Tester
 

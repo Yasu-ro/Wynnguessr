@@ -235,14 +235,22 @@ VERSION = '2.3'
 def site_version():
     return {'version': VERSION}
 
-# Themes: looks of the site, as on wynncraft.com (Classic and Fruma, their
-# two) and the season's (Yasuro, 2026-10-20: Halloween, the default while it
-# is Halloween). A player picks one in Edit Profile (users.theme); with none
-# picked, or no account, it is the season's. The colours: style.css, Themes
+# Themes: looks of the site, as on wynncraft.com, each named after the place
+# of its panorama on the home page (Yasuro, 2026-10-21: his own pictures,
+# with shaders, so never in the game: static/hero/<key>). The season's is
+# the default (Halloween: Detlas by night). A player picks one in Edit
+# Profile (users.theme); with none picked, or no account, it is the
+# season's. The colours: style.css, Themes. The keys stay as they were
+# saved, whatever the names become
 THEMES = {   # key: (name, what it is, its stone: the page's colour before the stylesheet comes)
-    'classic': ('Classic', 'The classic Wynncraft look', '#1d1c19'),
-    'fruma': ('Fruma', 'Ice and gold, as in Fruma', '#0d1b1f'),
-    'halloween': ('Halloween', 'Pumpkins under a purple night', '#151019'),
+    'classic': ('Ragni', 'The classic Wynncraft look', '#1d1c19'),
+    'fruma': ('Hyloch', 'Teal and gold, as in Fruma', '#0d1b1f'),
+    'halloween': ('Detlas', 'Halloween night', '#151019'),
+    'llevigar': ('Llevigar', 'White stone and spruce', '#181d1d'),
+    'royal-dam': ('Royal Dam', 'Blue sky over the dam', '#101a26'),
+    'auburn': ('Auburn Forest', 'Autumn leaves', '#1a1210'),
+    'toxic': ('Toxic Wastes', 'Poison under the stars', '#0c120d'),
+    'molten': ('Molten Heights', 'Lava and ash', '#140b09'),
 }
 
 def season_theme(day = None):

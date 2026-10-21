@@ -5109,14 +5109,16 @@ body.room-playing {
 
 /* ---------- Themes ----------
    As on wynncraft.com, a player picks a look (Edit Profile › Theme;
-   app.py: THEMES): Classic (all of the above), Fruma (Wynncraft's own,
-   ice and gold) and Halloween (the season's, by default in its time).
+   app.py: THEMES), each named after the place turning on the home page:
+   Ragni (key classic: all of the above), Hyloch (fruma: Wynncraft's own
+   Fruma theme), Detlas (halloween: the season's, by default in its time),
+   then Llevigar, Royal Dam, Auburn Forest, Toxic Wastes, Molten Heights.
    A theme sets the palette again on [data-theme]: the page's <html>, or a
    preview in Edit Profile, which shows itself in its own colours. The
    greens that mean something (a tag, a win, a check, a heart) stay as they
    are: only the accent (buttons, choices) follows the theme. */
 
-/* Fruma: wynncraft.com's Fruma theme, its teal and its gold, on frosted paper */
+/* Hyloch: wynncraft.com's Fruma theme, its teal and its gold, on frosted paper */
 [data-theme="fruma"] {
     --ink: #08303a;
     --ink-soft: #3f6872;
@@ -5147,7 +5149,7 @@ body.room-playing {
     filter: hue-rotate(45deg) saturate(.85) brightness(.95);
 }
 
-/* Halloween: pumpkins under a purple night, on candle-lit parchment */
+/* Detlas, Halloween: pumpkins under a purple night, on candle-lit parchment */
 [data-theme="halloween"] {
     --ink: #2b1a26;
     --ink-soft: #6b5262;
@@ -5176,18 +5178,161 @@ body.room-playing {
 [data-theme="halloween"] .card-table::before {
     filter: hue-rotate(150deg) saturate(.75) brightness(.72);
 }
-/* the home page at dusk: a purple sky, the last of the sun on the stones */
-[data-theme="halloween"] .hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    background: linear-gradient(rgba(58, 18, 86, .6), rgba(34, 12, 44, .25) 55%, rgba(255, 122, 26, .25));
-    pointer-events: none;
+/* Llevigar: white stone, dark spruce, the teal of its lanterns */
+[data-theme="llevigar"] {
+    --ink: #1d2b2c;
+    --ink-soft: #4d6264;
+    --wood: #8c7660;
+    --wood-light: #a38e78;
+    --ring: #7d6853;
+    --ring-dark: #4f3f30;
+    --sand: #cfd5cf;
+    --paper: #e4e8e2;
+    --paper-light: #f2f4f0;
+    --sign: #dde2dc;
+    --line: rgba(29, 43, 44, .2);
+    --accent: #5cc4b4;
+    --accent-light: #8ae0d2;
+    --accent-ink: #0d2b27;
+    --field: #5f6f6e;
+    --rope: #7d6a55;
+    --rope-dark: #4a3b2d;
+    --footer-ink: #9fb0ad;
+    --footer-link: #e4e8e2;
+    --band: #141a1a;
+    --night: #1b2222;
+    --stone: #181d1d;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23181d1d'/><path fill='%231d2222' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%231d2222' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%231d2222' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%231d2222' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%231b201f' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%231d2222' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%23151a1a' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%231b201f' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%231b201f' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%231b201f' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%23151a1a' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%231d2222' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%231d2222' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%23151a1a' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%23151a1a' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%231d2222' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%231d2222' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%23151a1a' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23141a1a'/><path fill='%23171c1c' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%23171c1c' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%23111718' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%23171c1c' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%23111718' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%23111718' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%23111718' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%23171c1c' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%23191e1d' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%23171c1c' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%23171c1c' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%23111718' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%23191e1d' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%23111718' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%23191e1d' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%23171c1c' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%23191e1d' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%23191e1d' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%23111718' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
 }
-[data-theme="halloween"] .hero > :not(.hero-pano) {
-    z-index: 2;
+[data-theme="llevigar"] .card-table::before {
+    filter: hue-rotate(40deg) saturate(.6);
 }
+
+/* Royal Dam: a blue sky, sandstone, green copper */
+[data-theme="royal-dam"] {
+    --ink: #1c2a3a;
+    --ink-soft: #4d5f73;
+    --wood: #b39662;
+    --wood-light: #c8ad7c;
+    --ring: #a3854f;
+    --ring-dark: #735a30;
+    --sand: #e0d1a8;
+    --paper: #eee3c2;
+    --paper-light: #f8f1dc;
+    --sign: #e8dbb4;
+    --line: rgba(28, 42, 58, .2);
+    --accent: #4aa3df;
+    --accent-light: #7cc0ee;
+    --accent-ink: #08233a;
+    --field: #7d6d4c;
+    --rope: #3f8f7a;
+    --rope-dark: #24584a;
+    --footer-ink: #9fb4c8;
+    --footer-link: #e6edf5;
+    --band: #0f1824;
+    --night: #142130;
+    --stone: #101a26;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23101a26'/><path fill='%23151f2b' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%23151f2b' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%23151f2b' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%23151f2b' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%23131d28' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%23151f2b' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%230d1723' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%23131d28' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%23131d28' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%23131d28' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%230d1723' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%23151f2b' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%23151f2b' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%230d1723' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%230d1723' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%23151f2b' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%23151f2b' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%230d1723' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%230f1824'/><path fill='%23121a26' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%23121a26' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%230c1522' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%23121a26' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%230c1522' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%230c1522' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%230c1522' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%23121a26' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%23141c27' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%23121a26' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%23121a26' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%230c1522' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%23141c27' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%230c1522' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%23141c27' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%23121a26' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%23141c27' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%23141c27' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%230c1522' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="royal-dam"] .card-table::before {
+    filter: hue-rotate(95deg) saturate(.8);
+}
+
+/* Auburn Forest: autumn leaves, dark oak */
+[data-theme="auburn"] {
+    --ink: #2a1a12;
+    --ink-soft: #6b4f3e;
+    --wood: #9a6a48;
+    --wood-light: #b08060;
+    --ring: #855a3a;
+    --ring-dark: #5a3a24;
+    --sand: #cfb48a;
+    --paper: #e2cba0;
+    --paper-light: #f0e0bd;
+    --sign: #dcc293;
+    --line: rgba(42, 26, 18, .22);
+    --accent: #d24a2f;
+    --accent-light: #ea7350;
+    --accent-ink: #2a0a04;
+    --field: #6f5640;
+    --rope: #8a5a30;
+    --rope-dark: #5a3518;
+    --footer-ink: #b49a7f;
+    --footer-link: #f0e0bd;
+    --band: #1a120e;
+    --night: #21160f;
+    --stone: #1a1210;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%231a1210'/><path fill='%231f1715' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%231f1715' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%231f1715' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%231f1715' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%231d1512' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%231f1715' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%23170f0d' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%231d1512' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%231d1512' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%231d1512' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%23170f0d' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%231f1715' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%231f1715' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%23170f0d' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%23170f0d' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%231f1715' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%231f1715' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%23170f0d' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%231a120e'/><path fill='%231d1410' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%231d1410' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%23170f0c' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%231d1410' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%23170f0c' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%23170f0c' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%23170f0c' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%231d1410' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%231f1611' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%231d1410' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%231d1410' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%23170f0c' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%231f1611' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%23170f0c' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%231f1611' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%231d1410' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%231f1611' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%231f1611' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%23170f0c' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="auburn"] .card-table::before {
+    filter: hue-rotate(250deg) saturate(.9) brightness(.8);
+}
+
+/* Toxic Wastes: poison green, purple candles, a night sky */
+[data-theme="toxic"] {
+    --ink: #17201a;
+    --ink-soft: #4a5a4c;
+    --wood: #7a7390;
+    --wood-light: #928bab;
+    --ring: #6a6385;
+    --ring-dark: #433d58;
+    --sand: #b9c2a8;
+    --paper: #cdd5bb;
+    --paper-light: #e2e8d3;
+    --sign: #c6cfb2;
+    --line: rgba(23, 32, 26, .22);
+    --accent: #a6e22e;
+    --accent-light: #c5f564;
+    --accent-ink: #142106;
+    --field: #4d5a4a;
+    --rope: #6b5a8a;
+    --rope-dark: #3e3256;
+    --footer-ink: #9aaa95;
+    --footer-link: #d6e8b0;
+    --band: #0c120d;
+    --night: #111a13;
+    --stone: #0c120d;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%230c120d'/><path fill='%23111712' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%23111712' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%23111712' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%23111712' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%230f150f' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%23111712' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%23090f0a' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%230f150f' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%230f150f' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%230f150f' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%23090f0a' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%23111712' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%23111712' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%23090f0a' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%23090f0a' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%23111712' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%23111712' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%23090f0a' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%230c120d'/><path fill='%230f140f' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%230f140f' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%23090f0b' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%230f140f' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%23090f0b' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%23090f0b' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%23090f0b' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%230f140f' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%23111610' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%230f140f' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%230f140f' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%23090f0b' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%23111610' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%23090f0b' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%23111610' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%230f140f' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%23111610' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%23111610' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%23090f0b' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="toxic"] .card-table::before {
+    filter: saturate(1.3) brightness(.65);
+}
+
+/* Molten Heights: lava, basalt, ash */
+[data-theme="molten"] {
+    --ink: #241614;
+    --ink-soft: #5e4440;
+    --wood: #8a6458;
+    --wood-light: #a37b6e;
+    --ring: #7a5246;
+    --ring-dark: #4f3029;
+    --sand: #bfa595;
+    --paper: #d6c1b2;
+    --paper-light: #e9dbd0;
+    --sign: #cfb8a8;
+    --line: rgba(36, 22, 20, .22);
+    --accent: #f05a28;
+    --accent-light: #ff8650;
+    --accent-ink: #2b0d00;
+    --field: #6a4d45;
+    --rope: #8a3a22;
+    --rope-dark: #4f1d10;
+    --footer-ink: #b0928a;
+    --footer-link: #f0d6c8;
+    --band: #140b09;
+    --night: #1c100d;
+    --stone: #140b09;
+    --tex-stone: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23140b09'/><path fill='%2319100e' d='M103 38 96 51 81 54 66 50 68 30 75 20 103 27z'/><path fill='%2319100e' d='M114 -7 111 -1 104 0 99 -0 93 -1 93 -9 98 -13 106 -14 112 -10z'/><path fill='%2319100e' d='M114 253 111 259 104 260 99 260 93 259 93 251 98 247 106 246 112 250z'/><path fill='%2319100e' d='M96 47 81 61 63 64 51 68 42 57 36 44 54 26 73 29 88 34z'/><path fill='%23170e0b' d='M173 120 169 132 159 142 142 142 127 127 125 114 129 105 140 101 162 99 176 110z'/><path fill='%2319100e' d='M57 106 55 111 46 119 41 115 34 112 27 105 33 100 38 94 50 90 57 98z'/><path fill='%23110806' d='M170 175 169 180 166 185 158 182 154 179 150 176 153 169 156 170 163 167 171 172z'/><path fill='%23170e0b' d='M139 30 140 36 133 47 121 42 105 36 103 33 104 24 122 11 130 17 136 21z'/><path fill='%23170e0b' d='M231 140 214 153 204 159 182 149 171 139 185 118 200 120 219 125z'/><path fill='%23170e0b' d='M225 186 221 196 204 204 194 192 193 180 203 175 225 178z'/><path fill='%23110806' d='M211 122 204 132 196 133 189 137 184 130 182 121 189 114 198 112 204 116z'/><path fill='%2319100e' d='M36 207 18 222 8 226 -11 225 -19 210 -20 194 4 188 28 191z'/><path fill='%2319100e' d='M296 207 278 222 268 226 249 225 241 210 240 194 264 188 288 191z'/><path fill='%23110806' d='M125 239 122 248 115 257 98 252 89 237 94 228 110 220 121 225z'/><path fill='%23110806' d='M94 73 82 87 71 92 56 94 43 85 33 72 41 55 62 53 75 48 84 64z'/><path fill='%2319100e' d='M43 113 41 122 37 123 28 122 20 119 19 116 23 110 31 105 33 107 40 110z'/><path fill='%2319100e' d='M75 83 72 91 54 103 41 107 20 88 29 80 31 66 52 66 73 67z'/><path fill='%23110806' d='M223 68 226 72 216 75 206 76 204 71 203 66 204 60 208 58 219 60 222 60z'/></svg>");
+    --tex-dirt: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><rect width='260' height='260' fill='%23140b09'/><path fill='%23170d0b' d='M149 146 144 156 126 172 115 167 95 166 95 144 94 123 110 121 121 128 137 135z'/><path fill='%23170d0b' d='M61 63 58 68 51 71 45 69 37 64 40 59 44 57 50 57 57 59z'/><path fill='%23110807' d='M257 96 243 115 211 123 196 109 196 89 213 83 242 77z'/><path fill='%23170d0b' d='M45 183 42 187 37 190 32 190 29 188 23 185 29 179 34 177 38 175 41 181z'/><path fill='%23110807' d='M11 57 9 60 -2 65 -10 67 -16 62 -14 51 -12 45 -2 45 11 47z'/><path fill='%23110807' d='M271 57 269 60 258 65 250 67 244 62 246 51 248 45 258 45 271 47z'/><path fill='%23110807' d='M63 167 56 171 55 182 37 182 23 177 22 163 20 155 32 151 50 145 57 155z'/><path fill='%23170d0b' d='M246 53 247 56 241 59 236 62 229 56 229 52 232 50 232 45 243 44 245 47z'/><path fill='%23190f0c' d='M141 190 141 200 121 200 111 193 110 187 117 176 135 184z'/><path fill='%23170d0b' d='M149 5 147 23 119 23 107 14 109 -5 129 -11 143 -7z'/><path fill='%23170d0b' d='M149 265 147 283 119 283 107 274 109 255 129 249 143 253z'/><path fill='%23110807' d='M171 125 162 134 157 135 145 129 140 121 154 114 166 118z'/><path fill='%23190f0c' d='M193 51 185 60 173 69 156 61 157 49 158 43 171 39 187 40z'/><path fill='%23110807' d='M161 80 154 94 134 101 121 105 104 95 105 83 111 68 123 57 140 67 148 65z'/><path fill='%23190f0c' d='M176 97 174 104 166 103 159 104 153 96 157 88 164 86 174 91z'/><path fill='%23170d0b' d='M128 230 124 238 111 246 99 244 90 244 86 235 91 220 99 221 110 221 123 220z'/><path fill='%23190f0c' d='M2 68 2 79 -9 91 -29 90 -36 74 -43 60 -25 49 -5 46 4 54z'/><path fill='%23190f0c' d='M262 68 262 79 251 91 231 90 224 74 217 60 235 49 255 46 264 54z'/><path fill='%23110807' d='M136 231 130 245 110 243 91 238 92 223 115 208 128 217z'/></svg>");
+}
+[data-theme="molten"] .card-table::before {
+    filter: hue-rotate(260deg) saturate(.8) brightness(.65);
+}
+
 /* cobwebs in the page's top corners, under everything on it */
 [data-theme="halloween"] .page::before, [data-theme="halloween"] .page::after {
     content: '';
@@ -5212,8 +5357,13 @@ body.room-playing {
    data-theme): the stone under everything, the wood, the paper, the accent */
 .theme-pick {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 14px;
+}
+@media (max-width: 560px) {
+    .theme-pick {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 .theme-pick input {
     position: absolute;

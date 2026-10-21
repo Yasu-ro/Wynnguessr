@@ -10,7 +10,8 @@
 
 <body>
 {% include "nav.html" %}
-    <header class="hero">
+    {% set hero = 'static/hero/' ~ theme() %}{# the theme's place (THEMES), turning behind the title #}
+    <header class="hero" style="background-image: url({{ asset('hero/' ~ theme() ~ '/fallback/r.webp') }})">
         <div class="hero-pano" id="hero-pano"></div>
         <img class="hero-logo" src="{{ asset('wynnlogo.png') }}" alt="" width="150" height="150">
         <h1 class="hero-name">WynnGuessr</h1>
@@ -47,13 +48,13 @@
         "multiRes": DEMO,
         "autoLoad": true
         });
-        // behind the title, the same street turns slowly, like the title
+        // behind the title, the theme's place turns slowly, like the title
         // screen of Minecraft (a turn in about 2.5 minutes), from the east,
         // the picture the page shows while it loads; still while out of sight
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             const SPIN = -2.5;  // degrees per second
             let hero = pannellum.viewer('hero-pano', {
-                "type": "multires", "multiRes": DEMO, "autoLoad": true, "autoRotate": SPIN,
+                "type": "multires", "multiRes": Object.assign({}, DEMO, {"basePath": "{{ hero }}"}), "autoLoad": true, "autoRotate": SPIN,
                 // framed like the still picture: never more than 90 degrees up and down
                 "yaw": 90, "pitch": 4, "minHfov": 30,
                 "hfov": Math.min(90, 2 * Math.atan(innerWidth / document.getElementById('hero-pano').clientHeight) * 180 / Math.PI),
