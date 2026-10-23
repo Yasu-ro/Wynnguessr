@@ -366,7 +366,8 @@ MOD_LINKS = {'Modrinth': None, 'CurseForge': None}
 # the team's socials (About › Team), filled in once they give them
 TEAM_LINKS = {
     'joko': {'Instagram': None, 'TikTok': None, 'X': None},
-    'yulo': {'Instagram': None, 'TikTok': None, 'X': None},
+    'yulo': {'X': 'https://x.com/yuloooo_', 'Twitch': 'https://www.twitch.tv/yuloooo_',
+             'YouTube': 'https://www.youtube.com/@yulofx'},
 }
 
 def mod_files():
