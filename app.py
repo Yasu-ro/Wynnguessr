@@ -355,7 +355,38 @@ def about():
                        + one("SELECT COUNT(*) FROM solo_guesses"),
             'locations': one(f"SELECT COUNT(*) FROM locations WHERE review IN {PLAYABLE}"),
         }
-    return render_template('about.html', discord = DISCORD, stats = stats, server = discord_counts())
+    return render_template('about.html', discord = DISCORD, stats = stats, server = discord_counts(),
+                           mod = mod_files(), mod_links = MOD_LINKS, team_links = TEAM_LINKS)
+
+# The 3D map mod (About › Mod): its files stay in its own folder, out of git
+# (49 MB of map); the jar is the newest in distribution/, the film is in
+# presentation/. The stores' pages, once they exist: None shows "soon".
+MOD_DIR = '/data/wynndle-carte3d'
+MOD_LINKS = {'Modrinth': None, 'CurseForge': None}
+# the team's socials (About › Team), filled in once they give them
+TEAM_LINKS = {
+    'joko': {'Instagram': None, 'TikTok': None, 'X': None},
+    'yulo': {'Instagram': None, 'TikTok': None, 'X': None},
+}
+
+def mod_files():
+    folder = os.path.join(MOD_DIR, 'distribution')
+    jars = sorted((f for f in os.listdir(folder) if f.endswith('.jar')),
+                  key = lambda f: os.path.getmtime(os.path.join(folder, f))) if os.path.isdir(folder) else []
+    if not jars:
+        return None
+    version = re.search(r'-(\d+(?:\.\d+)+)', jars[-1])
+    film = os.path.join(MOD_DIR, 'presentation', 'envol.mp4')
+    return {'jar': jars[-1], 'version': version[1] if version else '',
+            # Cloudflare keeps a file 4 h: the date in the address, as asset()
+            'film': 'mod/envol.mp4?v=%d' % os.path.getmtime(film) if os.path.exists(film) else None}
+
+@app.route("/mod/<name>")
+def mod_file(name):
+    if not name.endswith(('.jar', '.wdc', '.mp4')):
+        return ('', 404)
+    folder = 'presentation' if name.endswith('.mp4') else 'distribution'
+    return send_from_directory(os.path.join(MOD_DIR, folder), name, max_age = 3600, as_attachment = folder == 'distribution')
 
 @app.route("/game", methods=['POST', 'GET'])
 def game():

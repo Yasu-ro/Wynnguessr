@@ -1998,6 +1998,28 @@ fan, sans rien voler).
 - `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet
   (`DISCORD` dans `app.py`). Le texte reprend les mots de Yasuro (« garder ma
   touche ») ; ne rien y ajouter sans lui demander.
+- **Page About en trois onglets** (2026-10-23, demande de Yasuro) : **Mod ·
+  About · Team**, About au milieu et ouvert par défaut ; chaque onglet a son
+  adresse (`about#mod`, `about#team`, `static/js/about.js`). Les détails sont
+  derrière des **(!)** (pièce d'or, infobulle façon Minecraft, au survol ou au
+  toucher, repoussée du bord de l'écran) : le texte visible reste court.
+  - **Mod** : la Carte 3D Wynndle (`/data/wynndle-carte3d/`). Ses fichiers ne
+    sont **pas dans git** (49 Mo) : la route `mod/<nom>` les sert depuis
+    `MOD_DIR` (`.jar` et `.wdc` de `distribution/`, le plus récent des jars ;
+    la vidéo `presentation/envol.mp4`, avec `?v=<date>` pour Cloudflare).
+    Modrinth et CurseForge : `MOD_LINKS` d'`app.py`, `None` = « soon ».
+    Le jar se télécharge **dès la bêta**, à la demande de Yasuro (« présente-le
+    en jar »), alors que le `CLAUDE.md` du mod demande, avant toute diffusion
+    publique, l'accord d'un modérateur de Wynncraft et de vérifier ce que
+    WynnLODGrabber permet. À trancher avant la mise en prod. La page dit
+    « Not reviewed by a Wynncraft moderator yet » et ne prétend jamais à une
+    approbation. La vidéo actuelle « fait robot » (Yasuro) : à refaire sur le
+    banc d'essai du PC, puis remplacer `presentation/envol.mp4`.
+  - **Team** : Yasuro (texte et note « Yes, I use AI » = ses mots, traduits ;
+    ton relâché voulu, CSS compris), Joko (artiste) et Yulo (pub et réseaux).
+    Pseudos seulement, jamais de vrais noms. Leurs réseaux : `TEAM_LINKS`
+    d'`app.py`, `None` = « soon ». Avatars : la photo du compte 1 (Yasuro),
+    une lettre pour les deux autres, en attendant ce que Joko proposera.
 - **Version** du site dans le pied de page (`VERSION` d'`app.py`, lien vers les
   commits du fork), demandée par Yasuro le 2026-10-18 : **+0.1 à chaque mise
   en prod**. Reconstituée : 1.0 le jeu de Ched3, 2.0 la nouvelle DA

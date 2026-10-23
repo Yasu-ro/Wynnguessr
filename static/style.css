@@ -999,6 +999,396 @@ button, input {
         gap: 12px;
     }
 }
+.about-tabs {
+    margin: -6px 0 34px;
+}
+
+/* a (!) that tells more: a gold coin, and a Minecraft tooltip under it */
+.info {
+    position: relative;
+    display: inline-block;
+    margin-left: 3px;
+    vertical-align: 1px;
+    line-height: 1;
+}
+.info-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 21px;
+    height: 21px;
+    padding: 0 0 1px;
+    font: 700 14px/1 var(--sans);
+    color: var(--ink);
+    background: var(--gold);
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    box-shadow: inset -2px -2px 0 rgba(0, 0, 0, .14);
+    cursor: help;
+    transition: transform .15s cubic-bezier(.44, .51, .53, 1.94);
+}
+.info-btn:hover, .info.open .info-btn {
+    transform: scale(1.12);
+}
+.info-tip {
+    position: absolute;
+    top: calc(100% + 9px);
+    left: 50%;
+    z-index: 60;
+    display: none;
+    flex-direction: column;
+    gap: 3px;
+    width: max-content;
+    max-width: min(330px, calc(100vw - 20px));
+    padding: 8px 12px 10px;
+    font: 400 15px/1.35 var(--sans);
+    text-align: left;
+    color: #fff;
+    background: #160a19;
+    border: 3px solid #3b1868;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px #160a19, 0 4px 0 2px rgba(0, 0, 0, .3);
+    transform: translateX(calc(-50% + var(--shift, 0px)));
+}
+/* the gap between the coin and the note keeps it open under the pointer */
+.info-tip::before {
+    content: "";
+    position: absolute;
+    inset: -14px 0 auto;
+    height: 14px;
+}
+.info:hover .info-tip, .info.open .info-tip {
+    display: flex;
+}
+.info-tip .tip-name + span {
+    margin-top: -2px;
+}
+.info-tip span + .tip-name {
+    margin-top: 5px;
+}
+.info-tip a {
+    color: #55ffff;
+}
+.info-tip kbd {
+    color: var(--ink);
+}
+
+kbd {
+    display: inline-block;
+    padding: 0 6px 1px;
+    font: 700 14px/1.4 var(--sans);
+    color: var(--ink);
+    background: #e8e6df;
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18);
+}
+
+/* About › Mod: the 3D map */
+.mod-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    gap: 34px;
+    align-items: center;
+    margin-bottom: 44px;
+}
+.mod-film {
+    aspect-ratio: 16 / 9;
+    margin: 18px;
+    background: var(--night);
+    box-shadow: var(--frame-thin);
+}
+.mod-film video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.mod-intro .about-title {
+    margin-bottom: 10px;
+    text-align: left;
+}
+.mod-line {
+    font-size: 18px;
+}
+.mod-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 14px 0 18px;
+}
+.mod-facts span {
+    padding: 1px 9px 2px;
+    font-size: 14px;
+    background: var(--paper-light);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.mod-get {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+.mod-get .btn.big {
+    padding-inline: 30px;
+}
+.btn.soon, .chip.soon {
+    opacity: .6;
+    cursor: default;
+    filter: none;
+    transform: none;
+}
+.chip.soon {
+    gap: 5px;
+}
+.mod-get .btn.wood {
+    min-height: 40px;
+    padding: 6px 16px;
+    font-size: 15px;
+}
+.soon small {
+    font-size: 12px;
+    text-transform: none;
+}
+.mod-preview {
+    margin-top: 14px;
+    text-align: left;
+    font-size: 15px;
+    color: var(--ink-soft);
+}
+.mod-features {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 30px;
+    margin-bottom: 44px;
+}
+.mod-features .about-mode + .about-mode {
+    border-top: 0;
+}
+.mod-features .about-mode:nth-child(n+3) {
+    border-top: 2px solid var(--line);
+}
+.about-art svg[viewBox="0 0 12 10"], .about-art svg[viewBox="0 0 12 12"] {
+    width: 38px;
+    height: 34px;
+}
+.mod-text {
+    max-width: 620px;
+    margin: -8px auto 18px;
+    text-align: center;
+}
+.mod-fps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 0 auto 44px;
+}
+.mod-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+    margin-bottom: 24px;
+}
+.mod-two p, .mod-two li {
+    font-size: 16px;
+}
+.mod-steps {
+    margin: 12px 0 0;
+    padding-left: 22px;
+}
+.mod-steps li + li, .mod-list li + li {
+    margin-top: 7px;
+}
+.mod-steps a, .mod-credits a {
+    color: var(--green-dark);
+    font-weight: 700;
+}
+code {
+    padding: 0 4px;
+    font-size: 14px;
+    background: var(--paper-light);
+    border-radius: 3px;
+}
+.mod-hint {
+    margin-top: 14px;
+    color: var(--ink-soft);
+}
+.mod-keys {
+    margin: 0;
+}
+.mod-keys div {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 6px 0;
+    font-size: 16px;
+}
+.mod-keys div + div {
+    border-top: 2px solid var(--line);
+}
+.mod-keys dd {
+    margin: 0;
+    font-weight: 700;
+    text-align: right;
+}
+.mod-list {
+    margin: 10px 0 0;
+    padding-left: 20px;
+}
+.mod-credits {
+    max-width: 700px;
+    margin: 34px auto 0;
+    font-size: 15px;
+    color: var(--ink-soft);
+    text-align: center;
+}
+
+/* About › Team */
+.team-lead {
+    display: flex;
+    gap: 22px;
+    align-items: flex-start;
+    max-width: 760px;
+    margin: 0 auto;
+}
+.team-lead h2, .team-member h2 {
+    margin: 2px 0 8px;
+    font: 400 28px/1.15 var(--hand);
+}
+.team-lead h2 small, .team-member h2 small {
+    margin-left: 6px;
+    padding: 1px 8px 2px;
+    font: 700 13px/1.3 var(--sans);
+    vertical-align: 5px;
+    background: var(--gold);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.team-lead a {
+    color: var(--green-dark);
+    font-weight: 700;
+}
+.team-face {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 96px;
+    height: 96px;
+    overflow: hidden;
+    background: #c4b283;
+    border: 3px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 0 0 0 4px var(--wood), 0 0 0 7px var(--ink);
+    margin: 7px;
+}
+.team-face img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    image-rendering: pixelated;
+}
+.team-letter {
+    font: 400 48px/1 var(--hand);
+}
+/* his note on the AI, pinned under his card: paper, a nail, a bit crooked */
+.team-note {
+    position: relative;
+    max-width: 600px;
+    margin: 30px auto 46px;
+    padding: 24px 28px 22px;
+    background: var(--paper-light);
+    border-radius: 2px;
+    box-shadow: 0 4px 0 rgba(63, 39, 36, .25);
+    transform: rotate(-1deg);
+}
+.team-note::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: calc(50% - 7px);
+    width: 14px;
+    height: 14px;
+    background: var(--stud) center / 100% no-repeat;
+}
+.team-note h3 {
+    margin-bottom: 8px;
+    font: 400 26px/1.2 var(--hand);
+    text-align: center;
+}
+.team-note p + p {
+    margin-top: 8px;
+}
+.team-note p:last-child {
+    font-weight: 700;
+}
+.team-two {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+.team-member {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.team-member .team-face {
+    width: 76px;
+    height: 76px;
+    margin-bottom: 12px;
+}
+.team-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+.team-links .chip {
+    text-decoration: none;
+}
+@media (max-width: 760px) {
+    .mod-hero, .mod-features, .mod-two, .team-two {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .mod-hero {
+        gap: 18px;
+    }
+    .mod-film {
+        margin: 12px;
+    }
+    .mod-features .about-mode:nth-child(n+2) {
+        border-top: 2px solid var(--line);
+    }
+    .mod-fps {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .mod-fps div:nth-child(n) {
+        grid-column: auto;
+        border-top: 0;
+        border-left: 0;
+    }
+    .mod-fps div:nth-child(n+2) {
+        border-left: 2px solid var(--line);
+    }
+    .mod-fps dd {
+        font-size: 22px;
+    }
+    .team-lead {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .team-note {
+        padding-inline: 20px;
+    }
+    /* three tabs only: they can stay big */
+    .about-tabs .tab {
+        padding: 5px 16px 6px;
+        font-size: 19px;
+    }
+}
 .section-title {
     margin: 0 0 12px;
     font: 700 22px/1.2 var(--sans);
