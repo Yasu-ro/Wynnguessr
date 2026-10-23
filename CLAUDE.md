@@ -2013,8 +2013,10 @@ fan, sans rien voler).
     publique, l'accord d'un modérateur de Wynncraft et de vérifier ce que
     WynnLODGrabber permet. À trancher avant la mise en prod. La page dit
     « Not reviewed by a Wynncraft moderator yet » et ne prétend jamais à une
-    approbation. La vidéo actuelle « fait robot » (Yasuro) : à refaire sur le
-    banc d'essai du PC, puis remplacer `presentation/envol.mp4`.
+    approbation. **La vidéo** : la première « faisait robot » (Yasuro) ;
+    refaite le 2026-10-23 sur le banc d'essai du PC (18,9 s, gestes de joueur
+    et vrai curseur incrusté, en boucle), mise en place à sa demande.
+    L'ancienne est gardée en `presentation/envol-v1.mp4`.
   - **Team** : Yasuro (texte et note « Yes, I use AI » = ses mots, traduits ;
     ton relâché voulu, CSS compris), Joko (artiste) et Yulo (pub et réseaux).
     Pseudos seulement, jamais de vrais noms. Leurs réseaux : `TEAM_LINKS`
