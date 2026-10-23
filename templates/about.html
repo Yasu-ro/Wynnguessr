@@ -4,6 +4,14 @@
 
 {% block content %}
 {% set pin = "<svg width='26' height='40' viewBox='0 0 26 40' aria-hidden='true'><path d='M13 1.5C6.6 1.5 1.5 6.6 1.5 13c0 8.6 11.5 25 11.5 25s11.5-16.4 11.5-25C24.5 6.6 19.4 1.5 13 1.5z' fill='%s' stroke='black' stroke-width='2.5'/><circle cx='13' cy='13' r='4.5' fill='white'/></svg>" %}
+{# the socials, drawn in pixels like the rest of the site's things #}
+{% set social = {
+    'X': "<svg class='social' viewBox='0 0 9 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M0 0h1v1h-1zM8 0h1v1h-1zM0 1h2v1h-2zM7 1h1v1h-1zM1 2h2v1h-2zM6 2h1v1h-1zM2 3h2v1h-2zM5 3h1v1h-1zM3 4h2v1h-2zM3 5h1v1h-1zM5 5h2v1h-2zM2 6h1v1h-1zM6 6h2v1h-2zM1 7h1v1h-1zM7 7h2v1h-2zM0 8h1v1h-1zM8 8h1v1h-1z' fill='#3f2724'/></svg>",
+    'Twitch': "<svg class='social' viewBox='0 0 9 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h8v1h-8zM0 1h1v1h-1zM8 1h1v1h-1zM0 2h1v1h-1zM3 2h1v1h-1zM5 2h1v1h-1zM8 2h1v1h-1zM0 3h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h4v1h-4zM6 6h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM3 8h2v1h-2z' fill='#9146ff'/></svg>",
+    'YouTube': "<svg class='social' viewBox='0 0 10 7' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h8v1h-8zM0 1h4v1h-4zM5 1h5v1h-5zM0 2h4v1h-4zM6 2h4v1h-4zM0 3h4v1h-4zM7 3h3v1h-3zM0 4h4v1h-4zM6 4h4v1h-4zM0 5h4v1h-4zM5 5h5v1h-5zM1 6h8v1h-8z' fill='#ff0033'/><path d='M4 1h1v1h-1zM4 2h2v1h-2zM4 3h3v1h-3zM4 4h2v1h-2zM4 5h1v1h-1z' fill='#ffffff'/></svg>",
+    'Instagram': "<svg class='social' viewBox='0 0 9 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h7v1h-7zM0 1h1v1h-1zM8 1h1v1h-1zM0 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM0 3h1v1h-1zM3 3h3v1h-3zM8 3h1v1h-1zM0 4h1v1h-1zM3 4h1v1h-1zM5 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM3 5h3v1h-3zM8 5h1v1h-1zM0 6h1v1h-1zM8 6h1v1h-1zM0 7h1v1h-1zM8 7h1v1h-1zM1 8h7v1h-7z' fill='#d6297b'/></svg>",
+    'TikTok': "<svg class='social' viewBox='0 0 10 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M4 0h2v1h-2zM4 1h3v1h-3zM4 2h1v1h-1zM6 2h2v1h-2zM4 3h1v1h-1zM4 4h1v1h-1zM1 5h4v1h-4zM0 6h5v1h-5zM0 7h5v1h-5zM1 8h3v1h-3z' fill='#25f4ee'/><path d='M6 0h2v1h-2zM6 1h3v1h-3zM6 2h1v1h-1zM8 2h2v1h-2zM6 3h1v1h-1zM6 4h1v1h-1zM3 5h4v1h-4zM2 6h5v1h-5zM2 7h5v1h-5zM3 8h3v1h-3z' fill='#fe2c55'/><path d='M5 0h2v1h-2zM5 1h3v1h-3zM5 2h1v1h-1zM7 2h2v1h-2zM5 3h1v1h-1zM5 4h1v1h-1zM2 5h4v1h-4zM1 6h5v1h-5zM1 7h5v1h-5zM2 8h3v1h-3z' fill='#3f2724'/></svg>"
+} %}
 {# a (!) that tells more, on hover or on a tap (about.js) #}
 {% macro info(label) %}<span class="info"><button type="button" class="info-btn" aria-label="More about {{ label }}" aria-expanded="false">!</button><span class="info-tip" role="tooltip">{{ caller() }}</span></span>{% endmacro %}
     <h1 class="sign">About</h1>
@@ -256,8 +264,8 @@
                 <p>A young artist, still learning. We studied art together, and his drawing gets better every time. I want to give him all the visibility I can, so go show him some love!</p>
                 <p class="team-links">
                     {% for site, link in team_links.joko.items() %}
-                    {% if link %}<a class="chip small" href="{{ link }}" target="_blank" rel="noopener">{{ site }}</a>
-                    {% else %}<span class="chip small soon">{{ site }} <small>soon</small></span>{% endif %}
+                    {% if link %}<a class="chip small" href="{{ link }}" target="_blank" rel="noopener">{{ social[site] | safe }}{{ site }}</a>
+                    {% else %}<span class="chip small soon">{{ social[site] | safe }}{{ site }} <small>soon</small></span>{% endif %}
                     {% endfor %}
                 </p>
             </article>
@@ -267,8 +275,8 @@
                 <p>Makes the plans to advertise the project and get WynnGuessr out there, on every social network.</p>
                 <p class="team-links">
                     {% for site, link in team_links.yulo.items() %}
-                    {% if link %}<a class="chip small" href="{{ link }}" target="_blank" rel="noopener">{{ site }}</a>
-                    {% else %}<span class="chip small soon">{{ site }} <small>soon</small></span>{% endif %}
+                    {% if link %}<a class="chip small" href="{{ link }}" target="_blank" rel="noopener">{{ social[site] | safe }}{{ site }}</a>
+                    {% else %}<span class="chip small soon">{{ social[site] | safe }}{{ site }} <small>soon</small></span>{% endif %}
                     {% endfor %}
                 </p>
             </article>

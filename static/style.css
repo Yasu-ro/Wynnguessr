@@ -1346,7 +1346,12 @@ code {
     margin-top: 14px;
 }
 .team-links .chip {
+    gap: 6px;
     text-decoration: none;
+}
+.social {
+    width: 16px;
+    height: 16px;
 }
 @media (max-width: 760px) {
     .mod-hero, .mod-features, .mod-two, .team-two {

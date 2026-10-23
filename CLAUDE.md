@@ -2018,7 +2018,9 @@ fan, sans rien voler).
   - **Team** : Yasuro (texte et note « Yes, I use AI » = ses mots, traduits ;
     ton relâché voulu, CSS compris), Joko (artiste) et Yulo (pub et réseaux).
     Pseudos seulement, jamais de vrais noms. Leurs réseaux : `TEAM_LINKS`
-    d'`app.py`, `None` = « soon ». Avatars : la photo du compte 1 (Yasuro),
+    d'`app.py`, `None` = « soon » ; chacun a son icône en pixel art à nous
+    (couleur de la marque, `social` en tête d'`about.html`, dessinée depuis des
+    grilles de caractères : un nouveau réseau = une grille de plus). Avatars : la photo du compte 1 (Yasuro),
     une lettre pour les deux autres, en attendant ce que Joko proposera.
 - **Version** du site dans le pied de page (`VERSION` d'`app.py`, lien vers les
   commits du fork), demandée par Yasuro le 2026-10-18 : **+0.1 à chaque mise
