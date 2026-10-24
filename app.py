@@ -360,7 +360,7 @@ def about():
 
 @app.route("/mods")
 def mods():
-    return render_template('mods.html', discord = DISCORD, mod = mod_files(), mod_links = MOD_LINKS,
+    return render_template('mods.html', discord = DISCORD, mod = mod_files(), mod_links = MOD_LINKS if MOD_LINKS_LIVE else dict.fromkeys(MOD_LINKS),
                            pack_zip = MODPACK_ZIP, pack_links = MODPACK_LINKS)
 
 # Wynndle+, the mod (Mods › Wynndle+): its files stay in its own folder, out
@@ -368,7 +368,11 @@ def mods():
 # it), the film is in presentation/. The stores' pages, once they exist:
 # None shows "soon".
 MOD_DIR = '/data/wynndle-carte3d'
-MOD_LINKS = {'Modrinth': None, 'CurseForge': None}
+MOD_LINKS = {'Modrinth': 'https://modrinth.com/mod/wynndle-plus',
+             'CurseForge': 'https://www.curseforge.com/minecraft/mc-mods/wynndle'}
+# both pages wait for the stores' review: until both are approved, the buttons
+# stay "soon" (the links lead nowhere for the public)
+MOD_LINKS_LIVE = False
 # the Wynndle+ modpack (Mods › Modpack): the stores, and a .zip for anyone else
 MODPACK_LINKS = {'Modrinth': None, 'CurseForge': None}
 MODPACK_ZIP = None

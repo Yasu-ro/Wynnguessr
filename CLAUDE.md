@@ -2048,7 +2048,12 @@ fan, sans rien voler).
     téléchargent plus. « Fruma isn't on the map yet » est retiré : le sol de
     Fruma était caché par la mer du mod, corrigé en 0.9.0 (voir son
     `CLAUDE.md`). Modrinth et
-    CurseForge : `MOD_LINKS` d'`app.py`, `None` = « soon ». Le jar se
+    CurseForge : `MOD_LINKS` d'`app.py` (fiches envoyées en vérification le
+    2026-10-25) ; ils restent « soon » tant que `MOD_LINKS_LIVE` est faux,
+    à passer à vrai quand **les deux** fiches sont validées (demande de
+    Yasuro). La page CurseForge répond 403 aux robots : sa validation ne se
+    vérifie pas d'ici, Modrinth si (`api.modrinth.com/v2/project/wynndle-plus`,
+    404 avant). Le jar se
     télécharge **dès la bêta**, à la demande de Yasuro (« présente-le en
     jar »). **Wynncraft et Wynntils ont dit oui** pour ses mods (Yasuro,
     2026-10-24) ; **la page ne le dit pas**, elle les crédite avec leurs liens
