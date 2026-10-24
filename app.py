@@ -364,8 +364,9 @@ def mods():
                            pack_zip = MODPACK_ZIP, pack_links = MODPACK_LINKS)
 
 # Wynndle+, the mod (Mods › Wynndle+): its files stay in its own folder, out
-# of git (49 MB of map); the jar is the newest in distribution/, the film is
-# in presentation/. The stores' pages, once they exist: None shows "soon".
+# of git; the jar is the newest in distribution/ (49 MB: the map is inside
+# it), the film is in presentation/. The stores' pages, once they exist:
+# None shows "soon".
 MOD_DIR = '/data/wynndle-carte3d'
 MOD_LINKS = {'Modrinth': None, 'CurseForge': None}
 # the Wynndle+ modpack (Mods › Modpack): the stores, and a .zip for anyone else
@@ -392,7 +393,7 @@ def mod_files():
 
 @app.route("/mod/<name>")
 def mod_file(name):
-    if not name.endswith(('.jar', '.wdc', '.mp4')):
+    if not name.endswith(('.jar', '.mp4')):
         return ('', 404)
     folder = 'presentation' if name.endswith('.mp4') else 'distribution'
     return send_from_directory(os.path.join(MOD_DIR, folder), name, max_age = 3600, as_attachment = folder == 'distribution')

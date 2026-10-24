@@ -2037,10 +2037,17 @@ fan, sans rien voler).
     (dessiné comme celui de l'accueil, le « + » en vert), « a Wynntils
     add-on » dessous ; la carte 3D est présentée comme **sa première
     fonctionnalité** (Yasuro : « je pense pas que la map 3D sera le point
-    principal »). Ses fichiers ne sont **pas dans git** (49 Mo) : la route
-    `mod/<nom>` les sert depuis `MOD_DIR` (`.jar` et `.wdc` de
-    `distribution/`, le plus récent des jars ; la vidéo
-    `presentation/envol.mp4`, avec `?v=<date>` pour Cloudflare). Modrinth et
+    principal »). Ses fichiers ne sont **pas dans git** : la route
+    `mod/<nom>` les sert depuis `MOD_DIR` (le plus récent des jars de
+    `distribution/`, 49 Mo ; la vidéo `presentation/envol.mp4`, avec
+    `?v=<date>` pour Cloudflare). **Plus de bloc Install depuis la 0.9.0**
+    (2026-10-24, Yasuro : « can you not automate this to remove it ») : la
+    carte est dans le jar, un joueur n'installe que lui ; restent l'étiquette
+    « Needs Wynntils & Fabric API » et, en tête de Controls, la touche M avec
+    son (!) (la carte de Wynntils est aussi sur M). Les `.wdc` ne se
+    téléchargent plus. « Fruma isn't on the map yet » est retiré : le sol de
+    Fruma était caché par la mer du mod, corrigé en 0.9.0 (voir son
+    `CLAUDE.md`). Modrinth et
     CurseForge : `MOD_LINKS` d'`app.py`, `None` = « soon ». Le jar se
     télécharge **dès la bêta**, à la demande de Yasuro (« présente-le en
     jar »). **Wynncraft et Wynntils ont dit oui** pour ses mods (Yasuro,

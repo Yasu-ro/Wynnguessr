@@ -1416,14 +1416,15 @@ kbd {
 .mod-two p, .mod-two li {
     font-size: 16px;
 }
-.mod-steps {
-    margin: 12px 0 0;
-    padding-left: 22px;
+.mod-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
 }
-.mod-steps li + li, .mod-list li + li {
+.mod-list li + li {
     margin-top: 7px;
 }
-.mod-steps a, .mod-credits a, .mod-line a {
+.mod-credits a, .mod-line a {
     color: var(--green-dark);
     font-weight: 700;
 }
@@ -1432,10 +1433,6 @@ code {
     font-size: 14px;
     background: var(--paper-light);
     border-radius: 3px;
-}
-.mod-hint {
-    margin-top: 14px;
-    color: var(--ink-soft);
 }
 .mod-keys {
     margin: 0;

@@ -31,7 +31,7 @@
                 <h2 class="mod-name">Wynndle<span>+</span></h2>
                 <p class="mod-kind">a Wynntils add-on</p>
                 <p class="mod-line">More for Wynncraft, right inside Wynntils. The first feature: Wynncraft's map, in 3D.</p>
-                <p class="mod-facts"><span>Fabric mod</span><span>Minecraft 1.21.11</span><span>English &amp; French</span></p>
+                <p class="mod-facts"><span>Minecraft 1.21.11</span><span>Fabric</span><span>Needs Wynntils &amp; Fabric API</span><span>English &amp; French</span></p>
                 <div class="mod-get">
                     {% if mod %}
                     <a class="btn big" href="mod/{{ mod.jar }}" download>Download .jar</a>
@@ -91,23 +91,13 @@
             <div><dd>~140</dd><dt>fps in Max over the sky islands, the worst case</dt></div>
         </dl>
 
+        {# the map comes inside the jar: nothing to install but the jar (0.9.0) #}
         <div class="mod-two">
-            <section class="panel">
-                <h2>Install</h2>
-                <p class="mod-needs">Needs Minecraft 1.21.11, Fabric Loader 0.19+, Fabric API and Wynntils 4.2.
-                    {% call info('what it needs') %}<span>Tested with Wynntils 4.2.16.</span><span>Mod Menu is optional: it adds a Configure button.</span>{% endcall %}</p>
-                <ol class="mod-steps">
-                    <li>Put the <b>.jar</b> in your <code>mods</code> folder.</li>
-                    <li>Put <a href="mod/carte.wdc" download>carte.wdc</a> (12 MB, the map) in <code>config/wynndleplus</code>. Create the folder.
-                        {% call info('Max detail') %}<span>For Max detail, add <a href="mod/carte_max.wdc" download>carte_max.wdc</a> (37 MB) in the same folder. Without it, Max uses the normal map.</span>{% endcall %}</li>
-                    <li>In game, press <kbd>M</kbd>.
-                        {% call info('the M key') %}<span>Wynntils' own map is on <kbd>M</kbd> too: move one of them in Controls › Wynndle+. The Wynndle+ modpack puts Wynntils' map on the comma.</span>{% endcall %}</li>
-                </ol>
-                <p class="mod-hint">Nothing to install on the server: it works on Wynncraft as it is.</p>
-            </section>
             <section class="panel">
                 <h2>Controls</h2>
                 <dl class="mod-keys">
+                    <div><dt>Open</dt><dd><kbd>M</kbd>
+                        {% call info('the M key') %}<span>Wynntils' own map is on <kbd>M</kbd> too: move one of them in Controls › Wynndle+. The Wynndle+ modpack puts Wynntils' map on the comma.</span>{% endcall %}</dd></div>
                     <div><dt>Move</dt><dd>Drag</dd></div>
                     <div><dt>Turn</dt><dd>Right-click + drag</dd></div>
                     <div><dt>Zoom</dt><dd>Scroll</dd></div>
@@ -120,9 +110,7 @@
                     <div><dt>Close</dt><dd><kbd>M</kbd> or <kbd>Esc</kbd></dd></div>
                 </dl>
             </section>
-        </div>
-
-        <div class="mod-two">
+            <div class="mod-stack">
             <section class="panel">
                 <h2>Fair play</h2>
                 <p>Made around Wynncraft's mod rules
@@ -139,12 +127,12 @@
                 <h2>Good to know</h2>
                 <ul class="mod-list">
                     <li>The terrain is a snapshot: new builds show up when the map is rebuilt.</li>
-                    <li>Fruma isn't on the map yet.</li>
                     <li>No bank button: Wynntils' data has no banks.</li>
                     <li>"Open on last view" lasts until you close the game.</li>
                     <li>A Wynntils update can turn the icons off. The map keeps working.</li>
                 </ul>
             </section>
+            </div>
         </div>
 
         <p class="mod-credits">Thanks to <a href="https://wynntils.com" target="_blank" rel="noopener">Wynntils</a> (icons, waypoints, markers, player sharing; the mod needs it), <a href="https://github.com/DrBiznes/WynnLODGrabber" target="_blank" rel="noopener">WynnLODGrabber</a> by DrBiznes and <a href="https://modrinth.com/mod/distanthorizons" target="_blank" rel="noopener">Distant Horizons</a> (the terrain), and <a href="https://wynncraft.com" target="_blank" rel="noopener">Wynncraft</a> (the world itself).
