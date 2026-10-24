@@ -1,7 +1,9 @@
-// About: three tabs, each with its own address (about#mod, about#team), and
-// the (!) that tell more, on hover or on a tap
+// About and Mods: tabs, each with its own address (about#team, mods#modpack;
+// the one checked in the page needs none), and the (!) that tell more, on
+// hover or on a tap
 (function () {
     var tabs = document.querySelectorAll('[name=about-tab]');
+    var first = document.querySelector('[name=about-tab]:checked').value;
     var film = document.querySelector('.mod-film video');
     var still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -10,21 +12,21 @@
             t.checked = t.value === tab;
             document.getElementById('pane-' + t.value).hidden = t.value !== tab;
         });
-        // the film loads only when the Mod tab is opened; it never moves by
+        // the film loads only when its tab is opened; it never moves by
         // itself for those who asked for less motion
         if (film) {
-            if (tab !== 'mod') film.pause();
+            if (film.closest('.about-pane').hidden) film.pause();
             else if (still) film.controls = true;
             else film.play().catch(function () { film.controls = true; });
         }
     }
     function fromAddress() {
         var tab = location.hash.slice(1);
-        show(document.getElementById('tab-' + tab) ? tab : 'about');
+        show(document.getElementById('tab-' + tab) ? tab : first);
     }
     tabs.forEach(function (t) {
         t.addEventListener('change', function () {
-            history.replaceState(null, '', t.value === 'about' ? location.pathname + location.search : '#' + t.value);
+            history.replaceState(null, '', t.value === first ? location.pathname + location.search : '#' + t.value);
             show(t.value);
         });
     });

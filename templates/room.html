@@ -59,7 +59,7 @@
             {% else %}
             <form id="room-settings" class="room-column panel settings" onsubmit="return false">
                 <fieldset id="room-settings-fields" class="room-settings" disabled>
-{% with modes = [('classic', 'Classic'), ('duel', 'Duel'), ('survival', 'Survival')], friends = True %}{% include "modes.html" %}{% endwith %}
+{% with modes = [('classic', 'Classic'), ('survival', 'Survival')], friends = True %}{% include "modes.html" %}{% endwith %}
 {% include "settings.html" %}
 {% with friends = True %}{% include "difficulty.html" %}{% endwith %}
                 </fieldset>

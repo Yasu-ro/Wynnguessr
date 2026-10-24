@@ -119,6 +119,7 @@ button, input {
     height: 40px;
 }
 .nav-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -448,6 +449,24 @@ button, input {
     background: var(--red);
     border: 2px solid var(--ink);
     border-radius: 10px;
+}
+/* a new page in the menu: a red sticker stuck on the button's corner */
+.nav-new {
+    position: absolute;
+    top: -5px;
+    right: -11px;
+    padding: 3px 5px 3px 6px;
+    font: 700 12px/1 var(--sans);
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    -webkit-text-stroke: 0;
+    color: #fff;
+    background: var(--red) var(--facet) center / 100% 100% no-repeat;
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    transform: rotate(9deg);
+    pointer-events: none;
+    z-index: 1;   /* over the next button */
 }
 .mod-photos {
     display: grid;
@@ -930,10 +949,6 @@ button, input {
 .about-pins svg + svg {
     margin-left: -5px;
 }
-.about-art .room-hp {
-    width: 44px;
-    margin: 0;
-}
 .about-mode h3 {
     margin: 0 0 4px;
     font: 700 19px/1.2 var(--sans);
@@ -1001,6 +1016,195 @@ button, input {
 }
 .about-tabs {
     margin: -6px 0 34px;
+}
+
+/* About › Updates: the versions so far, this one, what comes next; each
+   column its own thing: a page of history, the sign of today, a note */
+.updates {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, .9fr);
+    gap: 30px;
+    align-items: start;
+}
+.version {
+    display: grid;
+    place-items: center;
+    flex: none;
+    min-width: 46px;
+    height: 32px;
+    padding: 0 6px;
+    font: 700 16px/1 var(--sans);
+    color: var(--ink);
+    background: var(--gold) var(--facet) center / 100% 100% no-repeat;
+    border: 3px solid var(--ink);
+    border-radius: 3px;
+}
+/* one rope runs down from version to version, behind their plates */
+.timeline {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.timeline li {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    padding-bottom: 18px;
+}
+.timeline li:last-child {
+    padding-bottom: 0;
+}
+.timeline li::before {
+    content: "";
+    position: absolute;
+    top: 16px;
+    bottom: -16px;
+    left: 19px;
+    z-index: 0;
+    width: 8px;
+    background: repeating-linear-gradient(-50deg, var(--rope) 0 5px, var(--rope-dark) 5px 8px);
+    border: solid var(--ink);
+    border-width: 0 2px;
+}
+.timeline li:last-child::before {
+    display: none;
+}
+.timeline .version {
+    position: relative;
+    z-index: 1;
+}
+/* the small versions: a smaller wooden plate on the same rope */
+.timeline li:not(.major) .version {
+    min-width: 38px;
+    height: 26px;
+    margin: 3px 4px 0;
+    font-size: 14px;
+    color: #fff;
+    background-color: var(--wood-light);
+    border-width: 2px;
+}
+.timeline h3 {
+    margin: 4px 0 2px;
+    font: 700 18px/1.2 var(--sans);
+}
+.timeline h3 small {
+    display: inline-block;
+    margin-left: 4px;
+    white-space: nowrap;
+    padding: 1px 6px 2px;
+    font-size: 13px;
+    vertical-align: 2px;
+    background: var(--paper-light);
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+}
+.timeline time {
+    display: block;
+    font-size: 14px;
+    color: var(--ink-soft);
+}
+.timeline li:not(.major) time {
+    margin-top: 4px;
+}
+.timeline p {
+    margin-top: 4px;
+    font-size: 16px;
+}
+.timeline a, .updates-list a {
+    color: var(--green-dark);
+    font-weight: 700;
+}
+.timeline a {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 15px;
+}
+/* today: a sign of its own, as big as the version it shows */
+.updates-now {
+    padding: 18px 22px 22px;
+    background: var(--stud) left 6px top 6px / 12px no-repeat, var(--stud) right 6px top 6px / 12px no-repeat,
+                var(--stud) left 6px bottom 6px / 12px no-repeat, var(--stud) right 6px bottom 6px / 12px no-repeat,
+                var(--sign);
+    border: 3px solid var(--ink);
+    border-radius: 3px;
+    box-shadow: 0 0 0 7px var(--wood), 0 0 0 10px var(--ink), 0 6px 0 10px rgba(0, 0, 0, .28);
+}
+.updates-now h2 {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    font: 400 30px/1 var(--hand);
+}
+.updates-now h2 .version {
+    min-width: 62px;
+    height: 42px;
+    font-size: 22px;
+}
+.updates-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.updates-list li {
+    position: relative;
+    padding-left: 22px;
+    font-size: 16px;
+}
+.updates-list li + li {
+    margin-top: 9px;
+}
+/* in today's version: a green square, done; in the note: an empty box */
+.updates-list li::before {
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    background: #55ff55;
+    border: 2px solid var(--ink);
+    border-radius: 2px;
+}
+.updates-next .updates-list li::before {
+    top: 4px;
+    width: 12px;
+    height: 12px;
+    background: var(--paper-light);
+}
+/* what comes next: a note pinned to the page, like Yasuro's on the AI */
+.updates-next {
+    position: relative;
+    padding: 28px 24px 22px;
+    background: var(--paper-light);
+    border-radius: 2px;
+    box-shadow: 0 4px 0 rgba(63, 39, 36, .25);
+    transform: rotate(1.2deg);
+}
+.updates-next::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    left: calc(50% - 7px);
+    width: 14px;
+    height: 14px;
+    background: var(--stud) center / 100% no-repeat;
+}
+.updates-next h2 {
+    margin-bottom: 14px;
+    font: 400 28px/1.1 var(--hand);
+    text-align: center;
+}
+@media (max-width: 860px) {
+    .updates {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 40px;
+    }
+    .updates-now, .updates-next {
+        width: min(520px, calc(100% - 20px));
+        margin: 0 auto;
+    }
 }
 
 /* a (!) that tells more: a gold coin, and a Minecraft tooltip under it */
@@ -1083,7 +1287,8 @@ kbd {
     box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18);
 }
 
-/* About › Mod: the 3D map */
+/* Mods › Wynndle+ (the mod, and its first feature, the 3D map) and
+   Mods › Modpack */
 .mod-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
@@ -1103,9 +1308,22 @@ kbd {
     height: 100%;
     object-fit: cover;
 }
-.mod-intro .about-title {
-    margin-bottom: 10px;
-    text-align: left;
+/* the name, drawn like the site's own on the home page */
+.mod-name {
+    font: italic 700 clamp(46px, 6vw, 66px)/1.05 var(--sans);
+    letter-spacing: -.01em;
+    color: #fff;
+    overflow-wrap: anywhere;
+    text-shadow: 3px 0 0 var(--ink), -3px 0 0 var(--ink), 0 3px 0 var(--ink), 0 -3px 0 var(--ink),
+                 2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink),
+                 0 7px 0 var(--ink), 0 10px 0 rgba(0, 0, 0, .2);
+}
+.mod-name span {
+    color: var(--green);
+}
+.mod-kind {
+    margin: 8px 0 12px;
+    font: 400 24px/1.2 var(--hand);
 }
 .mod-line {
     font-size: 18px;
@@ -1156,11 +1374,18 @@ kbd {
     font-size: 15px;
     color: var(--ink-soft);
 }
+.mod-feature {
+    margin-bottom: 44px;
+}
+.mod-feature-line {
+    max-width: 640px;
+    margin: -4px auto 8px;
+    text-align: center;
+}
 .mod-features {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0 30px;
-    margin-bottom: 44px;
 }
 .mod-features .about-mode + .about-mode {
     border-top: 0;
@@ -1198,7 +1423,7 @@ kbd {
 .mod-steps li + li, .mod-list li + li {
     margin-top: 7px;
 }
-.mod-steps a, .mod-credits a {
+.mod-steps a, .mod-credits a, .mod-line a {
     color: var(--green-dark);
     font-weight: 700;
 }
@@ -1240,6 +1465,18 @@ code {
     font-size: 15px;
     color: var(--ink-soft);
     text-align: center;
+}
+
+.pack-intro {
+    max-width: 680px;
+    margin: 10px auto 20px;
+    text-align: center;
+}
+.pack-intro .mod-name {
+    margin-bottom: 22px;
+}
+.pack-intro .mod-facts, .pack-intro .mod-get {
+    justify-content: center;
 }
 
 /* About › Team */
@@ -4702,6 +4939,13 @@ body.room-playing {
     .nav-btn span, .pill span {
         display: none;
     }
+    .nav-new {
+        top: -6px;
+        right: -13px;
+        padding: 2px 3px 2px 4px;
+        font-size: 10px;
+        letter-spacing: .02em;
+    }
     .nav-btn {
         padding: 0 9px;
     }
@@ -4924,6 +5168,15 @@ body.room-playing {
     #score-container #next-button {
         min-width: 0;
         width: 90%;
+    }
+}
+/* a phone, with the staff's seven buttons (Mods since 3.0): a little closer */
+@media (max-width: 480px) {
+    .nav-btn {
+        padding: 0 6px;
+    }
+    .nav-btn, .pill {
+        margin: 0 3px;
     }
 }
 

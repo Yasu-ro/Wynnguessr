@@ -356,16 +356,24 @@ def about():
             'locations': one(f"SELECT COUNT(*) FROM locations WHERE review IN {PLAYABLE}"),
         }
     return render_template('about.html', discord = DISCORD, stats = stats, server = discord_counts(),
-                           mod = mod_files(), mod_links = MOD_LINKS, team_links = TEAM_LINKS)
+                           team_links = TEAM_LINKS)
 
-# The 3D map mod (About › Mod): its files stay in its own folder, out of git
-# (49 MB of map); the jar is the newest in distribution/, the film is in
-# presentation/. The stores' pages, once they exist: None shows "soon".
+@app.route("/mods")
+def mods():
+    return render_template('mods.html', discord = DISCORD, mod = mod_files(), mod_links = MOD_LINKS,
+                           pack_zip = MODPACK_ZIP, pack_links = MODPACK_LINKS)
+
+# Wynndle+, the mod (Mods › Wynndle+): its files stay in its own folder, out
+# of git (49 MB of map); the jar is the newest in distribution/, the film is
+# in presentation/. The stores' pages, once they exist: None shows "soon".
 MOD_DIR = '/data/wynndle-carte3d'
 MOD_LINKS = {'Modrinth': None, 'CurseForge': None}
+# the Wynndle+ modpack (Mods › Modpack): the stores, and a .zip for anyone else
+MODPACK_LINKS = {'Modrinth': None, 'CurseForge': None}
+MODPACK_ZIP = None
 # the team's socials (About › Team), filled in once they give them
 TEAM_LINKS = {
-    'joko': {'Instagram': None, 'TikTok': None, 'X': None},
+    'joko': {'Instagram': 'https://www.instagram.com/jockoart', 'ArtStation': 'https://www.artstation.com/adamessalhi7'},
     'yulo': {'X': 'https://x.com/yuloooo_', 'Twitch': 'https://www.twitch.tv/yuloooo_',
              'YouTube': 'https://www.youtube.com/@yulofx'},
 }
@@ -1243,18 +1251,18 @@ def apology():
 # A room is a fixed list of locations, played live by everyone who joins before
 # the end: same round at the same time, the round closes once all have guessed
 # (or the clock runs out) and the next one starts by itself after the reveal.
-# Modes: classic (most points after N rounds), duel (health points, the
-# gap to the round's best guess hurts, more and more each round), survival
-# (the solo rules together, plus a shop: see "Survival with friends") and,
-# replaced by survival but still replayed for the games played with it,
-# royale (lives: the worst guess of a round loses one, a bullseye wins one back).
+# Modes: classic (most points after N rounds), survival (the solo rules
+# together, plus a shop: see "Survival with friends") and, no longer offered
+# but still replayed for the games played with them, duel (health points, the
+# gap to the round's best guess hurts, more and more each round) and royale
+# (lives: the worst guess of a round loses one, a bullseye wins one back).
 # Anyone opening a finished classic room plays the same locations alone and
 # lands in the same ranking. Rooms only move forward when someone asks: every
 # room request first runs tick().
 
 PROVINCES = ['wynn', 'gavel', 'corkus', 'ocean', 'silent-expanse', 'fruma']
 ROUNDS = ['3', '5', '10', '25']
-MODES = ['classic', 'duel', 'survival']   # royale: no new games
+MODES = ['classic', 'survival']   # duel, royale: no new games
 LAST_CALL = 15   # once someone guessed, the others have this long
 REVEAL = 10      # the answer stays on screen this long before the next round
 AWAY = 10        # a page that stopped polling this long is shown away

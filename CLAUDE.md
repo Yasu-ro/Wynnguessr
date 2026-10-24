@@ -457,7 +457,14 @@ notre propre liaison, par « Log in with Wynncraft ».
 ## Modes de jeu
 
 Classic par défaut (le jeu d'origine). Solo : Classic, **Survival**. Salons :
-Classic, **Duel**, **Battle Royale**. Constantes en tête de la section salons.
+Classic, **Survival**. Constantes en tête de la section salons.
+
+- **Duel retiré le 2026-10-24** (Yasuro : « dégage-le de partout ») : plus
+  aucune nouvelle partie (`MODES`), plus rien dans les menus ni les textes
+  (Create a Room, réglages du salon, accueil, About). Comme Battle Royale
+  avant lui, ses **anciennes parties restent lisibles** (historique des
+  profils, salons finis) : son moteur et `room.js` le gardent pour elles.
+  Il sera refait plus tard (« refaire Duel »).
 
 - **Survival** (solo, `game.js`) : rester à < 500 blocs (`SURVIVAL`) ; score =
   série. **Enregistré dès la fin de partie** (`saveIfOver`), pas au clic sur
@@ -933,8 +940,8 @@ Grosse mise à jour voulue par Yasuro avant de refaire Duel : jouer en ligne
     l'effet) : l'ordre met déjà en premier la carte où des joueurs
     attendent, c'était « cliquer la première carte » avec moins d'info.
   - **Décisions** : classement Classic **carte entière seulement** (filtre
-    des provinces retiré : « unclutter the page ») ; **Duel reste en Custom**
-    pour l'instant (sa refonte d'abord).
+    des provinces retiré : « unclutter the page ») ; Duel restait en Custom
+    (retiré partout le 2026-10-24, voir « Modes de jeu »).
 - **Phase 3 faite sur la bêta (2026-10-18)** — section « Multiplayer:
   worlds » d'`app.py`, page `multiplayer`, `multiplayer.js`, lobby du salon :
   - Un monde = un salon `rooms.world` (type), **sans hôte**, réglages de la
@@ -1930,7 +1937,7 @@ fan, sans rien voler).
   pour retoucher un dessin, modifier le script et recoller sa sortie dans
   `:root`. `solo.py` et `room.py` (Playwright) jouent une partie solo de 3
   manches et un salon à deux invités `zz_` (`room.py <url> <préfixe>
-  classic|duel|royale [largeur hauteur]`) et photographient chaque écran.
+  classic|survival [largeur hauteur]`) et photographient chaque écran.
   `xpsolo.py` (un compte `zz_` vise juste en solo, puis photographie la barre
   d'XP qui se remplit ; la page ne connaît plus la réponse : 6e argument =
   chemin de la base, pour viser) et `xproom.py` (deux comptes `zz_`, deux salons gagnés
@@ -1971,9 +1978,9 @@ fan, sans rien voler).
   part, carré vert d'un serveur allumé), puis Visitors, Player accounts,
   Games played, Guesses, Locations sur une bande de papier ; « Game Modes »
   en deux panneaux (On Your Own : Survival « main mode », Classic ; With
-  Friends : Survival, Classic, Duel), chaque mode montré par ses propres
+  Friends : Survival, Classic), chaque mode montré par ses propres
   objets dans une case comme celles du marchand (cœur, épingles, potion et
-  émeraude, barre de vie), son but en vert ; le Discord avec ses membres et
+  émeraude), son but en vert ; le Discord avec ses membres et
   ses connectés (invitation publique `?with_counts=true`, relue toutes les
   10 min). **Visiteurs** : `visitors` (un identifiant au hasard dans la
   session, écrit une fois par minute au plus, robots exclus), compté **depuis
@@ -1998,35 +2005,70 @@ fan, sans rien voler).
 - `about` (onglet About, 2026-10-18) : un seul panneau, le Discord du projet
   (`DISCORD` dans `app.py`). Le texte reprend les mots de Yasuro (« garder ma
   touche ») ; ne rien y ajouter sans lui demander.
-- **Page About en trois onglets** (2026-10-23, demande de Yasuro) : **Mod ·
-  About · Team**, About au milieu et ouvert par défaut ; chaque onglet a son
-  adresse (`about#mod`, `about#team`, `static/js/about.js`). Les détails sont
-  derrière des **(!)** (pièce d'or, infobulle façon Minecraft, au survol ou au
-  toucher, repoussée du bord de l'écran) : le texte visible reste court.
-  - **Mod** : la Carte 3D Wynndle (`/data/wynndle-carte3d/`). Ses fichiers ne
-    sont **pas dans git** (49 Mo) : la route `mod/<nom>` les sert depuis
-    `MOD_DIR` (`.jar` et `.wdc` de `distribution/`, le plus récent des jars ;
-    la vidéo `presentation/envol.mp4`, avec `?v=<date>` pour Cloudflare).
-    Modrinth et CurseForge : `MOD_LINKS` d'`app.py`, `None` = « soon ».
-    Le jar se télécharge **dès la bêta**, à la demande de Yasuro (« présente-le
-    en jar »), alors que le `CLAUDE.md` du mod demande, avant toute diffusion
-    publique, l'accord d'un modérateur de Wynncraft et de vérifier ce que
-    WynnLODGrabber permet. À trancher avant la mise en prod. La page dit
-    « Not reviewed by a Wynncraft moderator yet » et ne prétend jamais à une
-    approbation. **La vidéo** : la première « faisait robot » (Yasuro) ;
+- **Page About en trois onglets** (2026-10-23, demande de Yasuro ; revue le
+  2026-10-24) : **Updates · About · Team**, About au milieu et ouvert par
+  défaut ; chaque onglet a son adresse (`about#updates`, `about#team`,
+  `static/js/about.js` : l'onglet coché dans la page n'en a pas, le même
+  script sert la page Mods).
+  - **Updates** (2026-10-24, demande de Yasuro : « à gauche le passé, au
+    milieu le présent, à droite le futur ») : *Past* (une ligne par version
+    sur une corde, les grandes 1.0 et 2.0 avec titre et ce qu'elles ont
+    apporté, les petites 2.1 à 2.3 dessous ; 1.0 = Ched3, crédité avec le
+    lien de son GitHub), *Now* (la version en ligne, sur une enseigne
+    cloutée, ses grands ajouts) et *Next up* (une note épinglée, **sans
+    dates**, à la demande de Yasuro). Trois formes différentes exprès, pas
+    trois cartes pareilles. Contenu écrit dans `about.html` : **à chaque mise
+    en prod, passer la version de Now dans Past** (avec sa date) et remplir
+    Now. Next up vient de Yasuro (Lootrun, d'autres modes, classement par
+    semaine/mois/toujours, Realm of Light, nouveautés de Wynndle+) : n'y
+    rien ajouter sans lui.
+- **Page Mods** (2026-10-24, demande de Yasuro : le mod sort d'About et
+  rejoint le menu du haut, avec « un gros NEW ») : bouton **Mods** entre
+  Leaderboard et About, avec l'autocollant rouge `.nav-new` sur son coin
+  (seul ce bouton l'a). Deux onglets, **Wynndle+ · Modpack** (`mods#modpack`).
+  Les détails sont derrière des **(!)** (pièce d'or, infobulle façon
+  Minecraft, au survol ou au toucher, repoussée du bord de l'écran) : le
+  texte visible reste court.
+  - **Menu sur téléphone** : avec Mods, un membre de l'équipe a sept
+    boutons ; à 375 px Logout sortait de l'écran (31 px de trop, le menu ne
+    défile pas). Sous 480 px, les boutons sont un peu plus serrés.
+  - **Wynndle+** : le mod de `/data/wynndle-carte3d/` (ex-« Carte 3D
+    Wynndle », renommé le 2026-10-24, voir son `CLAUDE.md`). Son nom en gros
+    (dessiné comme celui de l'accueil, le « + » en vert), « a Wynntils
+    add-on » dessous ; la carte 3D est présentée comme **sa première
+    fonctionnalité** (Yasuro : « je pense pas que la map 3D sera le point
+    principal »). Ses fichiers ne sont **pas dans git** (49 Mo) : la route
+    `mod/<nom>` les sert depuis `MOD_DIR` (`.jar` et `.wdc` de
+    `distribution/`, le plus récent des jars ; la vidéo
+    `presentation/envol.mp4`, avec `?v=<date>` pour Cloudflare). Modrinth et
+    CurseForge : `MOD_LINKS` d'`app.py`, `None` = « soon ». Le jar se
+    télécharge **dès la bêta**, à la demande de Yasuro (« présente-le en
+    jar »). **Wynncraft et Wynntils ont dit oui** pour ses mods (Yasuro,
+    2026-10-24) ; **la page ne le dit pas**, elle les crédite avec leurs liens
+    (son choix : « je pense que ça ferait trop »). Ne jamais écrire
+    d'approbation. **La vidéo** : la première « faisait robot » (Yasuro) ;
     refaite le 2026-10-23 sur le banc d'essai du PC (18,9 s, gestes de joueur
     et vrai curseur incrusté, en boucle), mise en place à sa demande.
     L'ancienne est gardée en `presentation/envol-v1.mp4`.
-  - **Team** : Yasuro (texte et note « Yes, I use AI » = ses mots, traduits ;
-    ton relâché voulu, CSS compris), Joko (artiste) et Yulo (pub et réseaux).
-    Pseudos seulement, jamais de vrais noms. Leurs réseaux : `TEAM_LINKS`
-    d'`app.py`, `None` = « soon » ; chacun a son icône en pixel art à nous
+  - **Modpack** : le modpack Wynndle+ (l'instance Prism de Yasuro, sur son
+    PC). Ses mots, traduits : la meilleure façon de jouer à Wynncraft à son
+    goût, et qui changera au goût de la communauté (lien vers le Discord).
+    Modrinth, CurseForge (`MODPACK_LINKS`) et un .zip (`MODPACK_ZIP`) :
+    `None` = « soon » tant qu'ils n'existent pas.
+  - **Team** (onglet d'About) : Yasuro (texte et note « Yes, I use AI » = ses
+    mots, traduits ; ton relâché voulu, CSS compris ; « Nobody needs to
+    teach me any of that » retiré à sa demande le 2026-10-24), Joko
+    (artiste : Instagram et ArtStation, ses seuls liens ; ceux qu'il n'a pas
+    ne s'affichent pas, même en « soon ») et Yulo (pub et réseaux ; « get
+    Wynndle out there »). Pseudos seulement, jamais de vrais noms. Leurs
+    réseaux : `TEAM_LINKS` d'`app.py`, `None` = « soon » ; chacun a son icône
+    en pixel art à nous
     (couleur de la marque, `social` en tête d'`about.html`, dessinée depuis des
     grilles de caractères : un nouveau réseau = une grille de plus). Avatars : la photo du compte 1 (Yasuro),
     une lettre pour les deux autres, en attendant ce que Joko proposera.
 - **Version** du site dans le pied de page (`VERSION` d'`app.py`, lien vers les
   commits du fork), demandée par Yasuro le 2026-10-18 : **+0.1 à chaque mise
-  en prod**. Reconstituée : 1.0 le jeu de Ched3, 2.0 la nouvelle DA
+  en prod** (et l'onglet About › Updates à tenir avec elle). Reconstituée : 1.0 le jeu de Ched3, 2.0 la nouvelle DA
   (2026-10-17), 2.1 profils, sons et Survival refait, 2.2 Survival à
   plusieurs, 2.3 About, place au classement, carte des liens de salon,
   onglets endormis (2026-10-18).

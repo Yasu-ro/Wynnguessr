@@ -10,150 +10,83 @@
     'Twitch': "<svg class='social' viewBox='0 0 9 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h8v1h-8zM0 1h1v1h-1zM8 1h1v1h-1zM0 2h1v1h-1zM3 2h1v1h-1zM5 2h1v1h-1zM8 2h1v1h-1zM0 3h1v1h-1zM3 3h1v1h-1zM5 3h1v1h-1zM8 3h1v1h-1zM0 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM7 5h1v1h-1zM0 6h4v1h-4zM6 6h1v1h-1zM3 7h1v1h-1zM5 7h1v1h-1zM3 8h2v1h-2z' fill='#9146ff'/></svg>",
     'YouTube': "<svg class='social' viewBox='0 0 10 7' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h8v1h-8zM0 1h4v1h-4zM5 1h5v1h-5zM0 2h4v1h-4zM6 2h4v1h-4zM0 3h4v1h-4zM7 3h3v1h-3zM0 4h4v1h-4zM6 4h4v1h-4zM0 5h4v1h-4zM5 5h5v1h-5zM1 6h8v1h-8z' fill='#ff0033'/><path d='M4 1h1v1h-1zM4 2h2v1h-2zM4 3h3v1h-3zM4 4h2v1h-2zM4 5h1v1h-1z' fill='#ffffff'/></svg>",
     'Instagram': "<svg class='social' viewBox='0 0 9 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M1 0h7v1h-7zM0 1h1v1h-1zM8 1h1v1h-1zM0 2h1v1h-1zM6 2h1v1h-1zM8 2h1v1h-1zM0 3h1v1h-1zM3 3h3v1h-3zM8 3h1v1h-1zM0 4h1v1h-1zM3 4h1v1h-1zM5 4h1v1h-1zM8 4h1v1h-1zM0 5h1v1h-1zM3 5h3v1h-3zM8 5h1v1h-1zM0 6h1v1h-1zM8 6h1v1h-1zM0 7h1v1h-1zM8 7h1v1h-1zM1 8h7v1h-7z' fill='#d6297b'/></svg>",
+    'ArtStation': "<svg class='social' viewBox='0 0 11 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M5 0h2v1h-2zM5 1h3v1h-3zM3 2h1v1h-1zM6 2h2v1h-2zM2 3h3v1h-3zM6 3h3v1h-3zM1 4h4v1h-4zM7 4h3v1h-3zM1 5h5v1h-5zM8 5h2v1h-2zM8 6h3v1h-3zM0 7h7v1h-7zM9 7h2v1h-2zM1 8h7v1h-7z' fill='#13aff0'/></svg>",
     'TikTok': "<svg class='social' viewBox='0 0 10 9' shape-rendering='crispEdges' aria-hidden='true'><path d='M4 0h2v1h-2zM4 1h3v1h-3zM4 2h1v1h-1zM6 2h2v1h-2zM4 3h1v1h-1zM4 4h1v1h-1zM1 5h4v1h-4zM0 6h5v1h-5zM0 7h5v1h-5zM1 8h3v1h-3z' fill='#25f4ee'/><path d='M6 0h2v1h-2zM6 1h3v1h-3zM6 2h1v1h-1zM8 2h2v1h-2zM6 3h1v1h-1zM6 4h1v1h-1zM3 5h4v1h-4zM2 6h5v1h-5zM2 7h5v1h-5zM3 8h3v1h-3z' fill='#fe2c55'/><path d='M5 0h2v1h-2zM5 1h3v1h-3zM5 2h1v1h-1zM7 2h2v1h-2zM5 3h1v1h-1zM5 4h1v1h-1zM2 5h4v1h-4zM1 6h5v1h-5zM1 7h5v1h-5zM2 8h3v1h-3z' fill='#3f2724'/></svg>"
 } %}
-{# a (!) that tells more, on hover or on a tap (about.js) #}
-{% macro info(label) %}<span class="info"><button type="button" class="info-btn" aria-label="More about {{ label }}" aria-expanded="false">!</button><span class="info-tip" role="tooltip">{{ caller() }}</span></span>{% endmacro %}
     <h1 class="sign">About</h1>
 
-    {# three tabs, About in the middle; each has its own address (about#mod) #}
+    {# three tabs, About in the middle; each has its own address (about#updates) #}
     <div class="tabs about-tabs" id="about-tabs">
-        <input type="radio" name="about-tab" id="tab-mod" value="mod">
-        <label for="tab-mod" class="tab">Mod</label>
+        <input type="radio" name="about-tab" id="tab-updates" value="updates">
+        <label for="tab-updates" class="tab">Updates</label>
         <input type="radio" name="about-tab" id="tab-about" value="about" checked>
         <label for="tab-about" class="tab">About</label>
         <input type="radio" name="about-tab" id="tab-team" value="team">
         <label for="tab-team" class="tab">Team</label>
     </div>
 
-    {# ---------- Mod: the 3D map ---------- #}
-    <section class="about-pane" id="pane-mod" hidden>
-        <div class="mod-hero">
-            {% if mod and mod.film %}
-            <div class="mod-film"><video src="{{ mod.film }}" muted loop playsinline preload="none" aria-label="The camera flies up from a player into the 3D map, over Detlas"></video></div>
-            {% endif %}
-            <div class="mod-intro">
-                <h2 class="about-title">Wynndle 3D Map</h2>
-                <p class="mod-line">Wynncraft's map, in 3D. Press <kbd>M</kbd> and the camera flies up into a block-by-block relief of the province, in its true colours, with everything from Wynntils' map on top.</p>
-                <p class="mod-facts"><span>Fabric mod</span><span>Minecraft 1.21.11</span><span>Wynntils add-on</span><span>English &amp; French</span></p>
-                <div class="mod-get">
-                    {% if mod %}
-                    <a class="btn big" href="mod/{{ mod.jar }}" download>Download .jar</a>
-                    {% endif %}
-                    {% for store, link in mod_links.items() %}
-                    {% if link %}<a class="btn wood" href="{{ link }}" target="_blank" rel="noopener">{{ store }}</a>
-                    {% else %}<span class="btn wood soon">{{ store }} <small>soon</small></span>{% endif %}
-                    {% endfor %}
-                </div>
-                <p class="mod-preview">{% if mod %}Preview {{ mod.version }}. {% endif %}Not reviewed by a Wynncraft moderator yet.
-                    {% call info('the preview') %}Wynndle 3D Map is still a preview: it works, but nobody from Wynncraft's staff has looked at it yet. It was built around their mod rules, see "Fair play" below.{% endcall %}</p>
-            </div>
-        </div>
-
-        <h2 class="about-title">What it does</h2>
-        <div class="panel mod-features">
-            <article class="about-mode">
-                <span class="about-art"><svg viewBox="0 0 12 10" shape-rendering="crispEdges" aria-hidden="true"><path d="M0 7h3v3H0zM3 4h3v6H3zM6 1h3v9H6zM9 5h3v5H9z" fill="#8b5a2b"/><path d="M0 7h3v1H0zM3 4h3v1H3zM6 1h3v1H6zM9 5h3v1H9z" fill="#6aa13a"/><path d="M6 6h3v1H6zM3 8h3v1H3z" fill="#7a7a72"/></svg></span>
-                <div>
-                    <h3>The relief</h3>
-                    <p>The whole of Wynntils' map, rebuilt block by block, in true colours with Minecraft's shading and fog. Bridges, tree tops and the sky islands float; cliffs show their sides.
-                        {% call info('the relief') %}<b class="tip-name">Three detail levels, switched live</b><span>Low: big cells of 8 blocks.</span><span>Medium: a point every 2 blocks.</span><span>Max: every single block, and you can zoom closer.</span><span class="tip-text">A dark outline marks every edge, so it stays readable at any zoom.</span>{% endcall %}</p>
-                </div>
-            </article>
-            <article class="about-mode">
-                <span class="about-art">{{ (pin | format('#ffd75e')) | safe }}</span>
-                <div>
-                    <h3>Everything from Wynntils</h3>
-                    <p>Places, travel, services, merchants, dungeons, caves, loot chests, your waypoints and markers. Wynntils draws them itself, so they look and work just like on its 2D map.
-                        {% call info('the icons') %}<b class="tip-name">12 kinds of icons</b><span>Show or hide each kind from the left bar.</span><span>Hover an icon to see how far it is; the ground under your cursor gives its X, Z.</span><span>Buttons at the top find the nearest blacksmith, identifier or potion merchant.</span><span>A heatmap shows where to gather: mining, woodcutting, farming and fishing, by level.</span>{% endcall %}</p>
-                </div>
-            </article>
-            <article class="about-mode">
-                <span class="about-art about-pins">{{ (pin | format('#4363d8')) | safe }}{{ (pin | format('#3cb44b')) | safe }}</span>
-                <div>
-                    <h3>Party &amp; friends</h3>
-                    <p>See where your party and friends are, how far away, and near which place. Click someone to fly there, right-click to follow them with a marker.
-                        {% call info('party and friends') %}<span>Only players who use Wynntils and share their location show up.</span><span>Optional beams in their colour, visible in game even with the map closed (on Wynncraft only).</span>{% endcall %}</p>
-                </div>
-            </article>
-            <article class="about-mode">
-                <span class="about-art"><svg viewBox="0 0 12 12" shape-rendering="crispEdges" aria-hidden="true"><path d="M5 0h2v2h2V1h1v1h1v1h-1v2h2v2h-2v2h1v1h-1v1H9v-1H7v2H5v-2H3v1H2v-1H1V9h1V7H0V5h2V3H1V2h1V1h1v1h2zM5 4v1H4v2h1v1h2V7h1V5H7V4z" fill="#9b9b93" stroke="#3f2724" stroke-width=".6"/></svg></span>
-                <div>
-                    <h3>Your way</h3>
-                    <p>21 settings, from the gear button or Mod Menu: the opening flight, the controls, the detail, the icons, the fog, the sounds.
-                        {% call info('the settings') %}<b class="tip-name">Opening</b><span>Flight on or off and its speed, north up, open on you or on your last view, starting zoom and tilt (down to straight from above).</span><b class="tip-name">Controls</b><span>Rotation and zoom speed, zoom toward the cursor, invert scroll, smoothing.</span><b class="tip-name">Display</b><span>Detail, icon size, fog, outlines, coordinates, nearest-service buttons, heatmap opacity, sounds.</span><b class="tip-name">Party &amp; friends</b><span>In-game beams, for the party only or for friends too.</span>{% endcall %}</p>
-                </div>
-            </article>
-        </div>
-
-        <h2 class="about-title">Light on your PC</h2>
-        <p class="mod-text">While the map is open, the world isn't drawn at all, so it often runs faster than the game itself.
-            {% call info('performance') %}<span>Measured on the test PC at 1600×900. With Photon shaders, the game went from about 240 fps to 700 to 1,300 fps with the map open.</span><span class="tip-text">Max uses about 220 MB of RAM and up to about 530 MB of video memory. Low and Medium use far less (96 and 192 MB of video memory).</span>{% endcall %}</p>
-        <dl class="about-numbers mod-fps">
-            <div><dd>~360</dd><dt>fps in Medium</dt></div>
-            <div><dd>~350</dd><dt>fps in Max over Detlas</dt></div>
-            <div><dd>~140</dd><dt>fps in Max over the sky islands, the worst case</dt></div>
-        </dl>
-
-        <div class="mod-two">
-            <section class="panel">
-                <h2>Install</h2>
-                <p class="mod-needs">Needs Minecraft 1.21.11, Fabric Loader 0.19+, Fabric API and Wynntils 4.2.
-                    {% call info('what it needs') %}<span>Tested with Wynntils 4.2.16.</span><span>Mod Menu is optional: it adds a Configure button.</span>{% endcall %}</p>
-                <ol class="mod-steps">
-                    <li>Put the <b>.jar</b> in your <code>mods</code> folder.</li>
-                    <li>Put <a href="mod/carte.wdc" download>carte.wdc</a> (12 MB, the map) in <code>config/wynndle_carte3d</code>. Create the folder.
-                        {% call info('Max detail') %}<span>For Max detail, add <a href="mod/carte_max.wdc" download>carte_max.wdc</a> (37 MB) in the same folder. Without it, Max uses the normal map.</span>{% endcall %}</li>
-                    <li>In game, press <kbd>M</kbd>.
-                        {% call info('the M key') %}<span>Wynntils' own map is on <kbd>M</kbd> too: move one of them in Controls › Wynndle 3D Map. The Wynndle modpack puts Wynntils' map on the comma.</span>{% endcall %}</li>
+    {# ---------- Updates: the versions so far, this one, what comes next ---------- #}
+    <section class="about-pane" id="pane-updates" hidden>
+        <div class="updates">
+            <section class="panel updates-past">
+                <h2>Past</h2>
+                <ol class="timeline">
+                    <li class="major">
+                        <b class="version">1.0</b>
+                        <div>
+                            <h3>WynnGuessr <small>by Ched3</small></h3>
+                            <time>2024</time>
+                            <p>The original game: a place somewhere in Wynncraft, and a pin on the map to guess where it is.</p>
+                            <a href="https://github.com/Ched3/Wynnguessr" target="_blank" rel="noopener">Ched3's game on GitHub</a>
+                        </div>
+                    </li>
+                    <li class="major">
+                        <b class="version">2.0</b>
+                        <div>
+                            <h3>Picked up by Yasuro</h3>
+                            <time datetime="2026-10-17">Oct 17, 2026</time>
+                            <p>Rooms to play with friends, Log in with Wynncraft, the 2026 map with Fruma, levels and win streaks, and a whole new look.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <b class="version">2.1</b>
+                        <div><time datetime="2026-10-18">Oct 18, 2026</time><p>Profiles, sounds, and Survival remade.</p></div>
+                    </li>
+                    <li>
+                        <b class="version">2.2</b>
+                        <div><time datetime="2026-10-18">Oct 18, 2026</time><p>Survival with friends, and the Potion Merchant.</p></div>
+                    </li>
+                    <li>
+                        <b class="version">2.3</b>
+                        <div><time datetime="2026-10-18">Oct 18, 2026</time><p>This About page, and your own place on the leaderboard.</p></div>
+                    </li>
                 </ol>
-                <p class="mod-hint">Nothing to install on the server: it works on Wynncraft as it is.</p>
             </section>
-            <section class="panel">
-                <h2>Controls</h2>
-                <dl class="mod-keys">
-                    <div><dt>Move</dt><dd>Drag</dd></div>
-                    <div><dt>Turn</dt><dd>Right-click + drag</dd></div>
-                    <div><dt>Zoom</dt><dd>Scroll</dd></div>
-                    <div><dt>Marker on an icon</dt><dd>Click it</dd></div>
-                    <div><dt>Mark a spot</dt><dd>Middle-click</dd></div>
-                    <div><dt>New or edit waypoint</dt><dd><kbd>Shift</kbd> + middle-click</dd></div>
-                    <div><dt>Delete waypoint</dt><dd><kbd>Alt</kbd> + middle-click</dd></div>
-                    <div><dt>Back to you</dt><dd>Right-click or <kbd>Space</kbd></dd></div>
-                    <div><dt>North up</dt><dd>Click the compass</dd></div>
-                    <div><dt>Close</dt><dd><kbd>M</kbd> or <kbd>Esc</kbd></dd></div>
-                </dl>
-            </section>
-        </div>
 
-        <div class="mod-two">
-            <section class="panel">
-                <h2>Fair play</h2>
-                <p>Made around Wynncraft's mod rules
-                    {% call info('the rules') %}<span>Forum thread <a href="https://forums.wynncraft.com/threads/111874/" target="_blank" rel="noopener">111874</a>.</span><span class="tip-text">Not reviewed by a Wynncraft moderator yet.</span>{% endcall %}</p>
-                <ul class="mod-list">
-                    <li>No freecam: the game camera never moves.</li>
-                    <li>No cave maps: caves and closed rooms stay solid.</li>
-                    <li>Nothing outside the official map.</li>
-                    <li>No radar: no mobs, no loot alerts.</li>
-                    <li>Players only come from Wynntils' own sharing.</li>
+            <section class="updates-now">
+                <h2><b class="version">3.0</b> Now</h2>
+                <ul class="updates-list">
+                    <li><b>Multiplayer:</b> public games, no code needed.</li>
+                    <li><b><a href="mods">Wynndle+</a>:</b> our own mod, and soon a modpack.</li>
+                    <li><b>Ghosts:</b> fall in Survival with friends and keep playing, potions included.</li>
+                    <li><b>8 themes</b> for the site, in Edit Profile.</li>
+                    <li><b>Moderation:</b> a team, reports and a safer chat.</li>
+                    <li><b>Our Discord bot:</b> verify your Wynncraft account.</li>
+                    <li><b>A compass</b>, a faster map, and a Contact page.</li>
                 </ul>
             </section>
-            <section class="panel">
-                <h2>Good to know</h2>
-                <ul class="mod-list">
-                    <li>The terrain is a snapshot: new builds show up when the map is rebuilt.</li>
-                    <li>Fruma isn't on the map yet.</li>
-                    <li>No bank button: Wynntils' data has no banks.</li>
-                    <li>"Open on last view" lasts until you close the game.</li>
-                    <li>A Wynntils update can turn the icons off. The map keeps working.</li>
+
+            <section class="updates-next">
+                <h2>Next up</h2>
+                <ul class="updates-list">
+                    <li>Lootrun mode</li>
+                    <li>More game modes</li>
+                    <li>The leaderboard by week, by month or of all time</li>
+                    <li>The Realm of Light</li>
+                    <li>More Wynndle+ features</li>
                 </ul>
             </section>
         </div>
-
-        <p class="mod-credits">Thanks to <b>Wynntils</b> (icons, waypoints, markers, player sharing; the mod needs it), <b>WynnLODGrabber</b> by DrBiznes and <b>Distant Horizons</b> (the terrain), and <b>Wynncraft</b> (the world itself).
-            {% call info('how it is made') %}<span>The terrain comes from the Distant Horizons LOD pack published by WynnLODGrabber (release LOD-04-19-26).</span><span>Our server pulls out the surface, the sides of the blocks and the underside of floating things, then takes the colours from the block textures.</span>{% endcall %}
-            <br>Not affiliated with or endorsed by Wynncraft or Wynntils.</p>
     </section>
 
     {# ---------- About: the site in numbers, its game modes, the Discord ---------- #}
@@ -216,14 +149,6 @@
                     <p class="about-goal">Most points at the end wins.</p>
                 </div>
             </article>
-            <article class="about-mode">
-                <span class="about-art"><span class="room-hp"><span style="width: 62%"></span></span></span>
-                <div>
-                    <h3>Duel</h3>
-                    <p>Everyone starts with 6,000 health. Each round you lose the gap between your guess and the best one, and it hurts more as the game goes on.</p>
-                    <p class="about-goal">Be the last one alive.</p>
-                </div>
-            </article>
             <a class="btn wide" href="mode?play=friends">Play With Friends</a>
         </section>
     </div>
@@ -253,7 +178,7 @@
         <aside class="team-note">
             <h3>Yes, I use AI</h3>
             <p>Mostly as a tool. It exists, and it would be sad not to use it: it makes building things way faster, and it catches what a human eye can miss, especially when it comes to security.</p>
-            <p>I can read code, I can write code, I've been at it for 5 years. Nobody needs to teach me any of that.</p>
+            <p>I can read code, I can write code, I've been at it for 5 years.</p>
             <p>But I'll be honest: I absolutely suck at CSS. That's where AI saves me the most.</p>
         </aside>
 
@@ -272,7 +197,7 @@
             <article class="panel team-member">
                 <span class="team-face team-letter" aria-hidden="true">Y</span>
                 <h2>Yulo <small>ads &amp; socials</small></h2>
-                <p>Makes the plans to advertise the project and get WynnGuessr out there, on every social network.</p>
+                <p>Makes the plans to advertise the project and get Wynndle out there, on every social network.</p>
                 <p class="team-links">
                     {% for site, link in team_links.yulo.items() %}
                     {% if link %}<a class="chip small" href="{{ link }}" target="_blank" rel="noopener">{{ social[site] | safe }}{{ site }}</a>
