@@ -1045,6 +1045,15 @@ button, input {
     padding: 0;
     list-style: none;
 }
+/* the history grows with every version: a fixed height, scrolled inside,
+   so the page stays as tall as today's sign */
+.updates-past .timeline {
+    height: 412px;
+    overflow-y: auto;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--wood) transparent;
+}
 .timeline li {
     position: relative;
     display: flex;

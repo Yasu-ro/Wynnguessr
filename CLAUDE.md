@@ -2012,9 +2012,11 @@ fan, sans rien voler).
   script sert la page Mods).
   - **Updates** (2026-10-24, demande de Yasuro : « à gauche le passé, au
     milieu le présent, à droite le futur ») : *Past* (une ligne par version
-    sur une corde, les grandes 1.0 et 2.0 avec titre et ce qu'elles ont
-    apporté, les petites 2.1 à 2.3 dessous ; 1.0 = Ched3, crédité avec le
-    lien de son GitHub), *Now* (la version en ligne, sur une enseigne
+    sur une corde, **la plus récente en haut** (2026-10-25, demande de
+    Yasuro), les grandes 1.0 et 2.0 avec titre et ce qu'elles ont apporté ;
+    1.0 = Ched3, crédité avec le lien de son GitHub ; **hauteur fixe**, la
+    liste défile à l'intérieur pour que la colonne ne dépasse pas l'enseigne
+    Now : si Now change de taille, réajuster `.updates-past .timeline`), *Now* (la version en ligne, sur une enseigne
     cloutée, ses grands ajouts) et *Next up* (une note épinglée, **sans
     dates**, à la demande de Yasuro). Trois formes différentes exprès, pas
     trois cartes pareilles. Contenu écrit dans `about.html` : **à chaque mise
