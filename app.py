@@ -1749,7 +1749,8 @@ def solo_state(c, game):
         if game['deadline']:
             out['time_left'] = max(0, game['deadline'] - time.time())
         return out
-    guesses = [dict(g) for g in c.execute("""SELECT g.round, g.x, g.z, g.distance, g.score, l.x_position AS X, l.z_position AS Z
+    # sqlite3.Row looks names up case-insensitively, so dict(g) would give X/Z the guess's x/z
+    guesses = [dict(zip(g.keys(), g)) for g in c.execute("""SELECT g.round, g.x, g.z, g.distance, g.score, l.x_position AS X, l.z_position AS Z
             FROM solo_guesses g JOIN locations l ON l.location_id = g.location_id WHERE g.game_id = ? ORDER BY g.round""", (game['id'],))]
     out['result'] = guesses[-1] if guesses else None
     if game['phase'] == 'over':
